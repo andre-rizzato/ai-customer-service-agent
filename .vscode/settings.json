@@ -1,0 +1,19 @@
+{
+  // Usa o TypeScript instalado em node_modules (a versão travada no
+  // package-lock.json) para checagem de tipos e IntelliSense no editor —
+  // evita divergência entre o que o editor mostra como erro e o que
+  // "npm run typecheck" realmente reporta, caso o VS Code tenha uma versão
+  // global de TypeScript diferente.
+  "typescript.tsdk": "node_modules/typescript/lib",
+
+  // Habilita o auto-attach do debugger do Node: qualquer `node`/`tsx`
+  // rodado no terminal integrado do VS Code (ex.: `npm run dev`,
+  // `npm run simulate`) já sobe com o debugger anexado automaticamente,
+  // sem precisar configurar um launch.json específico para esse caso.
+  "debug.javascript.autoAttachFilter": "smart",
+
+  // Todo arquivo novo criado neste workspace usa quebra de linha LF — evita
+  // os avisos de "LF will be replaced by CRLF" do Git ao commitar em
+  // ambiente Windows.
+  "files.eol": "\n"
+}

@@ -1,0 +1,110 @@
+{
+  // Configurações de debug do VS Code para este projeto. Todas usam
+  // "node" + "--import tsx" em vez de compilar antes (npm run build) —
+  // o tsx transpila TypeScript on-the-fly, então dá para colocar
+  // breakpoint em qualquer arquivo .ts e rodar direto, sem passo de build.
+  // Requer Node 20.6+ (o --import de hooks ESM é estável a partir daí);
+  // o ambiente de desenvolvimento deste projeto usa Node 22.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // Debuga o servidor HTTP (webhooks de Telegram/WhatsApp/web) — o
+      // mesmo processo que "npm run dev" sobe, mas anexado ao debugger.
+      "type": "node",
+      "request": "launch",
+      "name": "Debug: Server",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--import", "tsx"],
+      "program": "${workspaceFolder}/src/server.ts",
+      // Carrega o .env do projeto no processo de debug — o próprio
+      // src/config.ts já faz `import "dotenv/config"`, então isto é
+      // redundante mas inofensivo, e ajuda ferramentas que leem
+      // process.env antes do import rodar.
+      "envFile": "${workspaceFolder}/.env",
+      // Ignora o código interno do Node e das dependências ao dar "step
+      // into" — só entra em código deste projeto.
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      // Reinicia automaticamente o debug se o processo cair (ex.: erro de
+      // configuração) — evita ter que apertar F5 de novo depois de corrigir.
+      "restart": false
+    },
+    {
+      // Debuga o chat de simulação no terminal (Fase 5 do runbook: testar
+      // sem precisar de Telegram/WhatsApp). PRECISA de "integratedTerminal"
+      // porque o script lê da stdin interativamente — no "internalConsole"
+      // do VS Code não dá para digitar respostas.
+      "type": "node",
+      "request": "launch",
+      "name": "Debug: Simulate (chat CLI)",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--import", "tsx"],
+      "program": "${workspaceFolder}/scripts/simulate.ts",
+      "envFile": "${workspaceFolder}/.env",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    },
+    {
+      // Debuga o script de indexação da base de conhecimento (Fase 3:
+      // Catalogar + Indexar) — útil para inspecionar os embeddings gerados
+      // ou diagnosticar por que um item não está sendo recuperado depois.
+      "type": "node",
+      "request": "launch",
+      "name": "Debug: Ingest knowledge base",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--import", "tsx"],
+      "program": "${workspaceFolder}/src/knowledge/ingest.ts",
+      "envFile": "${workspaceFolder}/.env",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    },
+    {
+      // Debuga só o arquivo de teste que estiver aberto/focado no editor
+      // (${relativeFile}) — mais rápido que rodar a suíte inteira quando
+      // você está iterando em um teste específico.
+      "type": "node",
+      "request": "launch",
+      "name": "Debug: Current Test File (Vitest)",
+      "runtimeExecutable": "node",
+      "program": "${workspaceFolder}/node_modules/vitest/vitest.mjs",
+      "args": ["run", "${relativeFile}"],
+      "envFile": "${workspaceFolder}/.env",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      // Necessário porque o Vitest roda os testes em worker
+      // threads/processos filhos por padrão — sem isto, breakpoints dentro
+      // dos arquivos de teste (rodando no worker) não seriam atingidos.
+      "autoAttachChildProcesses": true
+    },
+    {
+      // Debuga a suíte de testes inteira (equivalente a "npm test").
+      "type": "node",
+      "request": "launch",
+      "name": "Debug: All Tests (Vitest)",
+      "runtimeExecutable": "node",
+      "program": "${workspaceFolder}/node_modules/vitest/vitest.mjs",
+      "args": ["run"],
+      "envFile": "${workspaceFolder}/.env",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "autoAttachChildProcesses": true
+    },
+    {
+      // Anexa o debugger a um processo Node já em execução com
+      // --inspect/--inspect-brk (ex.: um `node --inspect --import tsx
+      // src/server.ts` rodado manualmente no terminal, ou um processo em
+      // produção/staging exposto temporariamente para diagnóstico).
+      "type": "node",
+      "request": "attach",
+      "name": "Attach: Running process (port 9229)",
+      "port": 9229,
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "restart": true
+    }
+  ]
+}
