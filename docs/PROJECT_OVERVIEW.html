@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Agente de Atendimento IA — Documentação Geral</title>
+<style>
+  @page { size: A4; margin: 22mm 18mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    color: #1a1a1a;
+    font-size: 10.5pt;
+    line-height: 1.5;
+  }
+  h1, h2, h3, h4 { color: #0f172a; page-break-after: avoid; }
+  h1 { font-size: 22pt; margin-bottom: 2mm; }
+  h2 {
+    font-size: 15pt; margin-top: 10mm; padding-bottom: 2mm;
+    border-bottom: 2px solid #2563eb;
+  }
+  h3 { font-size: 12pt; margin-top: 6mm; color: #1e3a8a; }
+  h4 { font-size: 10.5pt; margin-top: 4mm; }
+  p { margin: 2mm 0; }
+  code, pre {
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 9pt;
+  }
+  code {
+    background: #f1f5f9; padding: 0.5pt 3pt; border-radius: 3pt;
+    color: #b91c1c;
+  }
+  pre {
+    background: #0f172a; color: #e2e8f0; padding: 4mm;
+    border-radius: 3pt; line-height: 1.4;
+    white-space: pre-wrap; word-break: break-word;
+    page-break-inside: avoid;
+  }
+  pre code { background: none; color: inherit; padding: 0; }
+  table {
+    width: 100%; border-collapse: collapse; margin: 3mm 0;
+    font-size: 9.5pt; page-break-inside: avoid;
+  }
+  th, td { border: 1px solid #cbd5e1; padding: 2mm 3mm; text-align: left; vertical-align: top; }
+  th { background: #eff6ff; color: #1e3a8a; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  .cover {
+    height: 245mm; display: flex; flex-direction: column;
+    justify-content: center; page-break-after: always;
+  }
+  .cover .eyebrow {
+    color: #2563eb; font-weight: 600; letter-spacing: 1.5pt;
+    text-transform: uppercase; font-size: 10pt; margin-bottom: 4mm;
+  }
+  .cover h1 { font-size: 30pt; max-width: 130mm; }
+  .cover .sub { font-size: 12pt; color: #475569; max-width: 130mm; margin-top: 4mm; }
+  .cover .meta { margin-top: 14mm; font-size: 9.5pt; color: #64748b; }
+  .cover .meta div { margin: 1mm 0; }
+  .badge-row { display: flex; gap: 4mm; margin-top: 8mm; flex-wrap: wrap; }
+  .badge {
+    background: #eff6ff; color: #1e3a8a; border: 1px solid #bfdbfe;
+    border-radius: 20pt; padding: 2mm 5mm; font-size: 9pt; font-weight: 600;
+  }
+  .callout {
+    border-left: 4pt solid #2563eb; background: #eff6ff;
+    padding: 3mm 5mm; margin: 4mm 0; border-radius: 2pt;
+    page-break-inside: avoid;
+  }
+  .callout.warn { border-left-color: #d97706; background: #fffbeb; }
+  .callout strong { display: block; margin-bottom: 1mm; color: #0f172a; }
+  .grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; margin: 4mm 0;
+  }
+  .card {
+    border: 1px solid #cbd5e1; border-radius: 3pt; padding: 4mm;
+    page-break-inside: avoid;
+  }
+  .card .title { font-weight: 700; color: #1e3a8a; margin-bottom: 1mm; }
+  .flow {
+    background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 3pt;
+    padding: 4mm 5mm; font-family: "Consolas", monospace; font-size: 9pt;
+    white-space: pre; line-height: 1.6; page-break-inside: avoid;
+  }
+  .toc { page-break-after: always; }
+  .toc ol { padding-left: 6mm; }
+  .toc li { margin: 2mm 0; font-size: 11pt; }
+  .toc a { color: #1e3a8a; text-decoration: none; }
+  footer.pagefoot {
+    margin-top: 10mm; padding-top: 3mm; border-top: 1px solid #cbd5e1;
+    font-size: 8pt; color: #94a3b8;
+  }
+  section { page-break-inside: avoid; }
+  ul, ol { margin: 2mm 0; padding-left: 6mm; }
+  li { margin: 1mm 0; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="eyebrow">Documentação de Projeto</div>
+  <h1>Agente de Atendimento IA</h1>
+  <div class="sub">Arquitetura, componentes e decisões de design de um agente de atendimento por IA agnóstico de canal — Telegram, WhatsApp (Meta Cloud API) ou qualquer webhook — com RAG, handoff para humano e auditoria de conversas.</div>
+  <div class="badge-row">
+    <span class="badge">Node.js + TypeScript</span>
+    <span class="badge">Claude / OpenAI</span>
+    <span class="badge">Voyage AI Embeddings</span>
+    <span class="badge">Telegram · WhatsApp · Web</span>
+  </div>
+  <div class="meta">
+    <div>Repositório: github.com/andre-rizzato/ai-customer-service-agent</div>
+    <div>Versão do documento: 1.0 — Setembro/2026</div>
+  </div>
+</div>
+
+<div class="toc">
+<h2>Sumário</h2>
+<ol>
+  <li><a href="#visao-geral">Visão geral e origem</a></li>
+  <li><a href="#arquitetura">Arquitetura</a></li>
+  <li><a href="#fluxo">Fluxo de uma mensagem</a></li>
+  <li><a href="#componentes">Componentes e responsabilidades</a></li>
+  <li><a href="#estrutura">Estrutura de pastas</a></li>
+  <li><a href="#config">Configuração (negócio vs. ambiente)</a></li>
+  <li><a href="#rag">Base de conhecimento e RAG</a></li>
+  <li><a href="#handoff">Handoff para humano</a></li>
+  <li><a href="#canais">Canais suportados</a></li>
+  <li><a href="#testes">Testes</a></li>
+  <li><a href="#extensao">Como estender o projeto</a></li>
+</ol>
+</div>
+
+<section id="visao-geral">
+<h2>1. Visão geral e origem</h2>
+<p>Este projeto implementa, em código, o runbook <em>"Agente de atendimento por IA no WhatsApp, do zero à produção"</em> — mas de forma <strong>agnóstica de canal</strong>. A ideia central do runbook original é replicável para qualquer plataforma de mensagens: uma base de conhecimento fechada (o agente nunca inventa specs, preços ou prazos), transparência total quando perguntado se é uma IA, e um handoff limpo para um atendente humano quando a conversa sai do escopo.</p>
+<p>Em vez de acoplar essa lógica ao WhatsApp, o projeto isola tudo que é específico de plataforma atrás de uma interface (<code>ChannelAdapter</code>), e tudo que é regra de negócio (RAG, prompt, handoff, log) em um <strong>Orchestrator</strong> único e compartilhado. O resultado: o mesmo comportamento de atendimento funciona hoje no Telegram e no WhatsApp, e amanhã em qualquer outro canal que implemente a mesma interface.</p>
+<div class="callout">
+  <strong>Por que isso importa</strong>
+  Se o objetivo é oferecer isso como serviço para múltiplos clientes/negócios, cada um pode rodar sua própria instância com seu próprio catálogo, tom de voz e canal preferido — sem duplicar nem uma linha da lógica de atendimento.
+</div>
+</section>
+
+<section id="arquitetura">
+<h2>2. Arquitetura</h2>
+<p>Cinco peças, cada uma isolada atrás de uma interface própria — trocar a implementação de qualquer uma não exige mudanças nas outras:</p>
+<div class="grid">
+  <div class="card"><div class="title">1 · Canal (ChannelAdapter)</div>Recebe o webhook da plataforma, normaliza para <code>InboundMessage</code>, envia a resposta de volta. Implementações: Telegram, WhatsApp Cloud API, Web (REST simples para testes).</div>
+  <div class="card"><div class="title">2 · Orquestrador</div>Pipeline central: rate limit → gatilho de handoff → RAG → prompt → LLM → log. Não sabe de onde a mensagem veio nem para onde a resposta vai.</div>
+  <div class="card"><div class="title">3 · LLM (LLMProvider)</div>Gera a resposta em linguagem natural a partir do contexto recuperado — nunca da memória própria do modelo. Implementações: Anthropic (Claude), OpenAI.</div>
+  <div class="card"><div class="title">4 · Base de conhecimento (RAG)</div>Catálogo, specs, políticas, preços — indexados como embeddings em um vector store local. Implementações de embedding: Voyage AI (padrão), OpenAI, local (offline).</div>
+  <div class="card"><div class="title">5 · Handoff (HandoffNotifier)</div>Regra de transferência + histórico anexado. Implementações: console (dev), webhook (Slack/Discord/custom).</div>
+</div>
+</section>
+
+<section id="fluxo">
+<h2>3. Fluxo de uma mensagem</h2>
+<p>Implementado em <code>src/orchestrator/orchestrator.ts</code>, método <code>handleMessage()</code> — o mesmo caminho para qualquer canal:</p>
+<div class="flow">Mensagem chega (Telegram / WhatsApp / Web)
+        │
+        ▼
+ChannelAdapter normaliza → InboundMessage
+        │
+        ▼
+1. Rate limiter (por conversa)
+        │
+        ▼
+2. Gatilho de handoff? (palavra-chave / frustração)
+        ├─ Sim → HandoffNotifier avisa humano c/ histórico
+        │         responde "vou te conectar" → FIM
+        └─ Não → continua
+        │
+        ▼
+3. Busca RAG (embeddings + cosine similarity, top-K, corte de relevância)
+        │
+        ▼
+4. Monta system prompt (3 regras fixas + contexto + tom de voz)
+        │
+        ▼
+5. Chama o LLM (Claude ou OpenAI)
+        │
+        ▼
+6. Grava turno no histórico + log de auditoria (JSONL)
+        │
+        ▼
+ChannelAdapter envia a resposta de volta</div>
+</section>
+
+<section id="componentes">
+<h2>4. Componentes e responsabilidades</h2>
+<table>
+<thead><tr><th>Peça</th><th>Arquivo</th><th>Responsabilidade única</th></tr></thead>
+<tbody>
+<tr><td>Orchestrator</td><td><code>src/orchestrator/orchestrator.ts</code></td><td>Coordena o pipeline completo; único ponto de entrada (<code>handleMessage</code>) usado por todo canal.</td></tr>
+<tr><td>Detector de handoff</td><td><code>src/orchestrator/handoff.ts</code></td><td>Classifica a mensagem como pedido explícito, frustração, ou nenhum gatilho — por palavra-chave configurável.</td></tr>
+<tr><td>Prompt builder</td><td><code>src/orchestrator/promptBuilder.ts</code></td><td>Monta o system prompt com as 3 regras fixas + contexto recuperado.</td></tr>
+<tr><td>Rate limiter</td><td><code>src/orchestrator/rateLimiter.ts</code></td><td>Janela fixa de mensagens por conversa, evita custo descontrolado em loop.</td></tr>
+<tr><td>ConversationStore</td><td><code>src/conversation/store.ts</code></td><td>Histórico por conversa (JSON) + log de auditoria append-only (JSONL).</td></tr>
+<tr><td>KnowledgeBase</td><td><code>src/knowledge/knowledgeBase.ts</code></td><td>Busca semântica com corte de relevância mínima ("regra de vazio").</td></tr>
+<tr><td>FileVectorStore</td><td><code>src/knowledge/vectorStore.ts</code></td><td>Índice vetorial em arquivo JSON, similaridade de cosseno por força bruta.</td></tr>
+<tr><td>Ingest</td><td><code>src/knowledge/ingest.ts</code></td><td>Script CLI que lê o catálogo e popula o vector store (<code>npm run ingest</code>).</td></tr>
+<tr><td>LLMProvider</td><td><code>src/llm/*</code></td><td>Interface + implementações Anthropic/OpenAI, escolhidas por <code>LLM_PROVIDER</code>.</td></tr>
+<tr><td>EmbeddingProvider</td><td><code>src/embeddings/*</code></td><td>Interface + implementações Voyage/OpenAI/local, escolhidas por <code>EMBEDDING_PROVIDER</code>.</td></tr>
+<tr><td>HandoffNotifier</td><td><code>src/handoffNotifier/*</code></td><td>Interface + implementações console/webhook, escolhidas por <code>handoffNotifier</code> no config.</td></tr>
+<tr><td>ChannelAdapter</td><td><code>src/channels/*</code></td><td>Interface + implementações Telegram/WhatsApp/Web.</td></tr>
+<tr><td>Server</td><td><code>src/server.ts</code></td><td>Sobe o Express, monta um Orchestrator e uma rota <code>/webhook/&lt;canal&gt;</code> por adapter habilitado.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="estrutura">
+<h2>5. Estrutura de pastas</h2>
+<pre><code>.
+├── config/
+│   └── agent.config.example.json   # nome do negócio, tom, gatilhos de handoff
+├── knowledge/
+│   └── catalog.example.json        # catálogo (produtos/serviços/políticas)
+├── src/
+│   ├── channels/                   # Telegram, WhatsApp, Web
+│   ├── conversation/                # histórico + log de auditoria
+│   ├── embeddings/                  # Voyage, OpenAI, local
+│   ├── handoffNotifier/             # console, webhook
+│   ├── knowledge/                   # vector store, ingest, busca
+│   ├── llm/                         # Anthropic, OpenAI
+│   ├── orchestrator/                # pipeline central
+│   ├── config.ts                    # carga e validação (.env + agent.config.json)
+│   ├── server.ts                    # entrypoint HTTP
+│   └── types.ts                     # tipos compartilhados
+├── scripts/simulate.ts             # chat de teste via terminal
+├── tests/                          # suíte automatizada (Vitest)
+├── .vscode/launch.json             # configs de debug
+└── .env.example                    # template de variáveis de ambiente
+</code></pre>
+</section>
+
+<section id="config">
+<h2>6. Configuração: negócio vs. ambiente</h2>
+<p>O projeto separa deliberadamente dois tipos de configuração, cada um com seu próprio arquivo e propósito:</p>
+<table>
+<thead><tr><th></th><th><code>config/agent.config.json</code></th><th><code>.env</code></th></tr></thead>
+<tbody>
+<tr><td>Natureza</td><td>Configuração do negócio</td><td>Segredos e ambiente de execução</td></tr>
+<tr><td>Exemplos</td><td>Nome do negócio, tom de voz, palavras de handoff, top-K do RAG</td><td>Chaves de API, tokens de canal, portas, caminhos de dados</td></tr>
+<tr><td>Versionamento</td><td>Pode ser versionado por cliente/negócio</td><td>Nunca commitado (.gitignore)</td></tr>
+<tr><td>Quem define</td><td>O negócio, na Fase 0 (briefing)</td><td>Quem opera a infraestrutura</td></tr>
+</tbody>
+</table>
+<p>Os dois são carregados e validados (com <code>zod</code>) uma única vez, em <code>src/config.ts</code>, na inicialização do processo — qualquer campo ausente ou mal formatado falha imediatamente, com mensagem clara, em vez de quebrar silenciosamente no meio de uma conversa.</p>
+</section>
+
+<section id="rag">
+<h2>7. Base de conhecimento e RAG</h2>
+<p>Cada linha do catálogo (<code>knowledge/catalog.example.json</code>) representa um produto, serviço ou política, no formato:</p>
+<pre><code>{ "id": "filtro-fx200", "title": "Filtro FX200", "content": "specs, preço, garantia, FAQ..." }</code></pre>
+<p>O script <code>npm run ingest</code> lê esse catálogo, gera um embedding por item (via Voyage/OpenAI/local) e grava tudo em <code>data/vector-store.json</code>. Em tempo de resposta, a pergunta do usuário também vira um embedding e é comparada por similaridade de cosseno contra cada item — os <code>topK</code> mais similares acima de <code>minRelevanceScore</code> entram no prompt.</p>
+<div class="callout warn">
+  <strong>Regra de vazio</strong>
+  Se nenhum item passar no corte de relevância, o prompt informa explicitamente "nenhum trecho relevante encontrado" — é isso que permite à regra fixa nº 1 instruir o modelo a admitir que não sabe, em vez de inventar uma resposta.
+</div>
+</section>
+
+<section id="handoff">
+<h2>8. Handoff para humano</h2>
+<p>Roda <strong>antes</strong> da busca RAG e da chamada ao LLM (mais barato e mais previsível que deixar o próprio modelo decidir). Dois gatilhos, configuráveis em <code>agent.config.json</code>:</p>
+<ul>
+  <li><strong>Pedido explícito</strong> — lista <code>handoffKeywords</code> (ex.: "falar com atendente").</li>
+  <li><strong>Frustração</strong> — lista <code>frustrationKeywords</code> (ex.: "péssimo", "não aguento").</li>
+</ul>
+<p>Quando dispara, o <code>HandoffNotifier</code> configurado recebe o histórico completo da conversa (não só a última mensagem) e o usuário recebe uma resposta padrão avisando que será conectado a um atendente. A regra 3 do prompt (ver Seção 9 do guia de deploy) reforça o mesmo comportamento como segunda camada, para casos que a lista de palavras-chave não cobrir.</p>
+</section>
+
+<section id="canais">
+<h2>9. Canais suportados</h2>
+<table>
+<thead><tr><th>Canal</th><th>Arquivo</th><th>Observação</th></tr></thead>
+<tbody>
+<tr><td>Telegram</td><td><code>src/channels/telegram.ts</code></td><td>Webhook simples, secret token opcional para autenticar a Meta/Telegram.</td></tr>
+<tr><td>WhatsApp</td><td><code>src/channels/whatsapp.ts</code></td><td>Meta Cloud API oficial — GET para verificação, POST para mensagens.</td></tr>
+<tr><td>Web</td><td><code>src/channels/web.ts</code></td><td>REST simples (<code>POST /webhook/web</code>) para testes locais ou widget próprio.</td></tr>
+</tbody>
+</table>
+<p>Adicionar um novo canal (Instagram, SMS, etc.) significa implementar a interface <code>ChannelAdapter</code> e registrá-lo em <code>src/server.ts</code> — nenhuma linha do Orchestrator muda.</p>
+</section>
+
+<section id="testes">
+<h2>10. Testes</h2>
+<p>A suíte automatizada (<code>npm test</code>, Vitest) cobre a parte determinística da matriz de testes da Fase 5 do runbook original — detecção de handoff, montagem do prompt, rate limiting e ranking do vector store — sem depender de nenhuma API externa. O script <code>npm run simulate</code> complementa isso com um chat interativo no terminal, para rodar manualmente os casos que dependem do LLM responder (pergunta dentro/fora do escopo, "você é IA?", reclamação).</p>
+</section>
+
+<section id="extensao">
+<h2>11. Como estender o projeto</h2>
+<table>
+<thead><tr><th>Quero...</th><th>Faço isso</th></tr></thead>
+<tbody>
+<tr><td>Trocar de LLM</td><td>Mudar <code>LLM_PROVIDER</code> no <code>.env</code>, ou implementar <code>LLMProvider</code> e registrar em <code>src/llm/index.ts</code></td></tr>
+<tr><td>Trocar de embeddings</td><td>Mudar <code>EMBEDDING_PROVIDER</code>, ou implementar <code>EmbeddingProvider</code> em <code>src/embeddings/</code></td></tr>
+<tr><td>Adicionar um canal novo</td><td>Implementar <code>ChannelAdapter</code> em <code>src/channels/</code> e registrar em <code>src/server.ts</code></td></tr>
+<tr><td>Crescer o catálogo além de dezenas de itens</td><td>Trocar <code>FileVectorStore</code> por uma implementação com a mesma interface sobre Pinecone/pgvector/Supabase</td></tr>
+<tr><td>Notificar handoff em outro lugar</td><td>Implementar <code>HandoffNotifier</code> (ex.: e-mail, Teams) em <code>src/handoffNotifier/</code></td></tr>
+</tbody>
+</table>
+</section>
+
+<footer class="pagefoot">Agente de Atendimento IA — Documentação Geral · Gerado a partir do estado do repositório em Setembro/2026</footer>
+
+</body>
+</html>

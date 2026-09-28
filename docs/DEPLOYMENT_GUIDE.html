@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Agente de Atendimento IA — Guia de Deploy</title>
+<style>
+  @page { size: A4; margin: 22mm 18mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    color: #1a1a1a;
+    font-size: 10.5pt;
+    line-height: 1.5;
+  }
+  h1, h2, h3, h4 { color: #0f172a; page-break-after: avoid; }
+  h1 { font-size: 22pt; margin-bottom: 2mm; }
+  h2 {
+    font-size: 15pt; margin-top: 10mm; padding-bottom: 2mm;
+    border-bottom: 2px solid #15803d;
+  }
+  h3 { font-size: 12pt; margin-top: 6mm; color: #14532d; }
+  h4 { font-size: 10.5pt; margin-top: 4mm; }
+  p { margin: 2mm 0; }
+  code, pre {
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 9pt;
+  }
+  code {
+    background: #f1f5f9; padding: 0.5pt 3pt; border-radius: 3pt;
+    color: #b91c1c;
+  }
+  pre {
+    background: #0f172a; color: #e2e8f0; padding: 4mm;
+    border-radius: 3pt; line-height: 1.4;
+    white-space: pre-wrap; word-break: break-word;
+    page-break-inside: avoid;
+  }
+  pre code { background: none; color: inherit; padding: 0; }
+  table {
+    width: 100%; border-collapse: collapse; margin: 3mm 0;
+    font-size: 9pt; page-break-inside: avoid;
+  }
+  th, td { border: 1px solid #cbd5e1; padding: 1.8mm 3mm; text-align: left; vertical-align: top; }
+  th { background: #f0fdf4; color: #14532d; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  .cover {
+    height: 245mm; display: flex; flex-direction: column;
+    justify-content: center; page-break-after: always;
+  }
+  .cover .eyebrow {
+    color: #15803d; font-weight: 600; letter-spacing: 1.5pt;
+    text-transform: uppercase; font-size: 10pt; margin-bottom: 4mm;
+  }
+  .cover h1 { font-size: 30pt; max-width: 130mm; }
+  .cover .sub { font-size: 12pt; color: #475569; max-width: 130mm; margin-top: 4mm; }
+  .cover .meta { margin-top: 14mm; font-size: 9.5pt; color: #64748b; }
+  .cover .meta div { margin: 1mm 0; }
+  .badge-row { display: flex; gap: 4mm; margin-top: 8mm; flex-wrap: wrap; }
+  .badge {
+    background: #f0fdf4; color: #14532d; border: 1px solid #bbf7d0;
+    border-radius: 20pt; padding: 2mm 5mm; font-size: 9pt; font-weight: 600;
+  }
+  .callout {
+    border-left: 4pt solid #15803d; background: #f0fdf4;
+    padding: 3mm 5mm; margin: 4mm 0; border-radius: 2pt;
+    page-break-inside: avoid;
+  }
+  .callout.warn { border-left-color: #d97706; background: #fffbeb; }
+  .callout.danger { border-left-color: #dc2626; background: #fef2f2; }
+  .callout strong { display: block; margin-bottom: 1mm; color: #0f172a; }
+  .toc { page-break-after: always; }
+  .toc ol { padding-left: 6mm; }
+  .toc li { margin: 2mm 0; font-size: 11pt; }
+  .toc a { color: #14532d; text-decoration: none; }
+  footer.pagefoot {
+    margin-top: 10mm; padding-top: 3mm; border-top: 1px solid #cbd5e1;
+    font-size: 8pt; color: #94a3b8;
+  }
+  section { page-break-inside: avoid; }
+  ul, ol { margin: 2mm 0; padding-left: 6mm; }
+  li { margin: 1mm 0; }
+  .step {
+    display: flex; gap: 3mm; margin: 3mm 0; align-items: flex-start;
+    page-break-inside: avoid;
+  }
+  .step .n {
+    background: #15803d; color: white; border-radius: 50%;
+    width: 6mm; height: 6mm; min-width: 6mm; display: flex;
+    align-items: center; justify-content: center; font-size: 8.5pt;
+    font-weight: 700; margin-top: 0.5mm;
+  }
+  .checklist { list-style: none; padding-left: 0; }
+  .checklist li {
+    display: flex; gap: 3mm; align-items: flex-start; margin: 2mm 0;
+    padding: 1.5mm 0; border-bottom: 1px dotted #cbd5e1;
+  }
+  .checklist .box {
+    width: 4mm; height: 4mm; min-width: 4mm; border: 1.3pt solid #15803d;
+    border-radius: 1.5pt; margin-top: 0.8mm;
+  }
+  .checklist-group {
+    border: 1px solid #cbd5e1; border-radius: 3pt; padding: 4mm 5mm;
+    margin: 4mm 0; page-break-inside: avoid;
+  }
+  .checklist-group h3 { margin-top: 0; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="eyebrow">Guia de Deploy</div>
+  <h1>Agente de Atendimento IA</h1>
+  <div class="sub">Passo a passo completo para configurar, testar e colocar o agente em produção — Docker ou processo direto, Telegram e/ou WhatsApp — com checklist de lançamento e rotina de monitoramento pós-deploy.</div>
+  <div class="badge-row">
+    <span class="badge">Setup local</span>
+    <span class="badge">Docker</span>
+    <span class="badge">Telegram + WhatsApp</span>
+    <span class="badge">Checklist de produção</span>
+  </div>
+  <div class="meta">
+    <div>Repositório: github.com/andre-rizzato/ai-customer-service-agent</div>
+    <div>Versão do documento: 1.0 — Setembro/2026</div>
+  </div>
+</div>
+
+<div class="toc">
+<h2>Sumário</h2>
+<ol>
+  <li><a href="#prereq">Pré-requisitos</a></li>
+  <li><a href="#env">Variáveis de ambiente (referência completa)</a></li>
+  <li><a href="#setup">Setup local passo a passo</a></li>
+  <li><a href="#docker">Deploy com Docker</a></li>
+  <li><a href="#semdocker">Deploy sem Docker (processo direto / PM2)</a></li>
+  <li><a href="#telegram">Configurar o canal Telegram</a></li>
+  <li><a href="#whatsapp">Configurar o canal WhatsApp</a></li>
+  <li><a href="#checklist">Checklist completo de lançamento</a></li>
+  <li><a href="#monitoramento">Monitoramento pós-deploy</a></li>
+  <li><a href="#troubleshooting">Troubleshooting comum</a></li>
+  <li><a href="#seguranca">Segurança e segredos</a></li>
+</ol>
+</div>
+
+<section id="prereq">
+<h2>1. Pré-requisitos</h2>
+<table>
+<thead><tr><th>Item</th><th>Necessário para</th></tr></thead>
+<tbody>
+<tr><td>Node.js 18.17+ (recomendado 22)</td><td>Rodar o servidor sem Docker; sempre necessário para <code>npm run ingest</code></td></tr>
+<tr><td>Docker + Docker Compose (opcional)</td><td>Deploy containerizado (Seção 4)</td></tr>
+<tr><td>Chave de API Anthropic ou OpenAI</td><td>Gerar as respostas do agente (<code>LLM_PROVIDER</code>)</td></tr>
+<tr><td>Chave de API Voyage AI (ou OpenAI, ou nenhuma p/ modo local)</td><td>Gerar embeddings do catálogo e das perguntas (<code>EMBEDDING_PROVIDER</code>)</td></tr>
+<tr><td>Token de bot do Telegram (@BotFather)</td><td>Canal Telegram (opcional)</td></tr>
+<tr><td>App configurado no Meta for Developers</td><td>Canal WhatsApp (opcional)</td></tr>
+<tr><td>URL pública (domínio próprio ou túnel como ngrok em dev)</td><td>Receber webhooks de Telegram/WhatsApp</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="env">
+<h2>2. Variáveis de ambiente (referência completa)</h2>
+<p>Todas validadas por <code>src/config.ts</code> na inicialização — o processo recusa subir se algo obrigatório faltar. Copie <code>.env.example</code> para <code>.env</code> e preencha.</p>
+<table>
+<thead><tr><th>Variável</th><th>Obrigatória quando</th><th>Descrição</th></tr></thead>
+<tbody>
+<tr><td><code>PORT</code></td><td>Nunca (default 3000)</td><td>Porta HTTP do servidor</td></tr>
+<tr><td><code>AGENT_CONFIG_PATH</code></td><td>Nunca (default <code>./config/agent.config.json</code>)</td><td>Caminho do arquivo de configuração do negócio</td></tr>
+<tr><td><code>LLM_PROVIDER</code></td><td>Nunca (default <code>anthropic</code>)</td><td><code>anthropic</code> ou <code>openai</code></td></tr>
+<tr><td><code>ANTHROPIC_API_KEY</code></td><td><code>LLM_PROVIDER=anthropic</code></td><td>Chave da API da Anthropic</td></tr>
+<tr><td><code>ANTHROPIC_MODEL</code></td><td>Nunca (default <code>claude-haiku-4-5-20251001</code>)</td><td>Modelo Claude a usar</td></tr>
+<tr><td><code>OPENAI_API_KEY</code></td><td><code>LLM_PROVIDER=openai</code> ou <code>EMBEDDING_PROVIDER=openai</code></td><td>Chave da API da OpenAI</td></tr>
+<tr><td><code>OPENAI_MODEL</code></td><td>Nunca (default <code>gpt-4o-mini</code>)</td><td>Modelo de chat da OpenAI</td></tr>
+<tr><td><code>EMBEDDING_PROVIDER</code></td><td>Nunca (default <code>voyage</code>)</td><td><code>voyage</code>, <code>openai</code> ou <code>local</code></td></tr>
+<tr><td><code>VOYAGE_API_KEY</code></td><td><code>EMBEDDING_PROVIDER=voyage</code></td><td>Chave da API da Voyage AI</td></tr>
+<tr><td><code>VOYAGE_MODEL</code></td><td>Nunca (default <code>voyage-3.5-lite</code>)</td><td>Modelo de embedding da Voyage</td></tr>
+<tr><td><code>OPENAI_EMBEDDING_MODEL</code></td><td>Nunca (default <code>text-embedding-3-small</code>)</td><td>Modelo de embedding da OpenAI</td></tr>
+<tr><td><code>TELEGRAM_BOT_TOKEN</code></td><td>Para habilitar o canal Telegram</td><td>Token do @BotFather</td></tr>
+<tr><td><code>TELEGRAM_WEBHOOK_SECRET</code></td><td>Recomendado em produção</td><td>Autentica que o webhook veio do Telegram</td></tr>
+<tr><td><code>WHATSAPP_ACCESS_TOKEN</code></td><td>Para habilitar o canal WhatsApp</td><td>Token de acesso da Graph API</td></tr>
+<tr><td><code>WHATSAPP_PHONE_NUMBER_ID</code></td><td>Para habilitar o canal WhatsApp</td><td>Id do número no Meta for Developers</td></tr>
+<tr><td><code>WHATSAPP_VERIFY_TOKEN</code></td><td>Para habilitar o canal WhatsApp</td><td>Token definido por você para o handshake de verificação</td></tr>
+<tr><td><code>HANDOFF_WEBHOOK_URL</code></td><td><code>agent.config.json</code> → <code>handoffNotifier: "webhook"</code></td><td>URL (ex.: Incoming Webhook do Slack) para alertas de handoff</td></tr>
+<tr><td><code>CONVERSATIONS_DIR</code></td><td>Nunca (default <code>./data/conversations</code>)</td><td>Pasta com histórico por conversa</td></tr>
+<tr><td><code>AUDIT_LOG_PATH</code></td><td>Nunca (default <code>./data/audit-log.jsonl</code>)</td><td>Log de auditoria (JSON Lines)</td></tr>
+</tbody>
+</table>
+<div class="callout warn">
+  <strong>Persistência dos dados</strong>
+  <code>CONVERSATIONS_DIR</code> e <code>AUDIT_LOG_PATH</code> (e o índice vetorial em <code>config.vectorStorePath</code>) vivem em disco local. Em qualquer deploy containerizado ou com múltiplas réplicas, isso PRECISA ser um volume persistente — sem isso, um redeploy apaga todo o histórico e o índice do catálogo.
+</div>
+</section>
+
+<section id="setup">
+<h2>3. Setup local passo a passo</h2>
+<div class="step"><div class="n">1</div><div>Clonar o repositório e instalar dependências: <code>npm install</code></div></div>
+<div class="step"><div class="n">2</div><div>Copiar os templates: <code>cp .env.example .env</code> e <code>cp config/agent.config.example.json config/agent.config.json</code></div></div>
+<div class="step"><div class="n">3</div><div>Preencher <code>.env</code> com as chaves de LLM/embeddings (Seção 2) e <code>config/agent.config.json</code> com nome do negócio, tom de voz e gatilhos de handoff (Fase 0: defina isso com o negócio antes de codar)</div></div>
+<div class="step"><div class="n">4</div><div>Editar/substituir <code>knowledge/catalog.example.json</code> pelo catálogo real (uma linha por produto/serviço/política)</div></div>
+<div class="step"><div class="n">5</div><div>Indexar a base: <code>npm run ingest</code> — repita sempre que o catálogo mudar</div></div>
+<div class="step"><div class="n">6</div><div>Testar sem canal nenhum: <code>npm run simulate</code> — rode a matriz de testes da Fase 5 (dentro do escopo, fora do escopo, "você é IA?", pedido de humano, reclamação, mensagem ambígua)</div></div>
+<div class="step"><div class="n">7</div><div>Rodar a suíte automatizada: <code>npm test</code></div></div>
+<div class="step"><div class="n">8</div><div>Só depois de validar os passos 6 e 7, seguir para a Seção 4 ou 5 (deploy)</div></div>
+</section>
+
+<section id="docker">
+<h2>4. Deploy com Docker</h2>
+<p>O <code>Dockerfile</code> na raiz do projeto faz build multi-stage: compila TypeScript em um estágio com as devDependencies, e a imagem final roda só o JavaScript compilado com <code>node</code> puro (sem <code>tsx</code>, sem TypeScript instalado) — imagem menor e sem ferramentas de build na superfície de produção.</p>
+<pre><code># build da imagem
+docker build -t ai-customer-service-agent .
+
+# rodar com variáveis de ambiente e volume de dados persistente
+docker run -d \
+  --name agente-atendimento \
+  -p 3000:3000 \
+  --env-file .env \
+  -v $(pwd)/data:/app/data \
+  ai-customer-service-agent</code></pre>
+<div class="callout">
+  <strong>Catálogo e configuração customizados na imagem</strong>
+  O Dockerfile copia <code>config/agent.config.example.json</code> e <code>knowledge/catalog.example.json</code> como fallback funcional. Para produção, monte seus arquivos reais por volume (<code>-v $(pwd)/config/agent.config.json:/app/config/agent.config.json</code> e o equivalente para o catálogo) ou construa uma imagem própria por cliente copiando os arquivos reais no lugar dos exemplos.
+</div>
+<p>Depois de subir o container, rode o ingest uma vez (dentro do container ou apontando <code>VECTOR_STORE</code>/dados para o mesmo volume montado):</p>
+<pre><code>docker exec -it agente-atendimento node dist/src/knowledge/ingest.js</code></pre>
+<h3>docker-compose (opcional)</h3>
+<pre><code>services:
+  agente:
+    build: .
+    ports: ["3000:3000"]
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+      - ./config/agent.config.json:/app/config/agent.config.json
+      - ./knowledge/catalog.json:/app/knowledge/catalog.json
+    restart: unless-stopped</code></pre>
+</section>
+
+<section id="semdocker">
+<h2>5. Deploy sem Docker (processo direto / PM2)</h2>
+<p>Alternativa em uma VPS comum, sem containers:</p>
+<div class="step"><div class="n">1</div><div>Na VPS: <code>git clone</code>, <code>npm ci</code>, configurar <code>.env</code> e <code>config/agent.config.json</code></div></div>
+<div class="step"><div class="n">2</div><div>Compilar: <code>npm run build</code></div></div>
+<div class="step"><div class="n">3</div><div>Rodar o processo com um gerenciador que reinicia sozinho em caso de crash — <code>pm2 start dist/src/server.js --name agente-atendimento</code> (ou um serviço <code>systemd</code> equivalente)</div></div>
+<div class="step"><div class="n">4</div><div>Colocar um proxy reverso (Nginx/Caddy) na frente, com TLS, apontando para a porta do processo (<code>PORT</code> no <code>.env</code>)</div></div>
+<div class="step"><div class="n">5</div><div>Rodar <code>npm run ingest</code> uma vez após o deploy (e a cada atualização do catálogo)</div></div>
+</section>
+
+<section id="telegram">
+<h2>6. Configurar o canal Telegram</h2>
+<div class="step"><div class="n">1</div><div>Criar um bot com o <strong>@BotFather</strong> no Telegram e copiar o token gerado</div></div>
+<div class="step"><div class="n">2</div><div>Definir <code>TELEGRAM_BOT_TOKEN</code> (e um <code>TELEGRAM_WEBHOOK_SECRET</code> à sua escolha) no <code>.env</code></div></div>
+<div class="step"><div class="n">3</div><div>Com o servidor já publicado em uma URL HTTPS pública, registrar o webhook:</div></div>
+<pre><code>curl "https://api.telegram.org/bot&lt;TOKEN&gt;/setWebhook?url=&lt;SUA-URL-PUBLICA&gt;/webhook/telegram&secret_token=&lt;TELEGRAM_WEBHOOK_SECRET&gt;"</code></pre>
+<div class="step"><div class="n">4</div><div>Confirmar: mande uma mensagem para o bot no Telegram e verifique se a resposta chega</div></div>
+<div class="callout">
+  <strong>Testando localmente antes de ter domínio público</strong>
+  Use um túnel (ex.: <code>ngrok http 3000</code>) para gerar uma URL HTTPS temporária apontando para sua máquina local, e use essa URL no <code>setWebhook</code> acima.
+</div>
+</section>
+
+<section id="whatsapp">
+<h2>7. Configurar o canal WhatsApp (Meta Cloud API)</h2>
+<div class="step"><div class="n">1</div><div>Criar um app no <strong>Meta for Developers</strong> e adicionar o produto WhatsApp</div></div>
+<div class="step"><div class="n">2</div><div>Copiar <code>WHATSAPP_ACCESS_TOKEN</code> e <code>WHATSAPP_PHONE_NUMBER_ID</code> do painel do app</div></div>
+<div class="step"><div class="n">3</div><div>Definir <code>WHATSAPP_VERIFY_TOKEN</code> — uma string à sua escolha, usada só no handshake de verificação</div></div>
+<div class="step"><div class="n">4</div><div>No painel do Meta, configurar o webhook apontando para <code>&lt;SUA-URL-PUBLICA&gt;/webhook/whatsapp</code>, usando o mesmo <code>WHATSAPP_VERIFY_TOKEN</code> — a Meta faz uma chamada GET de verificação automaticamente</div></div>
+<div class="step"><div class="n">5</div><div>Assinar o webhook para o campo <code>messages</code></div></div>
+<div class="step"><div class="n">6</div><div>Confirmar: mande uma mensagem de teste para o número WhatsApp Business e verifique a resposta</div></div>
+<div class="callout warn">
+  <strong>Número verificado para clientes reais</strong>
+  Para atendimento comercial de verdade, use um número WhatsApp Business verificado, conectado ao webhook de PRODUÇÃO — separado do número/ambiente usado nos testes acima (Fase 6 do runbook original).
+</div>
+</section>
+
+<section id="checklist">
+<h2>8. Checklist completo de lançamento</h2>
+
+<div class="checklist-group">
+<h3>Antes de codar (Fase 0)</h3>
+<ul class="checklist">
+  <li><span class="box"></span> Escopo fechado: 10–20 perguntas frequentes reais do negócio listadas</li>
+  <li><span class="box"></span> Histórico de 15–20 conversas reais revisado (tom de voz, jeito de falar)</li>
+  <li><span class="box"></span> Critério de sucesso mensurável definido (taxa de resolução, tempo de resposta)</li>
+</ul>
+</div>
+
+<div class="checklist-group">
+<h3>Configuração</h3>
+<ul class="checklist">
+  <li><span class="box"></span> <code>.env</code> preenchido com chaves de LLM e embeddings válidas</li>
+  <li><span class="box"></span> <code>config/agent.config.json</code> preenchido (nome do negócio, tom, gatilhos de handoff, rate limit)</li>
+  <li><span class="box"></span> <code>knowledge/catalog.json</code> com o catálogo real do negócio (não o example)</li>
+  <li><span class="box"></span> <code>npm run ingest</code> executado com sucesso após o catálogo real</li>
+</ul>
+</div>
+
+<div class="checklist-group">
+<h3>Testes (Fase 5 — não pular)</h3>
+<ul class="checklist">
+  <li><span class="box"></span> <code>npm test</code> passando (handoff, prompt, rate limit, vector store)</li>
+  <li><span class="box"></span> <code>npm run simulate</code>: pergunta dentro do escopo respondida corretamente com base no catálogo</li>
+  <li><span class="box"></span> <code>npm run simulate</code>: pergunta fora do escopo → bot admite que não sabe, nunca inventa</li>
+  <li><span class="box"></span> <code>npm run simulate</code>: "você é uma IA?" → resposta de transparência total</li>
+  <li><span class="box"></span> <code>npm run simulate</code>: pedido explícito de atendente → handoff dispara</li>
+  <li><span class="box"></span> <code>npm run simulate</code>: mensagem de reclamação/frustração → handoff dispara</li>
+  <li><span class="box"></span> Matriz de testes rodada por 2+ pessoas diferentes (evita viés de quem escreveu o prompt)</li>
+</ul>
+</div>
+
+<div class="checklist-group">
+<h3>Infraestrutura</h3>
+<ul class="checklist">
+  <li><span class="box"></span> Volume/persistência configurado para <code>data/</code> (histórico + auditoria + índice vetorial sobrevivem a redeploy)</li>
+  <li><span class="box"></span> HTTPS válido na URL pública do servidor (obrigatório para Telegram/WhatsApp aceitarem o webhook)</li>
+  <li><span class="box"></span> Rate limit ajustado em <code>agent.config.json</code> conforme volume esperado</li>
+  <li><span class="box"></span> Alerta de handoff configurado — <code>handoffNotifier: "webhook"</code> + <code>HANDOFF_WEBHOOK_URL</code> apontando para Slack/canal do time</li>
+  <li><span class="box"></span> Health check (<code>/health</code>) integrado ao monitoramento de infraestrutura</li>
+</ul>
+</div>
+
+<div class="checklist-group">
+<h3>Canais</h3>
+<ul class="checklist">
+  <li><span class="box"></span> Webhook do canal configurado e testado isoladamente (mensagem simples, sem LLM, se possível)</li>
+  <li><span class="box"></span> Número/bot de PRODUÇÃO separado do ambiente de teste</li>
+  <li><span class="box"></span> <code>TELEGRAM_WEBHOOK_SECRET</code> configurado (Telegram) — evita webhook falso</li>
+</ul>
+</div>
+
+<div class="checklist-group">
+<h3>Lançamento</h3>
+<ul class="checklist">
+  <li><span class="box"></span> Soft-launch: só uma fração dos contatos (ex.: novos leads) passa pelo bot na primeira semana</li>
+  <li><span class="box"></span> Atendimento humano continua paralelo durante o soft-launch</li>
+  <li><span class="box"></span> Rotina semanal de auditoria de amostra agendada (Fase 7)</li>
+</ul>
+</div>
+
+<div class="callout danger">
+  <strong>Não pule o soft-launch</strong>
+  Ir direto para 100% do volume é o erro que transforma um problema de prompt em problema de reputação — um cliente que recebe resposta errada em massa não volta.
+</div>
+</section>
+
+<section id="monitoramento">
+<h2>9. Monitoramento pós-deploy</h2>
+<table>
+<thead><tr><th>Rotina</th><th>Frequência</th><th>Onde/como</th></tr></thead>
+<tbody>
+<tr><td>Auditoria de amostra (ler conversas, marcar respostas duvidosas)</td><td>Semanal</td><td><code>data/audit-log.jsonl</code> — cada linha tem <code>contextUsed</code> mostrando o(s) item(ns) da base usados naquela resposta</td></tr>
+<tr><td>Atualizar o catálogo sempre que produto/preço/política mudar</td><td>Sob demanda</td><td>Editar <code>knowledge/catalog.json</code> + rodar <code>npm run ingest</code> de novo</td></tr>
+<tr><td>Revisar taxa de handoff (alto demais / baixo demais)</td><td>Semanal/quinzenal</td><td>Ajustar <code>handoffKeywords</code>/<code>frustrationKeywords</code>/<code>minRelevanceScore</code> em <code>agent.config.json</code></td></tr>
+<tr><td>Checar health check e uso de CPU/memória do processo</td><td>Contínuo</td><td>Ferramenta de monitoramento de infraestrutura apontando para <code>/health</code></td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="troubleshooting">
+<h2>10. Troubleshooting comum</h2>
+<table>
+<thead><tr><th>Sintoma</th><th>Causa provável</th><th>O que checar</th></tr></thead>
+<tbody>
+<tr><td>Processo não sobe, erro de validação na inicialização</td><td>Variável de ambiente ou campo de <code>agent.config.json</code> faltando/errado</td><td>Ler a mensagem de erro (o zod aponta exatamente o campo) e comparar com <code>.env.example</code></td></tr>
+<tr><td>Bot sempre responde "não tenho essa informação"</td><td>Índice vetorial vazio ou desatualizado</td><td>Rodar <code>npm run ingest</code>; checar se <code>knowledgeBasePath</code>/<code>vectorStorePath</code> apontam para os arquivos certos</td></tr>
+<tr><td>Webhook do Telegram/WhatsApp não recebe nada</td><td>URL pública não é HTTPS válido, ou webhook não foi registrado</td><td>Repetir o passo de <code>setWebhook</code> (Telegram) ou a configuração no Meta for Developers (WhatsApp)</td></tr>
+<tr><td>WhatsApp: verificação do webhook falha (403)</td><td><code>WHATSAPP_VERIFY_TOKEN</code> diferente do configurado no painel Meta</td><td>Conferir se o valor no <code>.env</code> é idêntico ao digitado no painel</td></tr>
+<tr><td>Handoff nunca dispara</td><td>Palavras-chave configuradas não cobrem o vocabulário real dos clientes</td><td>Revisar <code>handoffKeywords</code>/<code>frustrationKeywords</code> com base em conversas reais</td></tr>
+<tr><td>Handoff dispara demais</td><td>Palavra-chave genérica demais capturando mensagens normais</td><td>Tornar as frases mais específicas em vez de palavras soltas</td></tr>
+<tr><td>Custo de LLM/embeddings mais alto que o esperado</td><td>Rate limit frouxo, ou muitas mensagens repetidas de um mesmo usuário</td><td>Apertar <code>rateLimit</code> em <code>agent.config.json</code></td></tr>
+<tr><td>Histórico "sumiu" após redeploy</td><td><code>data/</code> não estava em um volume persistente</td><td>Configurar volume (Docker) ou pasta persistente fora do diretório de deploy (processo direto)</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="seguranca">
+<h2>11. Segurança e segredos</h2>
+<ul>
+  <li><code>.env</code> nunca deve ser commitado — já está no <code>.gitignore</code> do projeto.</li>
+  <li>Use <code>TELEGRAM_WEBHOOK_SECRET</code> em produção — sem ele, qualquer pessoa que descubra a URL do webhook pode enviar mensagens falsas para o agente processar.</li>
+  <li>A verificação do webhook do WhatsApp (<code>WHATSAPP_VERIFY_TOKEN</code>) só protege o handshake inicial — a Meta não assina cada mensagem individualmente por padrão neste fluxo simples; trate a URL do webhook como não-pública mesmo assim.</li>
+  <li>Rotacione chaves de API (Anthropic/OpenAI/Voyage) periodicamente e imediatamente se algum <code>.env</code> vazar acidentalmente.</li>
+  <li>O log de auditoria (<code>data/audit-log.jsonl</code>) contém texto de conversas reais de clientes — trate como dado sensível (acesso restrito, backups seguros, conformidade com LGPD se aplicável).</li>
+</ul>
+</section>
+
+<footer class="pagefoot">Agente de Atendimento IA — Guia de Deploy · Gerado a partir do estado do repositório em Setembro/2026</footer>
+
+</body>
+</html>
