@@ -1,0 +1,36 @@
+{
+  "name": "ai-customer-service-agent",
+  "version": "0.1.0",
+  "description": "Agente de atendimento por IA, agnostico de canal (Telegram, WhatsApp, ou qualquer webhook), com RAG e handoff para humano.",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=18.17"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "ingest": "tsx src/knowledge/ingest.ts",
+    "simulate": "tsx scripts/simulate.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "openai": "^4.73.0",
+    "zod": "^3.23.8"
+  },
+  "optionalDependencies": {
+    "@xenova/transformers": "^2.17.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.9.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.4"
+  }
+}

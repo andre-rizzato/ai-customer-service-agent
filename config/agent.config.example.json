@@ -1,0 +1,33 @@
+{
+  "businessName": "Sua Empresa",
+  "toneAdjectives": ["cordial", "direto", "sem gírias em excesso"],
+  "knowledgeBasePath": "./knowledge/catalog.example.json",
+  "vectorStorePath": "./data/vector-store.json",
+  "topK": 3,
+  "minRelevanceScore": 0.72,
+  "handoffKeywords": [
+    "falar com atendente",
+    "falar com humano",
+    "quero um atendente",
+    "atendente humano",
+    "quero cancelar",
+    "reclamação",
+    "reclamacao"
+  ],
+  "frustrationKeywords": [
+    "péssimo",
+    "pessimo",
+    "horrível",
+    "horrivel",
+    "absurdo",
+    "não aguento",
+    "nao aguento",
+    "isso é um absurdo",
+    "quero meu dinheiro de volta"
+  ],
+  "rateLimit": {
+    "maxMessagesPerWindow": 20,
+    "windowSeconds": 60
+  },
+  "handoffNotifier": "console"
+}

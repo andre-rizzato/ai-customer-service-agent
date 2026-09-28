@@ -1,0 +1,27 @@
+[
+  {
+    "id": "filtro-agua-fx200",
+    "title": "Filtro de água FX200",
+    "content": "Filtro de água FX200. Tensão: bivolt (110V/220V, seleção automática). Preço: R$ 349,90. Instalação: acompanha kit de instalação para torneira padrão, instalação em até 15 minutos sem precisar de encanador. Garantia: 12 meses contra defeito de fabricação. Troca do refil recomendada a cada 6 meses ou 3.000 litros filtrados, o que ocorrer primeiro. Perguntas frequentes: reduz cloro, sedimentos e metais pesados; não remove sais minerais."
+  },
+  {
+    "id": "filtro-agua-fx100",
+    "title": "Filtro de água FX100",
+    "content": "Filtro de água FX100 (modelo de entrada). Tensão: não utiliza energia elétrica (filtro por gravidade). Preço: R$ 189,90. Instalação: uso de bancada, sem instalação na tubulação. Garantia: 6 meses contra defeito de fabricação. Troca do refil a cada 4 meses ou 2.000 litros."
+  },
+  {
+    "id": "politica-troca-devolucao",
+    "title": "Política de troca e devolução",
+    "content": "Troca ou devolução em até 7 dias corridos após o recebimento, conforme Código de Defesa do Consumidor, para produtos com defeito de fabricação ou arrependimento de compra (produto sem uso, na embalagem original). Reembolso processado em até 10 dias úteis após recebimento do produto devolvido. Frete de devolução por conta da empresa em caso de defeito; por conta do cliente em caso de arrependimento."
+  },
+  {
+    "id": "politica-entrega",
+    "title": "Prazo e política de entrega",
+    "content": "Prazo de entrega: 3 a 7 dias úteis para capitais, 5 a 12 dias úteis para demais localidades, após confirmação do pagamento. Frete grátis para compras acima de R$ 300,00. Rastreio enviado por mensagem assim que a nota fiscal é emitida."
+  },
+  {
+    "id": "formas-pagamento",
+    "title": "Formas de pagamento aceitas",
+    "content": "Aceitamos Pix (5% de desconto à vista), cartão de crédito em até 6x sem juros, e boleto bancário (compensação em até 2 dias úteis, envio do pedido após confirmação)."
+  }
+]
