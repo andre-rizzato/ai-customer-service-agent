@@ -25,7 +25,12 @@ const DIACRITICS_PATTERN = new RegExp("[̀-ͯ]", "g");
 // aguento" quanto "nao aguento", "NÃO AGUENTO" etc. Chamada tanto para o
 // texto do usuário quanto para cada palavra-chave configurada, garantindo
 // que os dois lados da comparação passem pelo mesmo tratamento.
-function normalize(text: string): string {
+// Exportado porque capabilityRouter.ts precisa da mesma normalização
+// "caixa baixa e sem acento" para comparar orderKeywords/etc. contra a
+// mensagem do usuário — mesmo motivo de ter uma função só (não duas cópias
+// divergindo com o tempo): "falar com atendente" e "status do meu pedido"
+// precisam ser tolerantes a acento do mesmo jeito.
+export function normalize(text: string): string {
   // toLowerCase(): remove diferença de maiúsculas/minúsculas.
   // normalize("NFD"): decompõe caracteres acentuados em "letra base +
   // marca de acento separada" (ex.: "ã" vira "a" + til combinante) — é essa

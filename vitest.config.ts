@@ -29,6 +29,11 @@ export default defineConfig({
       // erro de "chave ausente".
       ANTHROPIC_API_KEY: "test-key",
       VOYAGE_API_KEY: "test-key",
+      // config.example.json agora liga "order" em enabledCapabilities (pra
+      // capabilityRouter.test.ts ter o que testar) — isso faz config.ts
+      // exigir AGENT_SERVICE_URL na checagem cruzada do fim do arquivo.
+      // Nenhum teste determinístico chama de fato esse endereço.
+      AGENT_SERVICE_URL: "http://localhost:8100",
     },
   },
 });

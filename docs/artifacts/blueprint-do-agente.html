@@ -1,0 +1,562 @@
+<title>Blueprint do Agente</title>
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #F3F6FA;
+    --surface: #FFFFFF;
+    --surface-2: #E7ECF3;
+    --ink: #152138;
+    --ink-muted: #58698A;
+    --accent: #1C5FCC;
+    --accent-2: #B5701E;
+    --good: #2F8F62;
+    --border: #C7D2E0;
+    --border-strong: #9FB0C8;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0B1830;
+      --surface: #11213F;
+      --surface-2: #162A4E;
+      --ink: #E2E9F6;
+      --ink-muted: #92A6C9;
+      --accent: #6CA0FF;
+      --accent-2: #E3A857;
+      --good: #5FCB94;
+      --border: #2B3E66;
+      --border-strong: #3C5280;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #0B1830;
+    --surface: #11213F;
+    --surface-2: #162A4E;
+    --ink: #E2E9F6;
+    --ink-muted: #92A6C9;
+    --accent: #6CA0FF;
+    --accent-2: #E3A857;
+    --good: #5FCB94;
+    --border: #2B3E66;
+    --border-strong: #3C5280;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    margin: 0;
+    padding: 56px 24px 96px;
+  }
+
+  .page {
+    max-width: 1000px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 48px;
+  }
+
+  .prose {
+    max-width: 700px;
+  }
+
+  a { color: var(--accent); }
+  a:focus-visible, button:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .mono {
+    font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 10px;
+  }
+
+  h1 {
+    font-size: clamp(1.9rem, 1.5rem + 1.6vw, 2.5rem);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    margin: 0 0 8px;
+  }
+
+  h2 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    text-wrap: balance;
+    margin: 0 0 14px;
+  }
+
+  p { margin: 0 0 14px; color: var(--ink); }
+  p:last-child { margin-bottom: 0; }
+  .muted { color: var(--ink-muted); }
+
+  /* ---- title block ---- */
+  header.titleblock {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .meta-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--surface);
+  }
+
+  .meta-cell {
+    flex: 1 1 200px;
+    padding: 10px 16px;
+    border-right: 1px solid var(--border);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12.5px;
+  }
+  .meta-cell:last-child { border-right: none; }
+  .meta-cell .k {
+    display: block;
+    color: var(--ink-muted);
+    font-size: 10.5px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 3px;
+  }
+
+  /* ---- diagram ---- */
+  figure.diagram {
+    margin: 0;
+    animation: rise 0.5s ease-out both;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    figure.diagram { animation: none; }
+  }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .diagram-frame {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    overflow-x: auto;
+  }
+
+  .diagram-frame svg {
+    display: block;
+    width: 100%;
+    min-width: 760px;
+    height: auto;
+    color: var(--ink);
+  }
+
+  figcaption {
+    margin-top: 14px;
+    font-size: 13.5px;
+    color: var(--ink-muted);
+    max-width: 700px;
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-top: 16px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11.5px;
+    color: var(--ink-muted);
+  }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .legend-swatch { width: 22px; height: 0; border-top-width: 2.5px; border-top-style: solid; }
+  .legend-swatch.flow { border-color: var(--accent); }
+  .legend-swatch.secret { border-color: var(--accent-2); border-top-style: dashed; }
+  .legend-swatch.boundary { border-color: var(--ink-muted); border-top-style: dashed; }
+  .legend-swatch.setup { border-color: var(--ink-muted); border-top-style: dotted; border-top-width: 2px; }
+
+  /* ---- decision record ---- */
+  .decision {
+    border: 1px solid var(--border-strong);
+    border-left: 4px solid var(--accent-2);
+    border-radius: 6px;
+    background: var(--surface);
+    padding: 22px 26px;
+  }
+  .decision .tag {
+    display: inline-block;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--accent-2);
+    background: color-mix(in srgb, var(--accent-2) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent-2) 40%, transparent);
+    border-radius: 4px;
+    padding: 3px 9px;
+    margin-bottom: 12px;
+  }
+  .decision ul { margin: 12px 0 0; padding-left: 20px; }
+  .decision li { margin-bottom: 7px; }
+  .decision li:last-child { margin-bottom: 0; }
+  .decision .exception {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--border);
+    font-size: 14.5px;
+    color: var(--ink-muted);
+  }
+
+  /* ---- secrets table ---- */
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 560px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12.5px;
+  }
+  thead th {
+    text-align: left;
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    background: var(--surface-2);
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  tbody td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  .status { display: inline-flex; align-items: center; gap: 7px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  .dot.ok { background: var(--good); }
+  .dot.pending { background: var(--border-strong); }
+  .status.ok-text { color: var(--good); }
+  .status.pending-text { color: var(--ink-muted); }
+
+  /* ---- checklist ---- */
+  .checklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  .checklist li {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 12px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  .checklist .box {
+    width: 15px; height: 15px; margin-top: 2px;
+    border: 1.5px solid var(--border-strong);
+    border-radius: 3px;
+    flex: none;
+  }
+
+  footer {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    color: var(--ink-muted);
+    border-top: 1px solid var(--border);
+    padding-top: 18px;
+  }
+</style>
+
+<div class="page">
+
+  <header class="titleblock">
+    <div>
+      <p class="eyebrow">Arquitetura · Azure</p>
+      <h1>Blueprint do agente de atendimento</h1>
+    </div>
+    <div class="meta-strip mono">
+      <div class="meta-cell"><span class="k">Projeto</span>ai-customer-service-agent</div>
+      <div class="meta-cell"><span class="k">Resource group</span>rg-agente-atendimento</div>
+      <div class="meta-cell"><span class="k">Região</span>eastus</div>
+      <div class="meta-cell"><span class="k">Atualizado</span>03 out 2026</div>
+    </div>
+  </header>
+
+  <figure class="diagram">
+    <div class="diagram-frame">
+      <svg viewBox="0 0 1120 1030" role="img" aria-label="Diagrama mostrando o cadastro único do webhook no BotFather e no Meta for Developers, depois uma mensagem saindo do Telegram, WhatsApp ou chat web, passando pelo domínio HTTPS de propriedade da Sua Empresa, chegando na VM dentro do resource group do Azure, onde o processo busca segredos no Key Vault via Managed Identity antes de chamar as APIs da Anthropic e da Voyage AI.">
+        <defs>
+          <marker id="arrowFlow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor" />
+          </marker>
+          <marker id="arrowSecret" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--accent-2)" />
+          </marker>
+          <marker id="arrowSetup" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--ink-muted)" />
+          </marker>
+        </defs>
+
+        <!-- corner registration marks -->
+        <g stroke="var(--border-strong)" stroke-width="1">
+          <path d="M30,8 v14 M23,15 h14" />
+          <path d="M1090,8 v14 M1083,15 h14" />
+          <path d="M30,1008 v14 M23,1015 h14" />
+          <path d="M1090,1008 v14 M1083,1015 h14" />
+        </g>
+
+        <!-- Row 0: one-time webhook registration (done once, by you or the client) -->
+        <g font-family="IBM Plex Mono, monospace">
+          <rect x="200" y="26" width="220" height="52" rx="6" fill="var(--surface)" stroke="var(--border)" stroke-dasharray="3 3" />
+          <text x="310" y="48" text-anchor="middle" font-size="11.5" font-weight="600" fill="var(--ink-muted)">@BotFather</text>
+          <text x="310" y="63" text-anchor="middle" font-size="9.5" fill="var(--ink-muted)">gera token + setWebhook</text>
+
+          <rect x="450" y="26" width="220" height="52" rx="6" fill="var(--surface)" stroke="var(--border)" stroke-dasharray="3 3" />
+          <text x="560" y="48" text-anchor="middle" font-size="11.5" font-weight="600" fill="var(--ink-muted)">Meta for Developers</text>
+          <text x="560" y="63" text-anchor="middle" font-size="9.5" fill="var(--ink-muted)">painel → campo Webhook URL</text>
+        </g>
+        <g stroke="var(--ink-muted)" stroke-width="1.75" fill="none" stroke-dasharray="1.5 3.5">
+          <line x1="310" y1="78" x2="310" y2="136" marker-end="url(#arrowSetup)" />
+          <line x1="560" y1="78" x2="560" y2="136" marker-end="url(#arrowSetup)" />
+        </g>
+        <text x="322" y="108" font-size="9.5" fill="var(--ink-muted)">configurado 1x</text>
+        <text x="572" y="108" font-size="9.5" fill="var(--ink-muted)">configurado 1x</text>
+
+        <g transform="translate(0,110)">
+
+        <!-- Row 1: channels -->
+        <g font-family="IBM Plex Mono, monospace">
+          <g>
+            <rect x="200" y="30" width="220" height="64" rx="6" fill="var(--surface)" stroke="var(--border-strong)" />
+            <text x="310" y="57" text-anchor="middle" font-size="13" font-weight="600" fill="var(--ink)">Telegram</text>
+            <text x="310" y="75" text-anchor="middle" font-size="10.5" fill="var(--ink-muted)">Bot API</text>
+          </g>
+          <g>
+            <rect x="450" y="30" width="220" height="64" rx="6" fill="var(--surface)" stroke="var(--border-strong)" />
+            <text x="560" y="57" text-anchor="middle" font-size="13" font-weight="600" fill="var(--ink)">WhatsApp</text>
+            <text x="560" y="75" text-anchor="middle" font-size="10.5" fill="var(--ink-muted)">Meta Cloud API</text>
+          </g>
+          <g>
+            <rect x="700" y="30" width="220" height="64" rx="6" fill="var(--surface)" stroke="var(--border-strong)" />
+            <text x="810" y="57" text-anchor="middle" font-size="13" font-weight="600" fill="var(--ink)">Chat web</text>
+            <text x="810" y="75" text-anchor="middle" font-size="10.5" fill="var(--ink-muted)">/webhook/web</text>
+          </g>
+        </g>
+
+        <!-- arrows channels -> domain band -->
+        <g stroke="var(--accent)" stroke-width="2" fill="none" color="var(--accent)">
+          <line x1="310" y1="94" x2="310" y2="138" marker-end="url(#arrowFlow)" />
+          <line x1="560" y1="94" x2="560" y2="138" marker-end="url(#arrowFlow)" />
+          <line x1="810" y1="94" x2="810" y2="138" marker-end="url(#arrowFlow)" />
+        </g>
+        <text x="595" y="120" font-size="10.5" fill="var(--ink-muted)" font-family="IBM Plex Mono, monospace">POST (HTTPS)</text>
+
+        <!-- Row 2: domain band -->
+        <rect x="80" y="140" width="960" height="70" rx="6" fill="var(--surface-2)" stroke="var(--border-strong)" />
+        <text x="560" y="170" text-anchor="middle" font-size="15" font-weight="600" fill="var(--ink)" font-family="IBM Plex Mono, monospace">agente.suaempresa.com.br</text>
+        <text x="560" y="188" text-anchor="middle" font-size="11" fill="var(--ink-muted)" font-family="IBM Plex Mono, monospace">DNS + certificado TLS (Let's Encrypt)</text>
+        <rect x="860" y="152" width="160" height="22" rx="4" fill="none" stroke="var(--accent-2)" />
+        <text x="940" y="167" text-anchor="middle" font-size="10" font-weight="600" letter-spacing="0.04em" fill="var(--accent-2)" font-family="IBM Plex Mono, monospace">SUA EMPRESA</text>
+
+        <!-- arrow domain -> RG -->
+        <line x1="560" y1="210" x2="560" y2="248" stroke="var(--accent)" stroke-width="2" marker-end="url(#arrowFlow)" color="var(--accent)" />
+        <text x="575" y="233" font-size="10.5" fill="var(--ink-muted)" font-family="IBM Plex Mono, monospace">IP público estático</text>
+
+        <!-- Resource group boundary -->
+        <rect x="80" y="250" width="960" height="500" rx="8" fill="none" stroke="var(--ink-muted)" stroke-width="1.5" stroke-dasharray="5 4" />
+        <text x="100" y="272" font-size="10.5" font-weight="600" letter-spacing="0.05em" fill="var(--ink-muted)" font-family="IBM Plex Mono, monospace">AZURE · RESOURCE GROUP rg-agente-atendimento</text>
+
+        <!-- VM box -->
+        <rect x="120" y="300" width="640" height="430" rx="6" fill="var(--surface)" stroke="var(--border-strong)" />
+        <text x="140" y="325" font-size="13.5" font-weight="700" fill="var(--ink)" font-family="IBM Plex Mono, monospace">vm-agente</text>
+        <text x="140" y="342" font-size="10.5" fill="var(--ink-muted)" font-family="IBM Plex Mono, monospace">Ubuntu 22.04 · Standard_B1s · Node.js via PM2</text>
+
+        <!-- pipeline row -->
+        <g font-family="IBM Plex Mono, monospace">
+          <rect x="150" y="360" width="130" height="56" rx="5" fill="var(--surface-2)" stroke="var(--border)" />
+          <text x="215" y="384" text-anchor="middle" font-size="11" font-weight="600" fill="var(--ink)">Canal adapter</text>
+          <text x="215" y="399" text-anchor="middle" font-size="9.5" fill="var(--ink-muted)">tg / wa / web</text>
+
+          <rect x="300" y="360" width="130" height="56" rx="5" fill="var(--surface-2)" stroke="var(--border)" />
+          <text x="365" y="384" text-anchor="middle" font-size="11" font-weight="600" fill="var(--ink)">Orchestrator</text>
+          <text x="365" y="399" text-anchor="middle" font-size="9.5" fill="var(--ink-muted)">handoff · rate limit</text>
+
+          <rect x="450" y="360" width="130" height="56" rx="5" fill="var(--surface-2)" stroke="var(--border)" />
+          <text x="515" y="384" text-anchor="middle" font-size="11" font-weight="600" fill="var(--ink)">Base de conh.</text>
+          <text x="515" y="399" text-anchor="middle" font-size="9.5" fill="var(--ink-muted)">RAG · vector store</text>
+
+          <rect x="600" y="360" width="130" height="56" rx="5" fill="var(--surface-2)" stroke="var(--border)" />
+          <text x="665" y="384" text-anchor="middle" font-size="11" font-weight="600" fill="var(--ink)">Chamada LLM</text>
+          <text x="665" y="399" text-anchor="middle" font-size="9.5" fill="var(--ink-muted)">prompt builder</text>
+        </g>
+        <g stroke="var(--accent)" stroke-width="1.75" fill="none" color="var(--accent)">
+          <line x1="280" y1="388" x2="298" y2="388" marker-end="url(#arrowFlow)" />
+          <line x1="430" y1="388" x2="448" y2="388" marker-end="url(#arrowFlow)" />
+          <line x1="580" y1="388" x2="598" y2="388" marker-end="url(#arrowFlow)" />
+        </g>
+
+        <!-- config.ts box -->
+        <rect x="150" y="440" width="220" height="50" rx="5" fill="var(--surface)" stroke="var(--border)" stroke-dasharray="3 3" />
+        <text x="260" y="461" text-anchor="middle" font-size="11" font-weight="600" fill="var(--ink)" font-family="IBM Plex Mono, monospace">config.ts</text>
+        <text x="260" y="476" text-anchor="middle" font-size="9.5" fill="var(--ink-muted)" font-family="IBM Plex Mono, monospace">.env + KEY_VAULT_ENABLED</text>
+        <line x1="260" y1="416" x2="260" y2="438" stroke="var(--ink-muted)" stroke-width="1.5" />
+
+        <!-- Key Vault box -->
+        <rect x="820" y="380" width="220" height="160" rx="6" fill="var(--surface)" stroke="var(--accent-2)" stroke-width="1.5" />
+        <text x="840" y="405" font-size="12.5" font-weight="700" fill="var(--ink)" font-family="IBM Plex Mono, monospace">kv-agente-atendimento</text>
+        <text x="840" y="421" font-size="10" fill="var(--ink-muted)" font-family="IBM Plex Mono, monospace">Azure Key Vault</text>
+
+        <circle cx="828" cy="440" r="3.5" fill="var(--good)" />
+        <text x="840" y="444" font-size="10.5" fill="var(--ink)" font-family="IBM Plex Mono, monospace">anthropic-api-key</text>
+        <circle cx="828" cy="460" r="3.5" fill="var(--good)" />
+        <text x="840" y="464" font-size="10.5" fill="var(--ink)" font-family="IBM Plex Mono, monospace">voyage-api-key</text>
+        <circle cx="828" cy="480" r="3.5" fill="var(--border-strong)" />
+        <text x="840" y="484" font-size="10.5" fill="var(--ink-muted)" font-family="IBM Plex Mono, monospace">+ 6 pendentes</text>
+        <text x="840" y="500" font-size="9.5" fill="var(--ink-muted)" font-family="IBM Plex Mono, monospace">(telegram · whatsapp · handoff)</text>
+
+        <!-- amber arrow config.ts -> key vault -->
+        <line x1="372" y1="464" x2="817" y2="462" stroke="var(--accent-2)" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrowSecret)" />
+        <text x="595" y="452" text-anchor="middle" font-size="10.5" font-weight="600" fill="var(--accent-2)" font-family="IBM Plex Mono, monospace">Managed Identity → GET secret</text>
+        <text x="595" y="478" text-anchor="middle" font-size="9.5" fill="var(--ink-muted)" font-family="IBM Plex Mono, monospace">(sem credencial em disco)</text>
+
+        <!-- exit arrows to external APIs -->
+        <g stroke="var(--accent)" stroke-width="2" fill="none" color="var(--accent)">
+          <polyline points="515,730 515,765 340,765 340,798" marker-end="url(#arrowFlow)" />
+          <polyline points="665,730 665,765 780,765 780,798" marker-end="url(#arrowFlow)" />
+        </g>
+        <text x="430" y="758" text-anchor="middle" font-size="10" fill="var(--ink-muted)" font-family="IBM Plex Mono, monospace">embeddings</text>
+        <text x="720" y="758" text-anchor="middle" font-size="10" fill="var(--ink-muted)" font-family="IBM Plex Mono, monospace">chat</text>
+
+        <!-- external API boxes -->
+        <rect x="200" y="800" width="280" height="80" rx="6" fill="var(--surface)" stroke="var(--border-strong)" />
+        <text x="340" y="828" text-anchor="middle" font-size="12.5" font-weight="700" fill="var(--ink)" font-family="IBM Plex Mono, monospace">Voyage AI (via MongoDB)</text>
+        <text x="340" y="845" text-anchor="middle" font-size="10" fill="var(--ink-muted)" font-family="IBM Plex Mono, monospace">ai.mongodb.com/v1/embeddings</text>
+        <text x="340" y="860" text-anchor="middle" font-size="10" fill="var(--ink-muted)" font-family="IBM Plex Mono, monospace">voyage-3.5-lite</text>
+
+        <rect x="640" y="800" width="280" height="80" rx="6" fill="var(--surface)" stroke="var(--border-strong)" />
+        <text x="780" y="828" text-anchor="middle" font-size="12.5" font-weight="700" fill="var(--ink)" font-family="IBM Plex Mono, monospace">Anthropic API</text>
+        <text x="780" y="845" text-anchor="middle" font-size="10" fill="var(--ink-muted)" font-family="IBM Plex Mono, monospace">api.anthropic.com</text>
+        <text x="780" y="860" text-anchor="middle" font-size="10" fill="var(--ink-muted)" font-family="IBM Plex Mono, monospace">claude-haiku-4-5</text>
+
+        </g>
+      </svg>
+    </div>
+    <figcaption>
+      Da mensagem recebida no Telegram, WhatsApp ou chat web até a resposta do agente — passando pelo domínio (propriedade da Sua Empresa), pela VM dentro do resource group do Azure, e pela leitura de segredos no Key Vault via Managed Identity antes de chamar as APIs externas de LLM e embeddings.
+    </figcaption>
+    <div class="legend">
+      <div class="legend-item"><span class="legend-swatch flow"></span>fluxo de mensagem / dados</div>
+      <div class="legend-item"><span class="legend-swatch secret"></span>leitura de segredo (Managed Identity)</div>
+      <div class="legend-item"><span class="legend-swatch boundary"></span>limite do resource group Azure</div>
+      <div class="legend-item"><span class="legend-swatch setup"></span>registro de webhook (feito 1x)</div>
+    </div>
+  </figure>
+
+  <section class="prose">
+    <p class="eyebrow">Conexão com o cliente final</p>
+    <h2>Como as conversas chegam no seu domínio</h2>
+    <p>
+      O usuário final nunca aponta nada pro seu domínio — ele manda mensagem pro bot do Telegram ou pro número
+      de WhatsApp <em>do cliente</em>, que carregam a marca dele. O domínio só entra como endereço de entrega,
+      configurado <strong>uma única vez</strong>, por você (ou pelo cliente, com sua ajuda), direto no painel de
+      cada plataforma — nunca pelo usuário final.
+    </p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Canal</th><th>Onde se registra</th><th>Chamada</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Telegram</td>
+            <td>@BotFather gera o token; você faz 1 chamada HTTP</td>
+            <td class="mono">setWebhook?url=…/webhook/telegram</td>
+          </tr>
+          <tr>
+            <td>WhatsApp</td>
+            <td>Meta for Developers → produto WhatsApp → Webhooks</td>
+            <td class="mono">campo "Webhook URL" = …/webhook/whatsapp</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted" style="margin-top:14px; font-size:14.5px;">
+      Atendendo mais de um cliente: separe por subdomínio (<span class="mono">cliente-x.suaempresa.com.br</span>)
+      ou por path na mesma VM, pra isolar o tráfego de cada um.
+    </p>
+  </section>
+
+  <section class="prose">
+    <p class="eyebrow">Decisão de arquitetura</p>
+    <h2>De quem é o domínio e o certificado TLS?</h2>
+    <div class="decision">
+      <span class="tag">Decisão</span>
+      <p>O domínio usado pelos webhooks (ex. <span class="mono">agente.suaempresa.com.br</span>) é propriedade da <strong>Sua Empresa</strong>, não do cliente final.</p>
+      <ul>
+        <li>O cliente nunca vê essa URL — ele conversa direto pelo app do Telegram ou WhatsApp; o webhook é só plumbing interno entre a plataforma e a VM.</li>
+        <li>Um subdomínio seu por cliente mantém DNS e certificado sob seu controle, sem depender do TI de cada cliente para configurar ou renovar.</li>
+        <li>Evita atraso de deploy esperando acesso de terceiros a um registrador ou provedor de DNS que você não administra.</li>
+      </ul>
+      <p class="exception">Exceção: se o contrato exigir que toda a infraestrutura pertença ao cliente (compliance, ou garantia de troca de fornecedor sem reconfiguração), o domínio passa a ser dele — ao custo de depender da agilidade de cada cliente.</p>
+    </div>
+  </section>
+
+  <section class="prose">
+    <p class="eyebrow">Segurança</p>
+    <h2>Segredos vêm do Key Vault, nunca do disco</h2>
+    <p>
+      O <span class="mono">.env</span> da VM tem <span class="mono">KEY_VAULT_ENABLED=true</span> e nenhuma chave em texto plano.
+      No startup, <span class="mono">config.ts</span> usa <span class="mono">DefaultAzureCredential</span> — que resolve
+      para a Managed Identity da VM em produção, e para a sessão do <span class="mono">az login</span> localmente — para
+      buscar cada segredo no Key Vault antes de validar o ambiente. Com a flag em <span class="mono">false</span>, o
+      comportamento volta a ser idêntico ao original: tudo lido do <span class="mono">.env</span> local.
+    </p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Variável de ambiente</th><th>Secret no Key Vault</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>ANTHROPIC_API_KEY</td><td>anthropic-api-key</td><td><span class="status ok-text"><span class="dot ok"></span>configurado</span></td></tr>
+          <tr><td>VOYAGE_API_KEY</td><td>voyage-api-key</td><td><span class="status ok-text"><span class="dot ok"></span>configurado</span></td></tr>
+          <tr><td>TELEGRAM_BOT_TOKEN</td><td>telegram-bot-token</td><td><span class="status pending-text"><span class="dot pending"></span>pendente</span></td></tr>
+          <tr><td>TELEGRAM_WEBHOOK_SECRET</td><td>telegram-webhook-secret</td><td><span class="status pending-text"><span class="dot pending"></span>pendente</span></td></tr>
+          <tr><td>WHATSAPP_ACCESS_TOKEN</td><td>whatsapp-access-token</td><td><span class="status pending-text"><span class="dot pending"></span>pendente</span></td></tr>
+          <tr><td>WHATSAPP_PHONE_NUMBER_ID</td><td>whatsapp-phone-number-id</td><td><span class="status pending-text"><span class="dot pending"></span>pendente</span></td></tr>
+          <tr><td>WHATSAPP_VERIFY_TOKEN</td><td>whatsapp-verify-token</td><td><span class="status pending-text"><span class="dot pending"></span>pendente</span></td></tr>
+          <tr><td>HANDOFF_WEBHOOK_URL</td><td>handoff-webhook-url</td><td><span class="status pending-text"><span class="dot pending"></span>pendente</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="prose">
+    <p class="eyebrow">Próximos passos</p>
+    <h2>O que falta para produção</h2>
+    <ul class="checklist">
+      <li><span class="box"></span><span>Catálogo real do negócio — hoje a VM ainda indexa <span class="mono">catalog.example.json</span>.</span></li>
+      <li><span class="box"></span><span>Tokens do Telegram e/ou WhatsApp, subidos no Key Vault seguindo a mesma convenção kebab-case.</span></li>
+      <li><span class="box"></span><span>Domínio real da Sua Empresa + Nginx/TLS na frente da porta 3000, hoje só acessível via SSH.</span></li>
+    </ul>
+  </section>
+
+  <footer class="mono">vm-agente · 20.127.12.103 · kv-agente-atendimento · rg-agente-atendimento (eastus)</footer>
+
+</div>

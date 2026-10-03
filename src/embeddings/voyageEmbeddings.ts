@@ -6,8 +6,12 @@
 import type { EmbeddingProvider } from "./types.js";
 
 // Endpoint fixo da API de embeddings da Voyage — não muda por modelo (o
-// modelo vai no corpo da requisição, não na URL).
-const VOYAGE_API_URL = "https://api.voyageai.com/v1/embeddings";
+// modelo vai no corpo da requisição, não na URL). Desde a aquisição da
+// Voyage AI pela MongoDB, chaves emitidas pelo console do Atlas (em vez do
+// dashboard standalone da Voyage) só funcionam neste host — o antigo
+// api.voyageai.com responde 403 "This API key cannot access this endpoint"
+// para esse tipo de chave.
+const VOYAGE_API_URL = "https://ai.mongodb.com/v1/embeddings";
 
 // Preâmbulo: VoyageEmbeddings implementa EmbeddingProvider chamando a API
 // da Voyage AI. É instanciada por src/embeddings/index.ts quando

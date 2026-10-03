@@ -38,6 +38,18 @@ Cada peça é uma interface plugável:
 | Embeddings | `EmbeddingProvider` (`src/embeddings/types.ts`) | Voyage AI (padrão), OpenAI, local (sem API key) |
 | Base vetorial | `FileVectorStore` (`src/knowledge/vectorStore.ts`) | Arquivo JSON local (cosine similarity) — troque por Pinecone/pgvector se o catálogo crescer muito |
 | Notificação de handoff | `HandoffNotifier` (`src/handoffNotifier/types.ts`) | Console, Webhook (Slack/Discord/custom) |
+| Capacidade extra (pedido/agenda/venda) | `capabilityRouter.ts` detecta, `agentServiceClient.ts` delega | `AgentService` (Python, standalone — ver `docs/artifacts/mapa-capacidades.html`) |
+
+### Capacidades além de RAG (`enabledCapabilities`)
+
+Além do RAG, um cliente pode ligar `"order"`, `"scheduling"` ou `"sales"` em
+`config/agent.config.json` → `enabledCapabilities` — a mesma lista que
+alimenta o roteamento (`src/orchestrator/capabilityRouter.ts`) e, no
+produto, a precificação por tenant (ver "Mapa de Capacidades" em
+`docs/artifacts/mapa-capacidades.html`). Hoje só `"order"` tem um backend de
+verdade plugado (`AGENT_SERVICE_URL` → `DistributedOrderSystem/src/AgentService`);
+`"scheduling"`/`"sales"` já são detectadas mas caem em handoff até ganharem
+conector — nunca inventam uma resposta sem dado real.
 
 ## Setup
 

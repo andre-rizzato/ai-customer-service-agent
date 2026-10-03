@@ -29,5 +29,9 @@
     "maxMessagesPerWindow": 20,
     "windowSeconds": 60
   },
-  "handoffNotifier": "console"
+  "handoffNotifier": "console",
+  "enabledCapabilities": ["order", "scheduling", "sales"],
+  "orderKeywords": ["status do pedido", "status do meu pedido", "cancelar pedido", "rastrear pedido"],
+  "schedulingKeywords": ["marcar horário", "marcar um horário", "agendar", "tem horário"],
+  "salesKeywords": ["quero comprar", "link de pagamento", "fazer um pedido novo"]
 }

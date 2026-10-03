@@ -12,6 +12,8 @@ import { createHandoffNotifier, type HandoffNotifier } from "../handoffNotifier/
 import { KnowledgeBase } from "../knowledge/knowledgeBase.js";
 import { createLLMProvider, type LLMProvider } from "../llm/index.js";
 import type { InboundMessage } from "../types.js";
+import { callAgentService } from "./agentServiceClient.js";
+import { detectCapability } from "./capabilityRouter.js";
 import { detectHandoffTrigger } from "./handoff.js";
 import { buildSystemPrompt } from "./promptBuilder.js";
 import { RateLimiter } from "./rateLimiter.js";
@@ -25,6 +27,14 @@ const HANDOFF_REPLY =
 // raciocínio da constante acima.
 const RATE_LIMIT_REPLY =
   "Recebi várias mensagens muito rápido e preciso desacelerar um pouco — me manda de novo em um minuto, por favor.";
+// Mensagem fixa pra quando capabilityRouter detecta "scheduling"/"sales" —
+// capacidades que já existem na tela de configuração do cliente (Mapa de
+// Capacidades) mas ainda não têm conector plugado do lado do AgentService
+// nesta versão. Cair em handoff aqui é deliberado: é a mesma regra
+// anti-alucinação do resto do produto (promptBuilder.ts) aplicada à
+// orquestração — "sem integração real, não finge que resolveu".
+const CAPABILITY_NOT_WIRED_REPLY =
+  "Vou te conectar com um atendente humano para resolver isso com você. Só um instante.";
 
 // Preâmbulo: a classe Orchestrator é instanciada UMA VEZ por processo
 // (ver src/server.ts e scripts/simulate.ts) e reaproveitada para todas as
@@ -110,6 +120,54 @@ export class Orchestrator {
       // ("Sim -> transfere para humano" é um ramo que pula direto para o
       // fim, sem passar pela caixa de "busca na base").
       return HANDOFF_REPLY;
+    }
+
+    // PASSO 2.5 — Roteamento de capacidade: só chega aqui se não houve
+    // handoff. Pergunta "essa mensagem é sobre pedido/agenda/venda?" — se
+    // for e a capacidade estiver habilitada pro cliente, PULA o RAG+LLM
+    // normal (que não tem como responder "qual o status do MEU pedido",
+    // é dado em tempo real, não conhecimento geral do catálogo).
+    const capability = detectCapability(text);
+    if (capability === "order") {
+      // callAgentService pode falhar por rede/timeout (AgentService fora do
+      // ar, por exemplo) — degrada pra handoff em vez de propagar o erro
+      // pro ChannelAdapter, mesma filosofia de "nunca deixar o usuário sem
+      // resposta" do resto do pipeline.
+      try {
+        const agentResponse = await callAgentService(text, conversationId);
+        this.conversations.append(conversationId, {
+          role: "assistant",
+          text: agentResponse.reply,
+          timestamp: Date.now(),
+          contextUsed: agentResponse.order_id ? [`order:${agentResponse.order_id}`] : [],
+        });
+        return agentResponse.reply;
+      } catch (err) {
+        console.error("AgentService call failed, falling back to handoff:", err);
+        await this.handoffNotifier.notify(conversationId, "explicit_request", this.conversations.getHistory(conversationId));
+        this.conversations.append(conversationId, {
+          role: "system-note",
+          text: "Handoff acionado: order (AgentService indisponível)",
+          timestamp: Date.now(),
+          handoff: true,
+        });
+        return HANDOFF_REPLY;
+      }
+    }
+    if (capability === "scheduling" || capability === "sales") {
+      // Capacidade habilitada e detectada, mas sem conector real ainda
+      // (ver capabilityRouter.ts) — handoff honesto em vez de resposta
+      // inventada, registrado do mesmo jeito que um handoff por palavra-
+      // chave normal (ver PASSO 2 acima) pra aparecer igual na auditoria.
+      const history = this.conversations.getHistory(conversationId);
+      await this.handoffNotifier.notify(conversationId, "explicit_request", history);
+      this.conversations.append(conversationId, {
+        role: "system-note",
+        text: `Handoff acionado: ${capability} (capacidade sem conector ainda)`,
+        timestamp: Date.now(),
+        handoff: true,
+      });
+      return CAPABILITY_NOT_WIRED_REPLY;
     }
 
     // PASSO 3 — Busca RAG: só chega aqui se não houve gatilho de handoff.

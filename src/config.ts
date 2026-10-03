@@ -22,6 +22,14 @@ import "dotenv/config";
 // no meio de uma conversa; (2) derivar os tipos TypeScript automaticamente
 // a partir do schema, para não manter tipo e validação em dois lugares.
 import { z } from "zod";
+// Azure Key Vault: usado só quando KEY_VAULT_ENABLED=true no ambiente, para
+// buscar os segredos (chaves de API, tokens) de lá em vez do .env local.
+// DefaultAzureCredential tenta, em ordem, Managed Identity (quando rodando
+// numa VM/recurso Azure configurado para isso — o caso da VM de produção),
+// depois credenciais do `az login` (o caso do ambiente local de dev) — por
+// isso o mesmo código funciona nos dois ambientes sem configuração extra.
+import { DefaultAzureCredential } from "@azure/identity";
+import { SecretClient } from "@azure/keyvault-secrets";
 
 // Preâmbulo: AgentConfigSchema descreve a FORMA esperada do arquivo
 // config/agent.config.json — ou seja, tudo que é "configurável por
@@ -70,6 +78,26 @@ const AgentConfigSchema = z.object({
   // "console" só loga no terminal (bom para dev), "webhook" faz POST em
   // HANDOFF_WEBHOOK_URL (Fase 6: "alerta automático e-mail ou Slack").
   handoffNotifier: z.enum(["console", "webhook"]).default("console"),
+
+  // Quais capacidades além de RAG este cliente contratou — ver "Mapa de
+  // Capacidades" (docs/artifacts/mapa-capacidades.html): cada uma vira uma
+  // tela de configuração + um item de precificação. "order" é a única com
+  // um backend de verdade hoje (AgentService, ver agentServiceUrl abaixo);
+  // "scheduling"/"sales" já são detectadas pelo capabilityRouter mas ainda
+  // caem em handoff (ver orchestrator.ts) até ganharem conector real do
+  // lado do AgentService. Handoff para humano NUNCA é uma capacidade
+  // desligável por aqui — é a rede de segurança do produto inteiro, não um
+  // item de plano.
+  enabledCapabilities: z.array(z.enum(["order", "scheduling", "sales"])).default([]),
+  // Palavras/frases que, se aparecerem na mensagem, indicam pergunta sobre
+  // um pedido já feito ("status do meu pedido", "cancelar pedido 123") —
+  // checadas por capabilityRouter.ts SÓ quando "order" está em
+  // enabledCapabilities acima. Mesma técnica e mesmo motivo de
+  // handoffKeywords/frustrationKeywords: palavra-chave é mais barato e mais
+  // previsível do que pedir pro LLM decidir "isso é pergunta de pedido?".
+  orderKeywords: z.array(z.string()).default([]),
+  schedulingKeywords: z.array(z.string()).default([]),
+  salesKeywords: z.array(z.string()).default([]),
 });
 
 // Tipo TypeScript derivado do schema acima — z.infer lê a definição do zod
@@ -154,6 +182,23 @@ const EnvSchema = z.object({
   // — também escrito por src/conversation/store.ts, e é o arquivo que a
   // Fase 7 do runbook recomenda ler semanalmente.
   AUDIT_LOG_PATH: z.string().default("./data/audit-log.jsonl"),
+
+  // Se true, os segredos listados em SECRET_ENV_VARS (abaixo) são buscados
+  // no Azure Key Vault em vez de lidos do .env local — ver
+  // loadSecretsFromKeyVault(). Default false: comportamento idêntico ao
+  // projeto original, lendo tudo do .env.
+  KEY_VAULT_ENABLED: z.coerce.boolean().default(false),
+  // Nome do Key Vault (não a URL completa) — obrigatório quando
+  // KEY_VAULT_ENABLED=true, checado em loadSecretsFromKeyVault().
+  KEY_VAULT_NAME: z.string().optional(),
+
+  // URL base do AgentService (Python/FastAPI, standalone — ver
+  // DistributedOrderSystem/src/AgentService) — obrigatória quando "order"
+  // está em agentConfig.enabledCapabilities (checado mais abaixo). Esse
+  // serviço é quem de fato consulta o backend de pedidos do cliente; este
+  // processo Node só decide SE uma mensagem deve ir pra lá
+  // (capabilityRouter.ts) e repassa a resposta.
+  AGENT_SERVICE_URL: z.string().optional(),
 });
 
 // Tipo TypeScript derivado do schema de ambiente, mesmo raciocínio do
@@ -161,7 +206,8 @@ const EnvSchema = z.object({
 export type Env = z.infer<typeof EnvSchema>;
 
 // Preâmbulo: loadEnv valida process.env (já populado pelo `import
-// "dotenv/config"` no topo do arquivo) contra o EnvSchema. Chamada uma
+// "dotenv/config"` no topo do arquivo, e por loadSecretsFromKeyVault() logo
+// abaixo quando KEY_VAULT_ENABLED=true) contra o EnvSchema. Chamada uma
 // única vez para preencher a constante exportada `env`.
 function loadEnv(): Env {
   // process.env tem tipo Record<string, string | undefined> no Node; o zod
@@ -169,6 +215,77 @@ function loadEnv(): Env {
   // Env, além de aplicar os valores .default(...) onde a variável não foi
   // definida.
   return EnvSchema.parse(process.env);
+}
+
+// Mapa das variáveis de ambiente consideradas SEGREDO (credenciais/tokens) —
+// as únicas buscadas no Key Vault. Configuração não-secreta (PORT,
+// LLM_PROVIDER, nomes de modelo, caminhos de armazenamento etc.) continua
+// vindo sempre do .env/ambiente local, com ou sem Key Vault habilitado.
+// Nomes de secret no Key Vault só aceitam letras, números e hífen — daí a
+// conversão SNAKE_CASE -> kebab-case abaixo.
+const SECRET_ENV_VARS = [
+  "ANTHROPIC_API_KEY",
+  "OPENAI_API_KEY",
+  "VOYAGE_API_KEY",
+  "TELEGRAM_BOT_TOKEN",
+  "TELEGRAM_WEBHOOK_SECRET",
+  "WHATSAPP_ACCESS_TOKEN",
+  "WHATSAPP_PHONE_NUMBER_ID",
+  "WHATSAPP_VERIFY_TOKEN",
+  "HANDOFF_WEBHOOK_URL",
+] as const;
+
+function toKeyVaultSecretName(envVar: string): string {
+  return envVar.toLowerCase().replaceAll("_", "-");
+}
+
+// Preâmbulo: quando KEY_VAULT_ENABLED=true, busca cada variável de
+// SECRET_ENV_VARS no Azure Key Vault e sobrescreve process.env com o valor
+// encontrado, ANTES de loadEnv() validar o ambiente — por isso é chamada
+// (com await no nível do módulo, abaixo) antes de `export const env =
+// loadEnv()`. Um segredo ausente no Key Vault (404) é tratado como "não
+// configurado" e simplesmente não sobrescreve o que já está em
+// process.env (mesmo comportamento de um .env com a chave vazia/faltando);
+// qualquer outro erro (auth, rede, permissão) propaga e derruba a
+// inicialização — preferível a subir o processo com metade dos segredos.
+async function loadSecretsFromKeyVault(): Promise<void> {
+  const vaultName = process.env.KEY_VAULT_NAME;
+  if (!vaultName) {
+    throw new Error(
+      "KEY_VAULT_ENABLED=true mas KEY_VAULT_NAME não está definido no ambiente."
+    );
+  }
+
+  const client = new SecretClient(
+    `https://${vaultName}.vault.azure.net`,
+    new DefaultAzureCredential()
+  );
+
+  for (const envVar of SECRET_ENV_VARS) {
+    try {
+      const secret = await client.getSecret(toKeyVaultSecretName(envVar));
+      if (secret.value) {
+        process.env[envVar] = secret.value;
+      }
+    } catch (err) {
+      const statusCode = (err as { statusCode?: number }).statusCode;
+      if (statusCode === 404) {
+        continue;
+      }
+      throw new Error(
+        `Falha ao buscar o segredo "${toKeyVaultSecretName(envVar)}" no Key Vault "${vaultName}": ${(err as Error).message}`
+      );
+    }
+  }
+}
+
+// Top-level await: suportado porque o projeto roda como ESM (package.json
+// "type": "module", tsconfig "module": "NodeNext"). Decide, antes de
+// qualquer outro módulo poder importar `env`, se busca os segredos no Key
+// Vault — lendo process.env.KEY_VAULT_ENABLED diretamente (em vez de
+// esperar o `env` já validado) porque loadEnv() só roda depois.
+if (/^true$/i.test(process.env.KEY_VAULT_ENABLED ?? "")) {
+  await loadSecretsFromKeyVault();
 }
 
 // Executa a validação de ambiente imediatamente na importação deste módulo
@@ -186,6 +303,16 @@ export const agentConfig = loadAgentConfig();
 if (agentConfig.handoffNotifier === "webhook" && !env.HANDOFF_WEBHOOK_URL) {
   throw new Error(
     "agent.config.json sets handoffNotifier=webhook but HANDOFF_WEBHOOK_URL is not set in the environment."
+  );
+}
+
+// Mesmo raciocínio: "order" habilitado sem AGENT_SERVICE_URL configurado
+// significa que toda pergunta de pedido cairia num erro de rede em tempo de
+// resposta, em produção, pro primeiro cliente real que perguntasse — melhor
+// recusar subir o processo do que descobrir isso ao vivo.
+if (agentConfig.enabledCapabilities.includes("order") && !env.AGENT_SERVICE_URL) {
+  throw new Error(
+    'agent.config.json tem "order" em enabledCapabilities mas AGENT_SERVICE_URL não está definido no ambiente.'
   );
 }
 
