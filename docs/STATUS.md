@@ -1,0 +1,88 @@
+# Status do projeto
+
+Checklist consolidado de tudo que foi feito e do que falta, cobrindo os dois
+repositórios envolvidos: `ai-customer-service-agent` (este) e
+`DistributedOrderSystem` (o `AgentService`, Python). Para os passos manuais
+de domínio/email/WhatsApp, ver [`GO_LIVE_CHECKLIST.md`](GO_LIVE_CHECKLIST.md).
+
+Última atualização: 03/10/2026.
+
+---
+
+## Feito
+
+### Infraestrutura Azure (ambiente de teste)
+
+- [x] Resource group `rg-agente-atendimento` (eastus), VM `vm-agente` (Ubuntu 22.04, Standard_B1s)
+- [x] Azure Key Vault `kv-agente-atendimento` (RBAC) — segredos nunca em texto plano em nenhum dos dois serviços
+- [x] Managed Identity (system-assigned) na VM, com role `Key Vault Secrets User`
+- [x] `src/config.ts` (Node) e `config.py` (`AgentService`) buscam segredos do Key Vault via `DefaultAzureCredential` quando `KEY_VAULT_ENABLED=true`, com fallback idêntico ao `.env` local quando `false`
+- [x] 1GB de swap configurado na VM (`/etc/fstab`) — ver incidente abaixo
+
+### Agente de atendimento (Node)
+
+- [x] Deploy completo na VM via PM2 + systemd (sobrevive a reboot)
+- [x] Bug do endpoint da Voyage corrigido (`ai.mongodb.com`, não `api.voyageai.com`) e chave rotacionada
+- [x] Pipeline RAG + LLM + handoff validado de ponta a ponta
+
+### Arquitetura de capacidades
+
+- [x] Interfaces `OrderBackend` / `SchedulingBackend` / `CatalogBackend` / `CheckoutBackend` (`DistributedOrderSystem/src/AgentService/connectors/`)
+- [x] `RestOrderBackend` e `RestCatalogBackend` — genéricos, configuráveis por cliente via env var
+- [x] `GoogleCalendarBackend` — implementado (slot-picking com cobertura de teste, sem rede)
+- [x] `StripeCheckoutBackend` — implementado contra a API estável da Stripe
+- [x] `PagSeguroCheckoutBackend` — implementado, **payload não verificado contra conta real** (ver `connectors/README.md`)
+- [x] `capabilityRouter.ts` + `agentServiceClient.ts` (Node) — roteia pergunta de pedido pro `AgentService` antes do RAG, com fallback pra handoff em caso de falha
+- [x] `enabledCapabilities` por cliente em `agent.config.json` (gate de `order`/`scheduling`/`sales`)
+- [x] `AgentService` implantado na VM, rodando em paralelo ao agente Node
+- [x] Fallback público (`dummyjson.com/carts`) configurado enquanto o `GatewayBff` não está acessível da VM
+
+### CI/CD
+
+- [x] `deploy.yml` (Node) e `deploy-agent-service.yml` (`AgentService`) — GitHub Actions, deploy automático no push
+- [x] Chave SSH dedicada só pra CI (não a pessoal), restrita (`no-port-forwarding,no-X11-forwarding,no-agent-forwarding`)
+- [x] **Incidente resolvido**: `npm ci`/`pip install` rodando junto com os dois serviços já ativos travou a VM (B1s, sem swap) a ponto de não responder nem o SSH — corrigido com swap + os workflows agora param os dois serviços antes de instalar. Validado com deploy real depois da correção (56s, sucesso).
+
+### Documentação e artefatos
+
+- [x] [`Blueprint do Agente`](artifacts/blueprint-do-agente.html) — arquitetura de deploy, fluxo de mensagem, Key Vault
+- [x] [`Mapa de Capacidades`](artifacts/mapa-capacidades.html) — capacidades plugáveis, decisões de pagamento/implantação/roteamento
+- [x] Diagramas exportados como SVG standalone em `artifacts/images/` (abaixo)
+- [x] `GO_LIVE_CHECKLIST.md` — passos de domínio/email/DNS/Meta Developers + plano de teste com 2 tenants
+
+<img src="artifacts/images/blueprint-do-agente.svg" alt="Diagrama do Blueprint do Agente" width="100%" />
+
+<img src="artifacts/images/mapa-capacidades-camadas.svg" alt="Diagrama de camadas do Mapa de Capacidades" width="100%" />
+
+<img src="artifacts/images/mapa-capacidades-multi-tenant.svg" alt="Diagrama de implantação multi-tenant do Mapa de Capacidades" width="100%" />
+
+---
+
+## Pendente
+
+### Manual — só você consegue fazer (ver [`GO_LIVE_CHECKLIST.md`](GO_LIVE_CHECKLIST.md))
+
+- [ ] Domínio, site mínimo, email corporativo
+- [ ] DNS (subdomínio por tenant apontando pra VM)
+- [ ] Conta no Meta for Developers + número de teste do WhatsApp
+- [ ] Webhook registrado (Telegram e/ou WhatsApp)
+- [ ] Catálogo real do negócio (hoje ainda é `catalog.example.json`)
+
+### Técnico — capacidades
+
+- [ ] `scheduling`/`sales`: detectadas pelo `capabilityRouter` mas sem nó de grafo real no `AgentService` ainda — hoje caem em handoff (comportamento correto, honesto, mas não é a capacidade funcionando de fato)
+- [ ] `GoogleCalendarBackend` nunca testado contra uma conta Google real (sem service account disponível nesta sessão)
+- [ ] `PagSeguroCheckoutBackend`: verificar endpoint/payload contra a doc atual (dev.pagbank.com.br) antes de produção
+- [ ] `GatewayBff` do `DistributedOrderSystem` só roda local — capacidade `order` em produção de verdade depende disso (ou de outro backend real) existir em algum lugar acessível
+
+### Técnico — infraestrutura
+
+- [ ] VM `Standard_B1s` é pequena — o swap resolveu o travamento, mas vale considerar upgrade (B2s) se a carga crescer
+- [ ] Hardening do `AgentService`: retry/timeout nas chamadas HTTP, log estruturado, `/health` checando dependências reais (hoje só confirma que o processo subiu)
+- [ ] Modelo multi-tenant (container por cliente + User-Assigned Managed Identity + Key Vault por cliente) — **desenhado, não provisionado**. Só faz sentido quando houver um segundo cliente real.
+- [ ] Ambientes de staging/produção — **deliberadamente adiado** pro primeiro cliente real, não é trabalho de agora
+
+### Fora de escopo por enquanto (decisão já tomada)
+
+- RAG avançado (hybrid search, reranking, Qdrant, RAGAS, DSPy) e fine-tuning (LoRA/QLoRA, DPO, vLLM) — fica pro `DistributedOrderSystem`/curso, só migra pro produto quando o volume real justificar
+- `npm audit` acusa vulnerabilidades em `@xenova/transformers` (dependência opcional, embeddings locais não usados) — pré-existente, não introduzido nesta sessão

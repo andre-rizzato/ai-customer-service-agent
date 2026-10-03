@@ -1,0 +1,156 @@
+<svg viewBox="0 0 1120 1030" role="img" aria-label="Diagrama mostrando o cadastro único do webhook no BotFather e no Meta for Developers, depois uma mensagem saindo do Telegram, WhatsApp ou chat web, passando pelo domínio HTTPS de propriedade da Sua Empresa, chegando na VM dentro do resource group do Azure, onde o processo busca segredos no Key Vault via Managed Identity antes de chamar as APIs da Anthropic e da Voyage AI."><rect x="0" y="0" width="1120" height="1030" fill="#F3F6FA" />
+        <defs>
+          <marker id="arrowFlow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor" />
+          </marker>
+          <marker id="arrowSecret" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#B5701E" />
+          </marker>
+          <marker id="arrowSetup" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#58698A" />
+          </marker>
+        </defs>
+
+        <!-- corner registration marks -->
+        <g stroke="#9FB0C8" stroke-width="1">
+          <path d="M30,8 v14 M23,15 h14" />
+          <path d="M1090,8 v14 M1083,15 h14" />
+          <path d="M30,1008 v14 M23,1015 h14" />
+          <path d="M1090,1008 v14 M1083,1015 h14" />
+        </g>
+
+        <!-- Row 0: one-time webhook registration (done once, by you or the client) -->
+        <g font-family="IBM Plex Mono, monospace">
+          <rect x="200" y="26" width="220" height="52" rx="6" fill="#FFFFFF" stroke="#C7D2E0" stroke-dasharray="3 3" />
+          <text x="310" y="48" text-anchor="middle" font-size="11.5" font-weight="600" fill="#58698A">@BotFather</text>
+          <text x="310" y="63" text-anchor="middle" font-size="9.5" fill="#58698A">gera token + setWebhook</text>
+
+          <rect x="450" y="26" width="220" height="52" rx="6" fill="#FFFFFF" stroke="#C7D2E0" stroke-dasharray="3 3" />
+          <text x="560" y="48" text-anchor="middle" font-size="11.5" font-weight="600" fill="#58698A">Meta for Developers</text>
+          <text x="560" y="63" text-anchor="middle" font-size="9.5" fill="#58698A">painel → campo Webhook URL</text>
+        </g>
+        <g stroke="#58698A" stroke-width="1.75" fill="none" stroke-dasharray="1.5 3.5">
+          <line x1="310" y1="78" x2="310" y2="136" marker-end="url(#arrowSetup)" />
+          <line x1="560" y1="78" x2="560" y2="136" marker-end="url(#arrowSetup)" />
+        </g>
+        <text x="322" y="108" font-size="9.5" fill="#58698A">configurado 1x</text>
+        <text x="572" y="108" font-size="9.5" fill="#58698A">configurado 1x</text>
+
+        <g transform="translate(0,110)">
+
+        <!-- Row 1: channels -->
+        <g font-family="IBM Plex Mono, monospace">
+          <g>
+            <rect x="200" y="30" width="220" height="64" rx="6" fill="#FFFFFF" stroke="#9FB0C8" />
+            <text x="310" y="57" text-anchor="middle" font-size="13" font-weight="600" fill="#152138">Telegram</text>
+            <text x="310" y="75" text-anchor="middle" font-size="10.5" fill="#58698A">Bot API</text>
+          </g>
+          <g>
+            <rect x="450" y="30" width="220" height="64" rx="6" fill="#FFFFFF" stroke="#9FB0C8" />
+            <text x="560" y="57" text-anchor="middle" font-size="13" font-weight="600" fill="#152138">WhatsApp</text>
+            <text x="560" y="75" text-anchor="middle" font-size="10.5" fill="#58698A">Meta Cloud API</text>
+          </g>
+          <g>
+            <rect x="700" y="30" width="220" height="64" rx="6" fill="#FFFFFF" stroke="#9FB0C8" />
+            <text x="810" y="57" text-anchor="middle" font-size="13" font-weight="600" fill="#152138">Chat web</text>
+            <text x="810" y="75" text-anchor="middle" font-size="10.5" fill="#58698A">/webhook/web</text>
+          </g>
+        </g>
+
+        <!-- arrows channels -> domain band -->
+        <g stroke="#1C5FCC" stroke-width="2" fill="none" color="#1C5FCC">
+          <line x1="310" y1="94" x2="310" y2="138" marker-end="url(#arrowFlow)" />
+          <line x1="560" y1="94" x2="560" y2="138" marker-end="url(#arrowFlow)" />
+          <line x1="810" y1="94" x2="810" y2="138" marker-end="url(#arrowFlow)" />
+        </g>
+        <text x="595" y="120" font-size="10.5" fill="#58698A" font-family="IBM Plex Mono, monospace">POST (HTTPS)</text>
+
+        <!-- Row 2: domain band -->
+        <rect x="80" y="140" width="960" height="70" rx="6" fill="#E7ECF3" stroke="#9FB0C8" />
+        <text x="560" y="170" text-anchor="middle" font-size="15" font-weight="600" fill="#152138" font-family="IBM Plex Mono, monospace">agente.suaempresa.com.br</text>
+        <text x="560" y="188" text-anchor="middle" font-size="11" fill="#58698A" font-family="IBM Plex Mono, monospace">DNS + certificado TLS (Let's Encrypt)</text>
+        <rect x="860" y="152" width="160" height="22" rx="4" fill="none" stroke="#B5701E" />
+        <text x="940" y="167" text-anchor="middle" font-size="10" font-weight="600" letter-spacing="0.04em" fill="#B5701E" font-family="IBM Plex Mono, monospace">SUA EMPRESA</text>
+
+        <!-- arrow domain -> RG -->
+        <line x1="560" y1="210" x2="560" y2="248" stroke="#1C5FCC" stroke-width="2" marker-end="url(#arrowFlow)" color="#1C5FCC" />
+        <text x="575" y="233" font-size="10.5" fill="#58698A" font-family="IBM Plex Mono, monospace">IP público estático</text>
+
+        <!-- Resource group boundary -->
+        <rect x="80" y="250" width="960" height="500" rx="8" fill="none" stroke="#58698A" stroke-width="1.5" stroke-dasharray="5 4" />
+        <text x="100" y="272" font-size="10.5" font-weight="600" letter-spacing="0.05em" fill="#58698A" font-family="IBM Plex Mono, monospace">AZURE · RESOURCE GROUP rg-agente-atendimento</text>
+
+        <!-- VM box -->
+        <rect x="120" y="300" width="640" height="430" rx="6" fill="#FFFFFF" stroke="#9FB0C8" />
+        <text x="140" y="325" font-size="13.5" font-weight="700" fill="#152138" font-family="IBM Plex Mono, monospace">vm-agente</text>
+        <text x="140" y="342" font-size="10.5" fill="#58698A" font-family="IBM Plex Mono, monospace">Ubuntu 22.04 · Standard_B1s · Node.js via PM2</text>
+
+        <!-- pipeline row -->
+        <g font-family="IBM Plex Mono, monospace">
+          <rect x="150" y="360" width="130" height="56" rx="5" fill="#E7ECF3" stroke="#C7D2E0" />
+          <text x="215" y="384" text-anchor="middle" font-size="11" font-weight="600" fill="#152138">Canal adapter</text>
+          <text x="215" y="399" text-anchor="middle" font-size="9.5" fill="#58698A">tg / wa / web</text>
+
+          <rect x="300" y="360" width="130" height="56" rx="5" fill="#E7ECF3" stroke="#C7D2E0" />
+          <text x="365" y="384" text-anchor="middle" font-size="11" font-weight="600" fill="#152138">Orchestrator</text>
+          <text x="365" y="399" text-anchor="middle" font-size="9.5" fill="#58698A">handoff · rate limit</text>
+
+          <rect x="450" y="360" width="130" height="56" rx="5" fill="#E7ECF3" stroke="#C7D2E0" />
+          <text x="515" y="384" text-anchor="middle" font-size="11" font-weight="600" fill="#152138">Base de conh.</text>
+          <text x="515" y="399" text-anchor="middle" font-size="9.5" fill="#58698A">RAG · vector store</text>
+
+          <rect x="600" y="360" width="130" height="56" rx="5" fill="#E7ECF3" stroke="#C7D2E0" />
+          <text x="665" y="384" text-anchor="middle" font-size="11" font-weight="600" fill="#152138">Chamada LLM</text>
+          <text x="665" y="399" text-anchor="middle" font-size="9.5" fill="#58698A">prompt builder</text>
+        </g>
+        <g stroke="#1C5FCC" stroke-width="1.75" fill="none" color="#1C5FCC">
+          <line x1="280" y1="388" x2="298" y2="388" marker-end="url(#arrowFlow)" />
+          <line x1="430" y1="388" x2="448" y2="388" marker-end="url(#arrowFlow)" />
+          <line x1="580" y1="388" x2="598" y2="388" marker-end="url(#arrowFlow)" />
+        </g>
+
+        <!-- config.ts box -->
+        <rect x="150" y="440" width="220" height="50" rx="5" fill="#FFFFFF" stroke="#C7D2E0" stroke-dasharray="3 3" />
+        <text x="260" y="461" text-anchor="middle" font-size="11" font-weight="600" fill="#152138" font-family="IBM Plex Mono, monospace">config.ts</text>
+        <text x="260" y="476" text-anchor="middle" font-size="9.5" fill="#58698A" font-family="IBM Plex Mono, monospace">.env + KEY_VAULT_ENABLED</text>
+        <line x1="260" y1="416" x2="260" y2="438" stroke="#58698A" stroke-width="1.5" />
+
+        <!-- Key Vault box -->
+        <rect x="820" y="380" width="220" height="160" rx="6" fill="#FFFFFF" stroke="#B5701E" stroke-width="1.5" />
+        <text x="840" y="405" font-size="12.5" font-weight="700" fill="#152138" font-family="IBM Plex Mono, monospace">kv-agente-atendimento</text>
+        <text x="840" y="421" font-size="10" fill="#58698A" font-family="IBM Plex Mono, monospace">Azure Key Vault</text>
+
+        <circle cx="828" cy="440" r="3.5" fill="#2F8F62" />
+        <text x="840" y="444" font-size="10.5" fill="#152138" font-family="IBM Plex Mono, monospace">anthropic-api-key</text>
+        <circle cx="828" cy="460" r="3.5" fill="#2F8F62" />
+        <text x="840" y="464" font-size="10.5" fill="#152138" font-family="IBM Plex Mono, monospace">voyage-api-key</text>
+        <circle cx="828" cy="480" r="3.5" fill="#9FB0C8" />
+        <text x="840" y="484" font-size="10.5" fill="#58698A" font-family="IBM Plex Mono, monospace">+ 6 pendentes</text>
+        <text x="840" y="500" font-size="9.5" fill="#58698A" font-family="IBM Plex Mono, monospace">(telegram · whatsapp · handoff)</text>
+
+        <!-- amber arrow config.ts -> key vault -->
+        <line x1="372" y1="464" x2="817" y2="462" stroke="#B5701E" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrowSecret)" />
+        <text x="595" y="452" text-anchor="middle" font-size="10.5" font-weight="600" fill="#B5701E" font-family="IBM Plex Mono, monospace">Managed Identity → GET secret</text>
+        <text x="595" y="478" text-anchor="middle" font-size="9.5" fill="#58698A" font-family="IBM Plex Mono, monospace">(sem credencial em disco)</text>
+
+        <!-- exit arrows to external APIs -->
+        <g stroke="#1C5FCC" stroke-width="2" fill="none" color="#1C5FCC">
+          <polyline points="515,730 515,765 340,765 340,798" marker-end="url(#arrowFlow)" />
+          <polyline points="665,730 665,765 780,765 780,798" marker-end="url(#arrowFlow)" />
+        </g>
+        <text x="430" y="758" text-anchor="middle" font-size="10" fill="#58698A" font-family="IBM Plex Mono, monospace">embeddings</text>
+        <text x="720" y="758" text-anchor="middle" font-size="10" fill="#58698A" font-family="IBM Plex Mono, monospace">chat</text>
+
+        <!-- external API boxes -->
+        <rect x="200" y="800" width="280" height="80" rx="6" fill="#FFFFFF" stroke="#9FB0C8" />
+        <text x="340" y="828" text-anchor="middle" font-size="12.5" font-weight="700" fill="#152138" font-family="IBM Plex Mono, monospace">Voyage AI (via MongoDB)</text>
+        <text x="340" y="845" text-anchor="middle" font-size="10" fill="#58698A" font-family="IBM Plex Mono, monospace">ai.mongodb.com/v1/embeddings</text>
+        <text x="340" y="860" text-anchor="middle" font-size="10" fill="#58698A" font-family="IBM Plex Mono, monospace">voyage-3.5-lite</text>
+
+        <rect x="640" y="800" width="280" height="80" rx="6" fill="#FFFFFF" stroke="#9FB0C8" />
+        <text x="780" y="828" text-anchor="middle" font-size="12.5" font-weight="700" fill="#152138" font-family="IBM Plex Mono, monospace">Anthropic API</text>
+        <text x="780" y="845" text-anchor="middle" font-size="10" fill="#58698A" font-family="IBM Plex Mono, monospace">api.anthropic.com</text>
+        <text x="780" y="860" text-anchor="middle" font-size="10" fill="#58698A" font-family="IBM Plex Mono, monospace">claude-haiku-4-5</text>
+
+        </g>
+      </svg>

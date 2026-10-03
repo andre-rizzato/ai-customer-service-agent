@@ -1,0 +1,91 @@
+<svg viewBox="0 0 1120 560" role="img" aria-label="Diagrama em três camadas: verticais de negócio (barbearia, salão e clínica de um lado; loja e vendas ao consumidor do outro) apontando para capacidades de domínio (SchedulingBackend, SalesBackend, OrderBackend), cada uma com conectores plugáveis codificados por cor conforme o grau de reuso — verde para reuso total, azul para reuso configurável, laranja para código específico por cliente."><rect x="0" y="0" width="1120" height="560" fill="#F3F6FA" />
+        <defs>
+          <marker id="arrowFlow2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor" />
+          </marker>
+        </defs>
+
+        <g stroke="#9FB0C8" stroke-width="1">
+          <path d="M30,10 v14 M23,17 h14" />
+          <path d="M1090,10 v14 M1083,17 h14" />
+          <path d="M30,536 v14 M23,543 h14" />
+          <path d="M1090,536 v14 M1083,543 h14" />
+        </g>
+
+        <!-- Verticals -->
+        <g font-family="IBM Plex Mono, monospace">
+          <rect x="40" y="30" width="320" height="64" rx="6" fill="#FFFFFF" stroke="#9FB0C8" />
+          <text x="200" y="56" text-anchor="middle" font-size="12.5" font-weight="600" fill="#152138">Barbearia, salão &amp; clínica</text>
+          <text x="200" y="74" text-anchor="middle" font-size="10" fill="#58698A">agendamento de horário</text>
+
+          <rect x="450" y="30" width="630" height="64" rx="6" fill="#FFFFFF" stroke="#9FB0C8" />
+          <text x="765" y="56" text-anchor="middle" font-size="12.5" font-weight="600" fill="#152138">Loja / vendas ao consumidor</text>
+          <text x="765" y="74" text-anchor="middle" font-size="10" fill="#58698A">catálogo · negociação · checkout · pós-venda</text>
+        </g>
+
+        <!-- arrows verticals -> capabilities -->
+        <g stroke="#1C5FCC" stroke-width="2" fill="none" color="#1C5FCC">
+          <line x1="200" y1="94" x2="200" y2="238" marker-end="url(#arrowFlow2)" />
+          <line x1="600" y1="94" x2="560" y2="238" marker-end="url(#arrowFlow2)" />
+          <line x1="930" y1="94" x2="920" y2="238" marker-end="url(#arrowFlow2)" />
+        </g>
+
+        <!-- Capabilities -->
+        <g font-family="IBM Plex Mono, monospace">
+          <rect x="40" y="240" width="320" height="130" rx="6" fill="#E7ECF3" stroke="#9FB0C8" />
+          <text x="60" y="266" font-size="13" font-weight="700" fill="#152138">SchedulingBackend</text>
+          <text x="60" y="288" font-size="10.5" fill="#58698A">check_availability()</text>
+          <text x="60" y="306" font-size="10.5" fill="#58698A">book() / reschedule()</text>
+          <text x="60" y="324" font-size="10.5" fill="#58698A">cancel()</text>
+
+          <rect x="400" y="240" width="320" height="130" rx="6" fill="#E7ECF3" stroke="#9FB0C8" />
+          <text x="420" y="266" font-size="13" font-weight="700" fill="#152138">SalesBackend</text>
+          <text x="420" y="288" font-size="10.5" fill="#58698A">search_products() / get_product()</text>
+          <text x="420" y="306" font-size="10.5" fill="#58698A">create_checkout_link()</text>
+
+          <rect x="760" y="240" width="320" height="130" rx="6" fill="#E7ECF3" stroke="#9FB0C8" />
+          <text x="780" y="266" font-size="13" font-weight="700" fill="#152138">OrderBackend</text>
+          <text x="780" y="288" font-size="10.5" fill="#58698A">get_status()</text>
+          <text x="780" y="306" font-size="10.5" fill="#58698A">cancel()</text>
+        </g>
+
+        <!-- arrows capabilities -> connectors -->
+        <g stroke="#58698A" stroke-width="1.75" fill="none" color="#58698A">
+          <line x1="200" y1="370" x2="200" y2="406" marker-end="url(#arrowFlow2)" />
+          <line x1="560" y1="370" x2="560" y2="406" marker-end="url(#arrowFlow2)" />
+          <line x1="920" y1="370" x2="920" y2="406" marker-end="url(#arrowFlow2)" />
+        </g>
+
+        <!-- Connectors: Scheduling -->
+        <g font-family="IBM Plex Mono, monospace" font-size="11" font-weight="600">
+          <rect x="60" y="410" width="280" height="30" rx="5" fill="#FFFFFF" stroke="#2F8F62" stroke-width="1.5" />
+          <text x="200" y="430" text-anchor="middle" fill="#2F8F62">GoogleCalendarBackend</text>
+
+          <rect x="60" y="448" width="280" height="30" rx="5" fill="#FFFFFF" stroke="#1C5FCC" stroke-width="1.5" />
+          <text x="200" y="468" text-anchor="middle" fill="#1C5FCC">RestSchedulingBackend</text>
+
+          <rect x="60" y="486" width="280" height="30" rx="5" fill="#FFFFFF" stroke="#B4432E" stroke-width="1.5" />
+          <text x="200" y="506" text-anchor="middle" fill="#B4432E">CustomBackend</text>
+        </g>
+
+        <!-- Connectors: Sales -->
+        <g font-family="IBM Plex Mono, monospace" font-size="11" font-weight="600">
+          <rect x="420" y="410" width="280" height="30" rx="5" fill="#FFFFFF" stroke="#2F8F62" stroke-width="1.5" />
+          <text x="560" y="430" text-anchor="middle" fill="#2F8F62">PaymentLinkBackend</text>
+
+          <rect x="420" y="448" width="280" height="30" rx="5" fill="#FFFFFF" stroke="#1C5FCC" stroke-width="1.5" />
+          <text x="560" y="468" text-anchor="middle" fill="#1C5FCC">RestSalesBackend</text>
+
+          <rect x="420" y="486" width="280" height="30" rx="5" fill="#FFFFFF" stroke="#B4432E" stroke-width="1.5" />
+          <text x="560" y="506" text-anchor="middle" fill="#B4432E">CustomBackend</text>
+        </g>
+
+        <!-- Connectors: Order -->
+        <g font-family="IBM Plex Mono, monospace" font-size="11" font-weight="600">
+          <rect x="780" y="410" width="280" height="30" rx="5" fill="#FFFFFF" stroke="#1C5FCC" stroke-width="1.5" />
+          <text x="920" y="430" text-anchor="middle" fill="#1C5FCC">RestOrderBackend</text>
+
+          <rect x="780" y="448" width="280" height="30" rx="5" fill="#FFFFFF" stroke="#B4432E" stroke-width="1.5" />
+          <text x="920" y="468" text-anchor="middle" fill="#B4432E">CustomBackend</text>
+        </g>
+      </svg>
