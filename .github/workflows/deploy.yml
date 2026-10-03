@@ -45,13 +45,24 @@ jobs:
             -e "ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no" \
             ./ "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/home/${{ secrets.VM_USER }}/agente-atendimento/"
 
-      - name: Install, build, restart
+      - name: Stop services, install, build, restart
+        # vm-agente is a Standard_B1s (892MB RAM, 1 vCPU, no swap by default
+        # as of the first deploy). `npm ci` running concurrently with BOTH
+        # pm2 processes already resident locked the VM solid once -
+        # unresponsive even at the SSH banner, needed an Azure-level
+        # restart to recover. Stopping both (not just this repo's own)
+        # before installing, on a VM this small, is the fix - a few
+        # seconds of downtime on a single-tenant test environment is a
+        # trivial price for not repeating that incident on every push.
+        # (A 1GB swapfile was also added on the VM as a second line of
+        # defense, but don't rely on it alone - see the incident above.)
         run: |
           ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" '
             set -e
+            pm2 stop agente-atendimento agent-service || true
             cd ~/agente-atendimento
             npm ci
             npm run build
-            pm2 restart agente-atendimento --update-env
+            pm2 restart agente-atendimento agent-service --update-env
             pm2 save
           '
