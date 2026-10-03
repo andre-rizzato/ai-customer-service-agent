@@ -1,0 +1,57 @@
+# Redeploy to the test VM (rg-agente-atendimento, vm-agente) on every push
+# to master. "Test" is deliberate here — this VM is a single-tenant test
+# environment (see docs/GO_LIVE_CHECKLIST.md and the connectors/README.md
+# note in the sibling DistributedOrderSystem repo); a real staging/
+# production pipeline gets built per-client, later, not by widening this one.
+#
+# Deploys code only — never touches the VM's .env or config/agent.config.json
+# (both are gitignored, VM-local, and must keep whatever secrets/business
+# config are already there). KEY_VAULT_ENABLED=true means no API key ever
+# needs to exist in this workflow at all; DEPLOY_SSH_KEY is the only secret
+# it uses, scoped to a dedicated key (not anyone's personal SSH key) with
+# port/X11/agent forwarding disabled in the VM's authorized_keys.
+name: Deploy to test VM
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.VM_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Rsync code to the VM
+        # Excludes mirror the local manual deploy process: node_modules/dist
+        # get rebuilt on the VM, data/ is runtime state, .env and
+        # config/agent.config.json are VM-local and must survive redeploys.
+        run: |
+          rsync -az --delete \
+            --exclude node_modules \
+            --exclude .git \
+            --exclude dist \
+            --exclude data \
+            --exclude .env \
+            --exclude docs/artifacts \
+            --exclude config/agent.config.json \
+            -e "ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no" \
+            ./ "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/home/${{ secrets.VM_USER }}/agente-atendimento/"
+
+      - name: Install, build, restart
+        run: |
+          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no "${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}" '
+            set -e
+            cd ~/agente-atendimento
+            npm ci
+            npm run build
+            pm2 restart agente-atendimento --update-env
+            pm2 save
+          '
