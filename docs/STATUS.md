@@ -63,6 +63,7 @@ institucional). Para os passos manuais de domínio/email/WhatsApp, ver
 - [x] Bot fica em silêncio total depois de um handoff (`HandoffStateStore`, persistido em disco), com liberação manual (`scripts/releaseHandoff.ts`) e timeout de segurança (4h, configurável)
 - [x] `agent-service` na VM mudado de `--host 0.0.0.0` pra `127.0.0.1` — porta 8100 não é mais alcançável de fora da VM
 - [x] Regra anti-alucinação de status de pedido no system prompt (RAG nunca inventa status)
+- [x] **Incidente resolvido no deploy**: a nova checagem cruzada de `WHATSAPP_APP_SECRET` (item #3) derrubou o `agente-atendimento` na VM em crash-loop — o secret nunca tinha sido criado no Key Vault, porque não existia antes desta revisão. Corrigido adicionando `whatsapp-app-secret` em `kv-agente-atendimento` e reiniciando o processo; confirmado estável (sem mais restarts) e com os 3 canais montados. Lição: uma checagem fail-fast nova que depende de um secret precisa do secret já existir no Key Vault ANTES do deploy que introduz a checagem, não depois.
 - Detalhe completo dos 8 pontos revisados, o que foi corrigido e o que ficou pendente: [`SECURITY_REVIEW.md`](SECURITY_REVIEW.md)
 
 ### CI/CD

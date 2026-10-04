@@ -71,6 +71,16 @@ mensagens inteiras.
   obrigatório — falha rápido na inicialização, não em produção na primeira
   mensagem) e adicionado à lista `SECRET_ENV_VARS` (Key Vault).
 
+**Incidente no deploy desta mesma revisão:** a checagem acima derrubou o
+`agente-atendimento` na VM em crash-loop logo depois do push — o secret
+`whatsapp-app-secret` nunca tinha sido criado em `kv-agente-atendimento`,
+porque a exigência não existia antes desta sessão. Corrigido adicionando o
+secret no vault e reiniciando o processo (ver `STATUS.md`). Fica como nota
+pra próxima vez: uma checagem fail-fast nova que depende de Key Vault
+precisa do secret já existir ANTES do push que introduz a checagem, não
+depois — senão o deploy automático quebra o serviço em produção mesmo com
+os testes locais passando (o teste local não tem acesso ao Key Vault real).
+
 ## #4 — Autorização de cancelamento de pedido / identidade do solicitante
 
 **Risco levantado:** nada impedia o agente de cancelar um pedido a partir

@@ -295,7 +295,7 @@
       <div class="meta-cell"><span class="k">Projeto</span>ai-customer-service-agent</div>
       <div class="meta-cell"><span class="k">Resource group</span>rg-agente-atendimento</div>
       <div class="meta-cell"><span class="k">Região</span>eastus</div>
-      <div class="meta-cell"><span class="k">Atualizado</span>03 out 2026</div>
+      <div class="meta-cell"><span class="k">Atualizado</span>04 out 2026</div>
     </div>
   </header>
 
@@ -427,9 +427,9 @@
         <text x="840" y="444" font-size="10.5" fill="var(--ink)" font-family="IBM Plex Mono, monospace">anthropic-api-key</text>
         <circle cx="828" cy="460" r="3.5" fill="var(--good)" />
         <text x="840" y="464" font-size="10.5" fill="var(--ink)" font-family="IBM Plex Mono, monospace">voyage-api-key</text>
-        <circle cx="828" cy="480" r="3.5" fill="var(--border-strong)" />
-        <text x="840" y="484" font-size="10.5" fill="var(--ink-muted)" font-family="IBM Plex Mono, monospace">+ 6 pendentes</text>
-        <text x="840" y="500" font-size="9.5" fill="var(--ink-muted)" font-family="IBM Plex Mono, monospace">(telegram · whatsapp · handoff)</text>
+        <circle cx="828" cy="480" r="3.5" fill="var(--good)" />
+        <text x="840" y="484" font-size="10.5" fill="var(--ink)" font-family="IBM Plex Mono, monospace">+ 6 configurados</text>
+        <text x="840" y="500" font-size="9.5" fill="var(--ink-muted)" font-family="IBM Plex Mono, monospace">(telegram · whatsapp) · handoff-webhook-url pendente</text>
 
         <!-- amber arrow config.ts -> key vault -->
         <line x1="372" y1="464" x2="817" y2="462" stroke="var(--accent-2)" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrowSecret)" />
@@ -536,15 +536,24 @@
         <tbody>
           <tr><td>ANTHROPIC_API_KEY</td><td>anthropic-api-key</td><td><span class="status ok-text"><span class="dot ok"></span>configurado</span></td></tr>
           <tr><td>VOYAGE_API_KEY</td><td>voyage-api-key</td><td><span class="status ok-text"><span class="dot ok"></span>configurado</span></td></tr>
-          <tr><td>TELEGRAM_BOT_TOKEN</td><td>telegram-bot-token</td><td><span class="status pending-text"><span class="dot pending"></span>pendente</span></td></tr>
-          <tr><td>TELEGRAM_WEBHOOK_SECRET</td><td>telegram-webhook-secret</td><td><span class="status pending-text"><span class="dot pending"></span>pendente</span></td></tr>
-          <tr><td>WHATSAPP_ACCESS_TOKEN</td><td>whatsapp-access-token</td><td><span class="status pending-text"><span class="dot pending"></span>pendente</span></td></tr>
-          <tr><td>WHATSAPP_PHONE_NUMBER_ID</td><td>whatsapp-phone-number-id</td><td><span class="status pending-text"><span class="dot pending"></span>pendente</span></td></tr>
-          <tr><td>WHATSAPP_VERIFY_TOKEN</td><td>whatsapp-verify-token</td><td><span class="status pending-text"><span class="dot pending"></span>pendente</span></td></tr>
+          <tr><td>TELEGRAM_BOT_TOKEN</td><td>telegram-bot-token</td><td><span class="status ok-text"><span class="dot ok"></span>configurado</span></td></tr>
+          <tr><td>TELEGRAM_WEBHOOK_SECRET</td><td>telegram-webhook-secret</td><td><span class="status ok-text"><span class="dot ok"></span>configurado</span></td></tr>
+          <tr><td>WHATSAPP_ACCESS_TOKEN</td><td>whatsapp-access-token</td><td><span class="status ok-text"><span class="dot ok"></span>configurado</span></td></tr>
+          <tr><td>WHATSAPP_PHONE_NUMBER_ID</td><td>whatsapp-phone-number-id</td><td><span class="status ok-text"><span class="dot ok"></span>configurado</span></td></tr>
+          <tr><td>WHATSAPP_VERIFY_TOKEN</td><td>whatsapp-verify-token</td><td><span class="status ok-text"><span class="dot ok"></span>configurado</span></td></tr>
+          <tr><td>WHATSAPP_APP_SECRET</td><td>whatsapp-app-secret</td><td><span class="status ok-text"><span class="dot ok"></span>configurado</span></td></tr>
           <tr><td>HANDOFF_WEBHOOK_URL</td><td>handoff-webhook-url</td><td><span class="status pending-text"><span class="dot pending"></span>pendente</span></td></tr>
         </tbody>
       </table>
     </div>
+    <p class="muted" style="margin-top:14px; font-size:14.5px;">
+      <span class="mono">WHATSAPP_APP_SECRET</span> entrou na revisão de segurança de 04/10/2026 — é o que
+      <span class="mono">channels/whatsapp.ts</span> usa pra validar a assinatura HMAC-SHA256
+      (<span class="mono">X-Hub-Signature-256</span>) de cada webhook recebido, não só o handshake único de
+      verificação. Detalhe completo dos 8 pontos revisados em
+      <a href="../SECURITY_REVIEW.md">SECURITY_REVIEW.md</a>; o processo <span class="mono">agent-service</span>
+      também deixou de escutar em <span class="mono">0.0.0.0</span> (item #6 do mesmo documento).
+    </p>
   </section>
 
   <section class="prose">
@@ -552,8 +561,8 @@
     <h2>O que falta para produção</h2>
     <ul class="checklist">
       <li><span class="box"></span><span>Catálogo real do negócio — hoje a VM ainda indexa <span class="mono">catalog.example.json</span>.</span></li>
-      <li><span class="box"></span><span>Tokens do Telegram e/ou WhatsApp, subidos no Key Vault seguindo a mesma convenção kebab-case.</span></li>
-      <li><span class="box"></span><span>Domínio real da Sua Empresa + Nginx/TLS na frente da porta 3000, hoje só acessível via SSH.</span></li>
+      <li><span class="box"></span><span>Chip <span class="mono">+55</span> registrado na API do WhatsApp — o número de teste do Meta é <span class="mono">+1</span> e a regra antifraude barra o envio <span class="mono">+1 → +55</span> (planejado semana de 11/10/2026, ver <a href="../GO_LIVE_CHECKLIST.md">GO_LIVE_CHECKLIST.md</a>).</span></li>
+      <li><span class="box"></span><span>Pergunta de verificação de identidade (fallback pra canais sem telefone confiável, ex. Telegram) e mecanismo de relay em tempo real pro atendente humano — ambos ainda não desenhados, ver <a href="../SECURITY_REVIEW.md">SECURITY_REVIEW.md</a> itens #4 e #5.</span></li>
     </ul>
   </section>
 
