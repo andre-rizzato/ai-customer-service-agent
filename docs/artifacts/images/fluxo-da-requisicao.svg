@@ -1,0 +1,211 @@
+<svg viewBox="0 0 1300 1800" role="img" aria-label="Diagrama detalhado mostrando o fluxo de uma mensagem do WhatsApp do cliente, passando pela Meta, Nginx, e dentro da VM pelos processos agente-atendimento (Node.js) e agent-service (Python), módulo por módulo, até a resposta ser enviada de volta via WhatsApp Graph API."><rect x="0" y="0" width="1300" height="1800" fill="#F3F6FA" />
+        <defs>
+          <marker id="arrowFlow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor" />
+          </marker>
+          <marker id="arrowSecret" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#B5701E" />
+          </marker>
+          <marker id="arrowBranch" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#6E5A9E" />
+          </marker>
+        </defs>
+
+        <g stroke="#9FB0C8" stroke-width="1">
+          <path d="M30,10 v16 M23,17 h16" />
+          <path d="M1270,10 v16 M1263,17 h16" />
+          <path d="M30,1774 v16 M23,1781 h16" />
+          <path d="M1270,1774 v16 M1263,1781 h16" />
+        </g>
+
+        <g font-family="IBM Plex Mono, monospace">
+
+        <!-- Cliente -->
+        <rect x="510" y="20" width="280" height="70" rx="6" fill="#FFFFFF" stroke="#9FB0C8" />
+        <text x="650" y="50" text-anchor="middle" font-size="13" font-weight="700" fill="#152138">Cliente final</text>
+        <text x="650" y="67" text-anchor="middle" font-size="10" fill="#58698A">app do WhatsApp</text>
+
+        <line x1="650" y1="90" x2="650" y2="128" stroke="#1C5FCC" stroke-width="2" marker-end="url(#arrowFlow)" color="#1C5FCC" />
+        <text x="664" y="113" font-size="10" fill="#58698A">1 · envia mensagem</text>
+
+        <!-- Meta -->
+        <rect x="430" y="130" width="440" height="80" rx="6" fill="#E7ECF3" stroke="#9FB0C8" />
+        <text x="650" y="162" text-anchor="middle" font-size="13" font-weight="700" fill="#152138">Meta / WhatsApp Cloud API</text>
+        <text x="650" y="180" text-anchor="middle" font-size="10" fill="#58698A">servidores da Meta</text>
+        <text x="650" y="196" text-anchor="middle" font-size="9.5" fill="#58698A">valida webhook, repassa a mensagem</text>
+
+        <line x1="650" y1="210" x2="650" y2="248" stroke="#1C5FCC" stroke-width="2" marker-end="url(#arrowFlow)" color="#1C5FCC" />
+        <text x="664" y="233" font-size="10" fill="#58698A">2 · POST /webhook/whatsapp (HTTPS)</text>
+
+        <!-- VM boundary -->
+        <rect x="40" y="250" width="700" height="1500" rx="8" fill="none" stroke="#58698A" stroke-width="1.5" stroke-dasharray="5 4" />
+        <text x="60" y="272" font-size="10.5" font-weight="600" letter-spacing="0.04em" fill="#58698A">AZURE · VM vm-agente (UBUNTU 22.04)</text>
+
+        <!-- Nginx -->
+        <rect x="80" y="290" width="620" height="80" rx="6" fill="#FFFFFF" stroke="#9FB0C8" />
+        <text x="390" y="322" text-anchor="middle" font-size="12.5" font-weight="700" fill="#152138">Nginx — reverse proxy :443 / :80</text>
+        <text x="390" y="339" text-anchor="middle" font-size="10" fill="#58698A">TLS (Let's Encrypt) · proxy_pass → localhost:3000</text>
+        <text x="390" y="355" text-anchor="middle" font-size="9.5" fill="#58698A">redireciona :80 → :443</text>
+
+        <line x1="390" y1="370" x2="390" y2="398" stroke="#1C5FCC" stroke-width="2" marker-end="url(#arrowFlow)" color="#1C5FCC" />
+        <text x="404" y="388" font-size="10" fill="#58698A">3 · proxy_pass</text>
+
+        <!-- PM2 boundary -->
+        <rect x="60" y="400" width="660" height="1330" rx="8" fill="none" stroke="#58698A" stroke-width="1.3" stroke-dasharray="4 3" />
+        <text x="80" y="422" font-size="10" font-weight="600" letter-spacing="0.03em" fill="#58698A">PM2 (GERENCIADOR DE PROCESSOS · SYSTEMD NO BOOT)</text>
+
+        <!-- Service 1 -->
+        <rect x="80" y="440" width="620" height="730" rx="6" fill="#FFFFFF" stroke="#9FB0C8" />
+        <text x="100" y="463" font-size="12.5" font-weight="700" fill="#152138">agente-atendimento — Node.js :3000</text>
+        <text x="100" y="479" font-size="9.5" fill="#58698A">src/ — processo PM2 principal, exposto pelo Nginx</text>
+
+        <!-- config.ts -->
+        <rect x="540" y="448" width="150" height="46" rx="5" fill="#E7ECF3" stroke="#C7D2E0" stroke-dasharray="3 3" />
+        <text x="615" y="467" text-anchor="middle" font-size="10" font-weight="600" fill="#152138">config.ts</text>
+        <text x="615" y="481" text-anchor="middle" font-size="8.5" fill="#58698A">.env + Key Vault (boot)</text>
+
+        <!-- step 4 -->
+        <rect x="110" y="510" width="560" height="54" rx="5" fill="#E7ECF3" stroke="#C7D2E0" />
+        <text x="126" y="530" font-size="11" font-weight="700" fill="#152138">4 · channels/whatsapp.ts</text>
+        <text x="126" y="546" font-size="9.5" fill="#58698A">.handleWebhook() — recebe o payload da Meta, normaliza em InboundMessage</text>
+        <line x1="390" y1="564" x2="390" y2="576" stroke="#1C5FCC" stroke-width="1.75" marker-end="url(#arrowFlow)" color="#1C5FCC" />
+
+        <!-- step 5 -->
+        <rect x="110" y="578" width="560" height="48" rx="5" fill="#E7ECF3" stroke="#C7D2E0" />
+        <text x="126" y="597" font-size="11" font-weight="700" fill="#152138">5 · orchestrator/rateLimiter.ts</text>
+        <text x="126" y="612" font-size="9.5" fill="#58698A">bloqueia se a conversa exceder mensagens/min configurado</text>
+        <line x1="390" y1="626" x2="390" y2="638" stroke="#1C5FCC" stroke-width="1.75" marker-end="url(#arrowFlow)" color="#1C5FCC" />
+
+        <!-- step 6 -->
+        <rect x="110" y="640" width="560" height="58" rx="5" fill="#E7ECF3" stroke="#C7D2E0" />
+        <text x="126" y="660" font-size="11" font-weight="700" fill="#152138">6 · orchestrator/handoff.ts</text>
+        <text x="126" y="675" font-size="9.5" fill="#58698A">gatilho por palavra-chave (pedido humano, frustração)</text>
+        <text x="126" y="688" font-size="9" fill="#58698A" font-style="italic">se disparar: notifica humano, responde direto — pula o resto</text>
+        <line x1="390" y1="698" x2="390" y2="710" stroke="#1C5FCC" stroke-width="1.75" marker-end="url(#arrowFlow)" color="#1C5FCC" />
+
+        <!-- step 7 -->
+        <rect x="110" y="712" width="560" height="58" rx="5" fill="#E7ECF3" stroke="#C7D2E0" />
+        <text x="126" y="732" font-size="11" font-weight="700" fill="#152138">7 · orchestrator/capabilityRouter.ts</text>
+        <text x="126" y="747" font-size="9.5" fill="#58698A">detecta pedido (order) / agenda / venda por palavra-chave</text>
+        <text x="126" y="760" font-size="9" fill="#58698A" font-style="italic">ponto de decisão — duas saídas abaixo</text>
+
+        <!-- branch: RAG path (default) -->
+        <line x1="390" y1="770" x2="390" y2="798" stroke="#1C5FCC" stroke-width="2" marker-end="url(#arrowFlow)" color="#1C5FCC" />
+        <text x="404" y="790" font-size="9.5" fill="#58698A">sem capacidade / pergunta geral</text>
+
+        <!-- branch: order path -> service2 -->
+        <polyline points="670,741 710,741 710,1238 700,1238" fill="none" stroke="#6E5A9E" stroke-width="2" marker-end="url(#arrowBranch)" />
+        <text x="716" y="990" font-size="9.5" fill="#6E5A9E" transform="rotate(90 716 990)">capacidade "order" →</text>
+
+        <!-- step 8 RAG -->
+        <rect x="110" y="800" width="560" height="60" rx="5" fill="#E7ECF3" stroke="#C7D2E0" />
+        <text x="126" y="820" font-size="11" font-weight="700" fill="#152138">8 · knowledge/knowledgeBase.ts + vectorStore.ts</text>
+        <text x="126" y="835" font-size="9.5" fill="#58698A">busca por similaridade de cosseno no índice local (top-K)</text>
+        <text x="126" y="848" font-size="9" fill="#58698A" font-style="italic">embeda a pergunta primeiro — ver seta pra Voyage →</text>
+        <line x1="670" y1="830" x2="810" y2="831" stroke="#1C5FCC" stroke-width="2" marker-end="url(#arrowFlow)" color="#1C5FCC" />
+        <line x1="390" y1="860" x2="390" y2="874" stroke="#1C5FCC" stroke-width="1.75" marker-end="url(#arrowFlow)" color="#1C5FCC" />
+
+        <!-- step 9 -->
+        <rect x="110" y="876" width="560" height="50" rx="5" fill="#E7ECF3" stroke="#C7D2E0" />
+        <text x="126" y="895" font-size="11" font-weight="700" fill="#152138">9 · orchestrator/promptBuilder.ts</text>
+        <text x="126" y="910" font-size="9.5" fill="#58698A">monta o system prompt: regras fixas + contexto recuperado</text>
+        <line x1="390" y1="926" x2="390" y2="940" stroke="#1C5FCC" stroke-width="1.75" marker-end="url(#arrowFlow)" color="#1C5FCC" />
+
+        <!-- step 10 -->
+        <rect x="110" y="942" width="560" height="54" rx="5" fill="#E7ECF3" stroke="#C7D2E0" />
+        <text x="126" y="962" font-size="11" font-weight="700" fill="#152138">10 · llm/anthropicProvider.ts</text>
+        <text x="126" y="977" font-size="9.5" fill="#58698A">chama o modelo com o prompt + histórico da conversa</text>
+        <line x1="670" y1="969" x2="780" y2="1020" stroke="#1C5FCC" stroke-width="2" marker-end="url(#arrowFlow)" color="#1C5FCC" />
+        <line x1="390" y1="996" x2="390" y2="1010" stroke="#1C5FCC" stroke-width="1.75" marker-end="url(#arrowFlow)" color="#1C5FCC" />
+
+        <!-- step 11 -->
+        <rect x="110" y="1012" width="560" height="54" rx="5" fill="#E7ECF3" stroke="#C7D2E0" />
+        <text x="126" y="1032" font-size="11" font-weight="700" fill="#152138">11 · conversation/store.ts</text>
+        <text x="126" y="1047" font-size="9.5" fill="#58698A">grava o turno no histórico + audit log (JSONL)</text>
+        <text x="126" y="1060" font-size="9" fill="#58698A" font-style="italic">caminho RAG e caminho order (7a-7e) convergem aqui</text>
+        <line x1="390" y1="1066" x2="390" y2="1080" stroke="#1C5FCC" stroke-width="1.75" marker-end="url(#arrowFlow)" color="#1C5FCC" />
+
+        <!-- step 12 -->
+        <rect x="110" y="1082" width="560" height="58" rx="5" fill="#E7ECF3" stroke="#C7D2E0" />
+        <text x="126" y="1102" font-size="11" font-weight="700" fill="#152138">12 · channels/whatsapp.ts</text>
+        <text x="126" y="1117" font-size="9.5" fill="#58698A">.send() — POST pra Graph API com o texto da resposta</text>
+        <line x1="670" y1="1111" x2="780" y2="1045" stroke="#1C5FCC" stroke-width="2" marker-end="url(#arrowFlow)" color="#1C5FCC" />
+
+        <!-- Service 2 -->
+        <rect x="80" y="1210" width="620" height="440" rx="6" fill="#FFFFFF" stroke="#9FB0C8" />
+        <text x="100" y="1233" font-size="12.5" font-weight="700" fill="#152138">agent-service — Python/FastAPI :8100</text>
+        <text x="100" y="1249" font-size="9.5" fill="#58698A">DistributedOrderSystem/src/AgentService — só interno, nunca exposto pelo Nginx</text>
+
+        <!-- step 7a -->
+        <rect x="110" y="1270" width="560" height="48" rx="5" fill="#E7ECF3" stroke="#C7D2E0" />
+        <text x="126" y="1289" font-size="11" font-weight="700" fill="#152138">7a · main.py</text>
+        <text x="126" y="1304" font-size="9.5" fill="#58698A">FastAPI, recebe POST /agent/message do orchestrator</text>
+        <line x1="390" y1="1318" x2="390" y2="1330" stroke="#6E5A9E" stroke-width="1.75" marker-end="url(#arrowBranch)" />
+
+        <!-- step 7b -->
+        <rect x="110" y="1332" width="560" height="56" rx="5" fill="#E7ECF3" stroke="#C7D2E0" />
+        <text x="126" y="1351" font-size="11" font-weight="700" fill="#152138">7b · intent_classifier.py</text>
+        <text x="126" y="1366" font-size="9.5" fill="#58698A">classifica intenção via Anthropic (instructor, few-shot)</text>
+        <line x1="670" y1="1360" x2="786" y2="1225" stroke="#6E5A9E" stroke-width="1.75" marker-end="url(#arrowBranch)" />
+        <line x1="390" y1="1388" x2="390" y2="1400" stroke="#6E5A9E" stroke-width="1.75" marker-end="url(#arrowBranch)" />
+
+        <!-- step 7c -->
+        <rect x="110" y="1402" width="560" height="46" rx="5" fill="#E7ECF3" stroke="#C7D2E0" />
+        <text x="126" y="1421" font-size="11" font-weight="700" fill="#152138">7c · graph.py — route_by_confidence()</text>
+        <text x="126" y="1436" font-size="9.5" fill="#58698A">decide o próximo nó — função pura, sem custo de modelo</text>
+        <line x1="390" y1="1448" x2="390" y2="1460" stroke="#6E5A9E" stroke-width="1.75" marker-end="url(#arrowBranch)" />
+
+        <!-- step 7d -->
+        <rect x="110" y="1462" width="560" height="56" rx="5" fill="#E7ECF3" stroke="#C7D2E0" />
+        <text x="126" y="1481" font-size="11" font-weight="700" fill="#152138">7d · connectors/order_rest.py (RestOrderBackend)</text>
+        <text x="126" y="1496" font-size="9.5" fill="#58698A">consulta/cancela no backend de pedidos configurado</text>
+        <line x1="670" y1="1490" x2="810" y2="1496" stroke="#6E5A9E" stroke-width="1.75" marker-end="url(#arrowBranch)" />
+        <line x1="390" y1="1518" x2="390" y2="1530" stroke="#6E5A9E" stroke-width="1.75" marker-end="url(#arrowBranch)" />
+
+        <!-- step 7e -->
+        <rect x="110" y="1532" width="560" height="56" rx="5" fill="#E7ECF3" stroke="#C7D2E0" />
+        <text x="126" y="1551" font-size="11" font-weight="700" fill="#152138">7e · graph.py — generate_reply_node()</text>
+        <text x="126" y="1566" font-size="9.5" fill="#58698A">monta a resposta grounded no dado real, via Anthropic</text>
+        <text x="126" y="1579" font-size="9" fill="#58698A" font-style="italic">retorna pro orchestrator → segue no passo 11</text>
+        <line x1="670" y1="1560" x2="792" y2="1230" stroke="#6E5A9E" stroke-width="1.75" marker-end="url(#arrowBranch)" />
+
+        </g>
+
+        <!-- External: Key Vault -->
+        <g font-family="IBM Plex Mono, monospace">
+        <rect x="820" y="448" width="400" height="70" rx="6" fill="#FFFFFF" stroke="#B5701E" stroke-width="1.5" />
+        <text x="840" y="473" font-size="12" font-weight="700" fill="#152138">Azure Key Vault</text>
+        <text x="840" y="489" font-size="9.5" fill="#58698A">kv-agente-atendimento — Managed Identity</text>
+        <text x="840" y="503" font-size="9" fill="#58698A">lido 1x no boot de cada processo</text>
+        <line x1="690" y1="471" x2="810" y2="483" stroke="#B5701E" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrowSecret)" />
+
+        <!-- External: Voyage -->
+        <rect x="820" y="800" width="400" height="70" rx="6" fill="#FFFFFF" stroke="#9FB0C8" />
+        <text x="840" y="825" font-size="12" font-weight="700" fill="#152138">Voyage AI (via MongoDB)</text>
+        <text x="840" y="841" font-size="9.5" fill="#58698A">ai.mongodb.com/v1/embeddings</text>
+        <text x="840" y="855" font-size="9" fill="#58698A">embedding da pergunta do usuário</text>
+
+        <!-- External: WhatsApp Graph API -->
+        <rect x="820" y="1000" width="400" height="90" rx="6" fill="#FFFFFF" stroke="#9FB0C8" />
+        <text x="840" y="1023" font-size="12" font-weight="700" fill="#152138">WhatsApp Graph API</text>
+        <text x="840" y="1039" font-size="9.5" fill="#58698A">graph.facebook.com — POST /messages</text>
+        <text x="840" y="1055" font-size="9" fill="#58698A" font-style="italic">13 · Meta entrega a mensagem pro cliente</text>
+        <text x="840" y="1070" font-size="9" fill="#58698A">(fecha o ciclo — volta ao topo deste diagrama)</text>
+
+        <!-- External: Anthropic -->
+        <rect x="820" y="1140" width="400" height="110" rx="6" fill="#FFFFFF" stroke="#9FB0C8" />
+        <text x="840" y="1163" font-size="12" font-weight="700" fill="#152138">Anthropic API</text>
+        <text x="840" y="1179" font-size="9.5" fill="#58698A">api.anthropic.com</text>
+        <text x="840" y="1195" font-size="9" fill="#58698A">3 chamadas possíveis por mensagem:</text>
+        <text x="840" y="1209" font-size="9" fill="#58698A">· classificação de intenção (7b)</text>
+        <text x="840" y="1222" font-size="9" fill="#58698A">· resposta com RAG (10)</text>
+        <text x="840" y="1235" font-size="9" fill="#58698A">· resposta grounded em pedido (7e)</text>
+
+        <!-- External: Order backend -->
+        <rect x="820" y="1462" width="400" height="70" rx="6" fill="#FFFFFF" stroke="#9FB0C8" />
+        <text x="840" y="1487" font-size="12" font-weight="700" fill="#152138">Backend de pedidos</text>
+        <text x="840" y="1503" font-size="9.5" fill="#58698A">hoje: dummyjson.com (fallback público)</text>
+        <text x="840" y="1517" font-size="9" fill="#58698A">amanhã: GatewayBff do DistributedOrderSystem</text>
+        </g>
+
+      </svg>

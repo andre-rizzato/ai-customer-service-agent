@@ -15,6 +15,7 @@ const TOKENS = {
   "--ink-muted": "#58698A",
   "--accent": "#1C5FCC",
   "--accent-2": "#B5701E",
+  "--branch": "#6E5A9E",
   "--good": "#2F8F62",
   "--warn": "#B4432E",
   "--border": "#C7D2E0",
@@ -71,4 +72,7 @@ process("docs/artifacts/blueprint-do-agente.html", ["docs/artifacts/images/bluep
 process("docs/artifacts/mapa-capacidades.html", [
   "docs/artifacts/images/mapa-capacidades-camadas.svg",
   "docs/artifacts/images/mapa-capacidades-multi-tenant.svg",
+]);
+process("docs/artifacts/fluxo-da-requisicao.html", [
+  "docs/artifacts/images/fluxo-da-requisicao.svg",
 ]);

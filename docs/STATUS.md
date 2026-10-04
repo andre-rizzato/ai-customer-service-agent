@@ -64,6 +64,8 @@ institucional). Para os passos manuais de domínio/email/WhatsApp, ver
 
 - [x] [`Blueprint do Agente`](artifacts/blueprint-do-agente.html) — arquitetura de deploy, fluxo de mensagem, Key Vault
 - [x] [`Mapa de Capacidades`](artifacts/mapa-capacidades.html) — capacidades plugáveis, decisões de pagamento/implantação/roteamento
+- [x] [`Fluxo da Requisição`](artifacts/fluxo-da-requisicao.html) — Nginx/PM2/serviços, módulo por módulo, do webhook do WhatsApp até a resposta
+- [x] [`SSH_LINUX_GUIDE.pdf`](SSH_LINUX_GUIDE.pdf) — conectar na VM, comandos essenciais, receitas da rotina real do projeto
 - [x] Diagramas exportados como SVG standalone em `artifacts/images/` (abaixo)
 - [x] `GO_LIVE_CHECKLIST.md` — passos de domínio/email/DNS/Meta Developers + plano de teste com 2 tenants
 
@@ -72,6 +74,8 @@ institucional). Para os passos manuais de domínio/email/WhatsApp, ver
 <img src="artifacts/images/mapa-capacidades-camadas.svg" alt="Diagrama de camadas do Mapa de Capacidades" width="100%" />
 
 <img src="artifacts/images/mapa-capacidades-multi-tenant.svg" alt="Diagrama de implantação multi-tenant do Mapa de Capacidades" width="100%" />
+
+<img src="artifacts/images/fluxo-da-requisicao.svg" alt="Diagrama do fluxo da requisição, do WhatsApp até a resposta" width="100%" />
 
 ---
 
