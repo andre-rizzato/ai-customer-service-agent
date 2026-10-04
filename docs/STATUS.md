@@ -33,6 +33,14 @@ institucional). Para os passos manuais de domínio/email/WhatsApp, ver
 - [x] Deploy completo na VM via PM2 + systemd (sobrevive a reboot)
 - [x] Bug do endpoint da Voyage corrigido (`ai.mongodb.com`, não `api.voyageai.com`) e chave rotacionada
 - [x] Pipeline RAG + LLM + handoff validado de ponta a ponta
+- [x] Nginx + certificado Let's Encrypt (Certbot) na VM — `rizzato-tech.rizzatotech.com`, HTTPS com renovação automática
+- [x] `businessName` do tenant de teste atualizado pra "Rizzato Systems"
+
+### Canais
+
+- [x] **Telegram** — bot `@rizzatotech_atendimento_bot`, webhook registrado, **mensagem real testada em produção** (resposta do RAG recebida no app)
+- [x] **WhatsApp** — conta no Meta for Developers criada, número de teste liberado, webhook registrado e verificado (GET de verificação confirmado no log do Nginx)
+- [ ] **WhatsApp — envio bloqueado**: número de teste do Meta é `+1` (EUA); regra antifraude barra `+1 → +55` (erro 130497, descasamento de país — não é verificação de negócio/CNPJ). Correção planejada: registrar chip `+55` na API em nuvem (semana de 11/10/2026) — ver `GO_LIVE_CHECKLIST.md` passo 4 pros cuidados (chip sai do WhatsApp normal, guardar o PIN de 6 dígitos)
 
 ### Arquitetura de capacidades
 
@@ -72,9 +80,11 @@ institucional). Para os passos manuais de domínio/email/WhatsApp, ver
 ### Manual — só você consegue fazer (ver [`GO_LIVE_CHECKLIST.md`](GO_LIVE_CHECKLIST.md))
 
 - [x] ~~Domínio, site mínimo, email corporativo~~ — feito, ver seção acima
-- [ ] DNS dos tenants de teste do agente (`rizzato-systems`/`distributed-order`.rizzatotech.com → IP da VM) — separado do `www` do site institucional
-- [ ] Conta no Meta for Developers + número de teste do WhatsApp
-- [ ] Webhook registrado (Telegram e/ou WhatsApp)
+- [x] ~~DNS + HTTPS do tenant de teste~~ — `rizzato-tech.rizzatotech.com`, feito
+- [x] ~~Conta no Meta for Developers + número de teste do WhatsApp~~ — feito
+- [x] ~~Webhook registrado~~ — Telegram testado com mensagem real; WhatsApp verificado, envio pendente do chip `+55`
+- [ ] Chip `+55` registrado na API do WhatsApp (planejado semana de 11/10/2026)
+- [ ] DNS + teste via canal real pro tenant `DistributedOrderSystem` (só validado via `/webhook/web` até agora)
 - [ ] Catálogo real do negócio (hoje ainda é `catalog.example.json`)
 
 ### Técnico — capacidades
