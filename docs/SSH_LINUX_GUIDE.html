@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Agente de Atendimento IA — SSH e Linux na VM</title>
+<style>
+  @page { size: A4; margin: 22mm 18mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    color: #1a1a1a;
+    font-size: 10.5pt;
+    line-height: 1.5;
+  }
+  h1, h2, h3, h4 { color: #0f172a; page-break-after: avoid; }
+  h1 { font-size: 22pt; margin-bottom: 2mm; }
+  h2 {
+    font-size: 15pt; margin-top: 10mm; padding-bottom: 2mm;
+    border-bottom: 2px solid #15803d;
+  }
+  h3 { font-size: 12pt; margin-top: 6mm; color: #14532d; }
+  h4 { font-size: 10.5pt; margin-top: 4mm; }
+  p { margin: 2mm 0; }
+  code, pre {
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 9pt;
+  }
+  code {
+    background: #f1f5f9; padding: 0.5pt 3pt; border-radius: 3pt;
+    color: #b91c1c;
+  }
+  pre {
+    background: #0f172a; color: #e2e8f0; padding: 4mm;
+    border-radius: 3pt; line-height: 1.4;
+    white-space: pre-wrap; word-break: break-word;
+    page-break-inside: avoid;
+  }
+  pre code { background: none; color: inherit; padding: 0; }
+  table {
+    width: 100%; border-collapse: collapse; margin: 3mm 0;
+    font-size: 9pt; page-break-inside: avoid;
+  }
+  th, td { border: 1px solid #cbd5e1; padding: 1.8mm 3mm; text-align: left; vertical-align: top; }
+  th { background: #f0fdf4; color: #14532d; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  .cover {
+    height: 245mm; display: flex; flex-direction: column;
+    justify-content: center; page-break-after: always;
+  }
+  .cover .eyebrow {
+    color: #15803d; font-weight: 600; letter-spacing: 1.5pt;
+    text-transform: uppercase; font-size: 10pt; margin-bottom: 4mm;
+  }
+  .cover h1 { font-size: 30pt; max-width: 130mm; }
+  .cover .sub { font-size: 12pt; color: #475569; max-width: 130mm; margin-top: 4mm; }
+  .cover .meta { margin-top: 14mm; font-size: 9.5pt; color: #64748b; }
+  .cover .meta div { margin: 1mm 0; }
+  .badge-row { display: flex; gap: 4mm; margin-top: 8mm; flex-wrap: wrap; }
+  .badge {
+    background: #f0fdf4; color: #14532d; border: 1px solid #bbf7d0;
+    border-radius: 20pt; padding: 2mm 5mm; font-size: 9pt; font-weight: 600;
+  }
+  .callout {
+    border-left: 4pt solid #15803d; background: #f0fdf4;
+    padding: 3mm 5mm; margin: 4mm 0; border-radius: 2pt;
+    page-break-inside: avoid;
+  }
+  .callout.warn { border-left-color: #d97706; background: #fffbeb; }
+  .callout.danger { border-left-color: #dc2626; background: #fef2f2; }
+  .callout strong { display: block; margin-bottom: 1mm; color: #0f172a; }
+  .toc { page-break-after: always; }
+  .toc ol { padding-left: 6mm; }
+  .toc li { margin: 2mm 0; font-size: 11pt; }
+  .toc a { color: #14532d; text-decoration: none; }
+  footer.pagefoot {
+    margin-top: 10mm; padding-top: 3mm; border-top: 1px solid #cbd5e1;
+    font-size: 8pt; color: #94a3b8;
+  }
+  section { page-break-inside: avoid; }
+  ul, ol { margin: 2mm 0; padding-left: 6mm; }
+  li { margin: 1mm 0; }
+  .step {
+    display: flex; gap: 3mm; margin: 3mm 0; align-items: flex-start;
+    page-break-inside: avoid;
+  }
+  .step .n {
+    background: #15803d; color: white; border-radius: 50%;
+    width: 6mm; height: 6mm; min-width: 6mm; display: flex;
+    align-items: center; justify-content: center; font-size: 8.5pt;
+    font-weight: 700; margin-top: 0.5mm;
+  }
+  .checklist { list-style: none; padding-left: 0; }
+  .checklist li {
+    display: flex; gap: 3mm; align-items: flex-start; margin: 2mm 0;
+    padding: 1.5mm 0; border-bottom: 1px dotted #cbd5e1;
+  }
+  .checklist .box {
+    width: 4mm; height: 4mm; min-width: 4mm; border: 1.3pt solid #15803d;
+    border-radius: 1.5pt; margin-top: 0.8mm;
+  }
+  .checklist-group {
+    border: 1px solid #cbd5e1; border-radius: 3pt; padding: 4mm 5mm;
+    margin: 4mm 0; page-break-inside: avoid;
+  }
+  .checklist-group h3 { margin-top: 0; }
+  .recipe {
+    border: 1px solid #cbd5e1; border-radius: 3pt; padding: 4mm 5mm;
+    margin: 4mm 0; page-break-inside: avoid;
+  }
+  .recipe h4 { margin-top: 0; color: #14532d; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="eyebrow">Guia de Administração</div>
+  <h1>SSH e Linux na VM</h1>
+  <div class="sub">Como conectar na VM do agente, navegar pelos arquivos, editar configuração e rodar os comandos do dia a dia — PM2, Nginx, logs, memória e git.</div>
+  <div class="badge-row">
+    <span class="badge">Conexão SSH</span>
+    <span class="badge">Comandos essenciais</span>
+    <span class="badge">Rotina do projeto</span>
+    <span class="badge">Troubleshooting</span>
+  </div>
+  <div class="meta">
+    <div>Repositório: github.com/andre-rizzato/ai-customer-service-agent</div>
+    <div>VM: vm-agente — rg-agente-atendimento (Azure, eastus)</div>
+    <div>Versão do documento: 1.0 — Outubro/2026</div>
+  </div>
+</div>
+
+<div class="toc">
+<h2>Sumário</h2>
+<ol>
+  <li><a href="#conectar">Conectando via SSH</a></li>
+  <li><a href="#navegacao">Navegação e arquivos</a></li>
+  <li><a href="#editar">Ver e editar conteúdo</a></li>
+  <li><a href="#pm2">Processos com PM2</a></li>
+  <li><a href="#logs">Logs</a></li>
+  <li><a href="#sistema">Sistema — memória, disco, serviços</a></li>
+  <li><a href="#rede">Rede e testes</a></li>
+  <li><a href="#nginx">Nginx e certificado TLS</a></li>
+  <li><a href="#git">Git</a></li>
+  <li><a href="#receitas">Receitas prontas (rotina real do projeto)</a></li>
+  <li><a href="#seguranca">Segurança e boas práticas</a></li>
+</ol>
+</div>
+
+<section id="conectar">
+<h2>1. Conectando via SSH</h2>
+<p>SSH (<em>Secure Shell</em>) é como você abre um terminal dentro da VM, de dentro do seu próprio terminal. O comando usado neste projeto:</p>
+<pre><code>ssh -i ~/.ssh/id_rsa azureuser@20.127.12.103</code></pre>
+<table>
+<thead><tr><th>Parte</th><th>O que é</th></tr></thead>
+<tbody>
+<tr><td><code>-i ~/.ssh/id_rsa</code></td><td>Caminho da sua chave privada — a "senha" criptográfica que autentica você na VM, sem precisar digitar senha nenhuma</td></tr>
+<tr><td><code>azureuser</code></td><td>Usuário do sistema operacional dentro da VM</td></tr>
+<tr><td><code>20.127.12.103</code></td><td>IP público da VM (<code>vm-agente</code>)</td></tr>
+</tbody>
+</table>
+<div class="callout">
+  <strong>Primeira conexão</strong>
+  Na primeira vez, o terminal pergunta se confia no "host" (a VM) — responda <code>yes</code>. Isso fica salvo em <code>~/.ssh/known_hosts</code> e não pergunta de novo.
+</div>
+<div class="callout warn">
+  <strong>A chave privada nunca sai da sua máquina</strong>
+  <code>~/.ssh/id_rsa</code> é o que garante que só você entra na VM. Não copie, não cole em chat nenhum, não mande por email.
+</div>
+<p>Pra sair da VM e voltar pro seu terminal normal: <code>exit</code> ou <code>Ctrl+D</code>.</p>
+</section>
+
+<section id="navegacao">
+<h2>2. Navegação e arquivos</h2>
+<table>
+<thead><tr><th>Comando</th><th>O que faz</th></tr></thead>
+<tbody>
+<tr><td><code>pwd</code></td><td>Mostra em qual pasta você está agora</td></tr>
+<tr><td><code>ls</code> / <code>ls -la</code></td><td>Lista arquivos da pasta atual (<code>-la</code>: inclui ocultos, com detalhes — dono, tamanho, data)</td></tr>
+<tr><td><code>cd nome-da-pasta</code></td><td>Entra numa pasta. <code>cd ..</code> sobe um nível, <code>cd ~</code> vai pra sua pasta pessoal (<code>/home/azureuser</code>)</td></tr>
+<tr><td><code>mkdir nome</code></td><td>Cria uma pasta nova</td></tr>
+<tr><td><code>cp origem destino</code></td><td>Copia um arquivo. <code>cp -r</code> copia pasta inteira</td></tr>
+<tr><td><code>mv origem destino</code></td><td>Move ou renomeia (não existe comando "renomear" separado — <code>mv</code> faz os dois)</td></tr>
+<tr><td><code>rm arquivo</code></td><td>Apaga um arquivo. <code>rm -r pasta</code> apaga pasta inteira — <strong>sem lixeira, é definitivo</strong></td></tr>
+<tr><td><code>find . -name "*.log"</code></td><td>Procura arquivos por nome, a partir da pasta atual</td></tr>
+</tbody>
+</table>
+<div class="callout danger">
+  <strong>Cuidado com <code>rm -rf</code></strong>
+  Apaga sem pedir confirmação e sem lixeira. Antes de rodar, confirme com <code>pwd</code> e <code>ls</code> que está na pasta certa.
+</div>
+<p>As duas pastas que importam neste projeto:</p>
+<pre><code>~/agente-atendimento/   # o agente Node (RAG + LLM + canais)
+~/agent-service/        # o AgentService Python (DistributedOrderSystem)</code></pre>
+</section>
+
+<section id="editar">
+<h2>3. Ver e editar conteúdo</h2>
+<table>
+<thead><tr><th>Comando</th><th>O que faz</th></tr></thead>
+<tbody>
+<tr><td><code>cat arquivo</code></td><td>Mostra o conteúdo inteiro de uma vez — bom pra arquivos curtos (<code>.env</code>, <code>agent.config.json</code>)</td></tr>
+<tr><td><code>less arquivo</code></td><td>Mostra um arquivo grande por partes, navegável (setas, <code>q</code> pra sair)</td></tr>
+<tr><td><code>tail -n 20 arquivo</code></td><td>Mostra só as últimas 20 linhas</td></tr>
+<tr><td><code>tail -f arquivo</code></td><td>Mostra as últimas linhas e <strong>continua mostrando</strong> em tempo real — ótimo pra acompanhar log ao vivo</td></tr>
+<tr><td><code>nano arquivo</code></td><td>Abre um editor de texto simples direto no terminal — <code>Ctrl+O</code> salva, <code>Ctrl+X</code> sai</td></tr>
+<tr><td><code>grep "termo" arquivo</code></td><td>Procura um texto dentro de um arquivo. <code>grep -r "termo" pasta/</code> procura em todos os arquivos de uma pasta</td></tr>
+</tbody>
+</table>
+<div class="callout">
+  <strong>Editar <code>.env</code> ou <code>agent.config.json</code></strong>
+  <code>nano ~/agente-atendimento/.env</code> → edita → <code>Ctrl+O</code>, Enter, <code>Ctrl+X</code>. Depois de editar, sempre reinicie o processo (Seção 4) pra aplicar.
+</div>
+</section>
+
+<section id="pm2">
+<h2>4. Processos com PM2</h2>
+<p>PM2 é quem mantém o agente Node e o AgentService rodando continuamente, reinicia sozinho se travar, e sobrevive a reboot da VM.</p>
+<table>
+<thead><tr><th>Comando</th><th>O que faz</th></tr></thead>
+<tbody>
+<tr><td><code>pm2 list</code></td><td>Mostra todos os processos — status (online/stopped), uso de CPU/memória, quantas vezes reiniciou</td></tr>
+<tr><td><code>pm2 logs nome</code></td><td>Mostra os logs ao vivo de um processo (<code>Ctrl+C</code> pra sair)</td></tr>
+<tr><td><code>pm2 logs nome --lines 50 --nostream</code></td><td>Mostra as últimas 50 linhas e volta pro terminal (não fica "preso" acompanhando)</td></tr>
+<tr><td><code>pm2 restart nome</code></td><td>Reinicia um processo — necessário depois de editar <code>.env</code> ou <code>agent.config.json</code></td></tr>
+<tr><td><code>pm2 restart nome --update-env</code></td><td>Igual acima, mas também recarrega variáveis de ambiente novas (ex.: depois de adicionar um secret no Key Vault)</td></tr>
+<tr><td><code>pm2 stop nome</code> / <code>pm2 start nome</code></td><td>Para e liga um processo, sem removê-lo da lista</td></tr>
+<tr><td><code>pm2 save</code></td><td><strong>Importante depois de qualquer mudança</strong> — grava o estado atual pra sobreviver a um reboot da VM</td></tr>
+</tbody>
+</table>
+<p>Os dois processos deste projeto: <code>agente-atendimento</code> e <code>agent-service</code>.</p>
+</section>
+
+<section id="logs">
+<h2>5. Logs</h2>
+<table>
+<thead><tr><th>Onde</th><th>Comando</th></tr></thead>
+<tbody>
+<tr><td>Logs da aplicação (saída normal)</td><td><code>pm2 logs nome --lines 30 --nostream</code></td></tr>
+<tr><td>Só os erros</td><td><code>pm2 logs nome --lines 30 --nostream --err</code></td></tr>
+<tr><td>Requisições que chegaram no Nginx</td><td><code>sudo tail -30 /var/log/nginx/access.log</code></td></tr>
+<tr><td>Erros do Nginx (ex.: proxy falhando)</td><td><code>sudo tail -30 /var/log/nginx/error.log</code></td></tr>
+<tr><td>Log de um serviço systemd (ex.: o que sobe o PM2 no boot)</td><td><code>journalctl -u pm2-azureuser -n 30</code></td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="sistema">
+<h2>6. Sistema — memória, disco, serviços</h2>
+<table>
+<thead><tr><th>Comando</th><th>O que faz</th></tr></thead>
+<tbody>
+<tr><td><code>free -h</code></td><td>Memória RAM usada/livre (<code>-h</code>: formato legível, MB/GB). A VM é pequena (892MB) — confira antes de instalar algo pesado</td></tr>
+<tr><td><code>df -h</code></td><td>Espaço em disco usado/livre</td></tr>
+<tr><td><code>uptime</code></td><td>Há quanto tempo a VM está ligada, e carga média de CPU</td></tr>
+<tr><td><code>top</code></td><td>Lista processos ao vivo por uso de CPU/memória (<code>q</code> pra sair)</td></tr>
+<tr><td><code>systemctl status nome</code></td><td>Status de um serviço do sistema (ex.: <code>nginx</code>, <code>pm2-azureuser</code>)</td></tr>
+<tr><td><code>sudo systemctl restart nome</code></td><td>Reinicia um serviço do sistema</td></tr>
+</tbody>
+</table>
+<div class="callout warn">
+  <strong>VM pequena — cuidado com instalação/build</strong>
+  Já tivemos um incidente de memória esgotada rodando <code>npm ci</code> com os processos ativos ao mesmo tempo. Antes de instalar algo pesado, considere <code>pm2 stop</code> nos dois processos, e confira <code>free -h</code> antes e depois.
+</div>
+</section>
+
+<section id="rede">
+<h2>7. Rede e testes</h2>
+<table>
+<thead><tr><th>Comando</th><th>O que faz</th></tr></thead>
+<tbody>
+<tr><td><code>curl -s URL</code></td><td>Faz uma requisição HTTP e mostra a resposta — útil pra testar se o servidor está respondendo</td></tr>
+<tr><td><code>curl -s -o /dev/null -w "%{http_code}\n" URL</code></td><td>Mostra só o código de status HTTP (200, 404, 500...), sem o corpo da resposta</td></tr>
+<tr><td><code>curl -I URL</code></td><td>Mostra só os headers da resposta</td></tr>
+<tr><td><code>ss -tlnp</code></td><td>Lista quais portas estão escutando na VM (equivalente moderno do antigo <code>netstat</code>)</td></tr>
+<tr><td><code>ping -c 4 host</code></td><td>Testa se um host responde na rede (4 tentativas)</td></tr>
+</tbody>
+</table>
+<p>Pra conferir se o agente está de pé, de dentro da própria VM:</p>
+<pre><code>curl -s http://localhost:3000/health
+curl -s http://localhost:8100/health</code></pre>
+</section>
+
+<section id="nginx">
+<h2>8. Nginx e certificado TLS</h2>
+<table>
+<thead><tr><th>Comando</th><th>O que faz</th></tr></thead>
+<tbody>
+<tr><td><code>sudo nginx -t</code></td><td>Testa se a configuração do Nginx está válida, <strong>antes</strong> de recarregar — evita derrubar o site com um erro de sintaxe</td></tr>
+<tr><td><code>sudo systemctl reload nginx</code></td><td>Aplica mudanças de configuração sem derrubar conexões ativas</td></tr>
+<tr><td><code>sudo certbot certificates</code></td><td>Lista os certificados TLS instalados e quando expiram</td></tr>
+<tr><td><code>sudo certbot renew --dry-run</code></td><td>Testa a renovação automática sem renovar de verdade (a renovação real já roda sozinha agendada)</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="git">
+<h2>9. Git</h2>
+<table>
+<thead><tr><th>Comando</th><th>O que faz</th></tr></thead>
+<tbody>
+<tr><td><code>git status</code></td><td>Mostra o que mudou localmente, comparado ao último commit</td></tr>
+<tr><td><code>git pull</code></td><td>Baixa e aplica os commits mais recentes do GitHub</td></tr>
+<tr><td><code>git log --oneline -10</code></td><td>Mostra os últimos 10 commits, resumidos</td></tr>
+</tbody>
+</table>
+<div class="callout">
+  <strong>Normalmente você não precisa disso na VM</strong>
+  O deploy é automático via GitHub Actions a cada push — a VM se atualiza sozinha. <code>git pull</code> manual só é necessário se estiver investigando algo ou testando antes do CI rodar.
+</div>
+</section>
+
+<section id="receitas">
+<h2>10. Receitas prontas — rotina real do projeto</h2>
+
+<div class="recipe">
+<h4>Editei o <code>.env</code> ou <code>agent.config.json</code>, como aplico?</h4>
+<pre><code>pm2 restart agente-atendimento --update-env
+pm2 save</code></pre>
+</div>
+
+<div class="recipe">
+<h4>Adicionei um secret novo no Key Vault, como o processo pega ele?</h4>
+<pre><code>pm2 restart agente-atendimento --update-env
+# (o processo busca os secrets do Key Vault de novo, no startup)</code></pre>
+</div>
+
+<div class="recipe">
+<h4>O site/bot parece fora do ar — o que eu confiro, em ordem?</h4>
+<div class="step"><div class="n">1</div><div><code>pm2 list</code> — os dois processos estão <code>online</code>?</div></div>
+<div class="step"><div class="n">2</div><div><code>curl -s http://localhost:3000/health</code> — responde <code>{"ok":true}</code>?</div></div>
+<div class="step"><div class="n">3</div><div><code>pm2 logs agente-atendimento --lines 30 --nostream --err</code> — tem erro recente?</div></div>
+<div class="step"><div class="n">4</div><div><code>free -h</code> — a VM não está sem memória?</div></div>
+</div>
+
+<div class="recipe">
+<h4>A VM ficou lenta ou travou depois de instalar algo</h4>
+<pre><code>free -h                                  # confirma se é falta de memória
+pm2 stop agente-atendimento agent-service  # libera memória
+# ... termina a instalação/build ...
+pm2 restart agente-atendimento agent-service --update-env
+pm2 save</code></pre>
+</div>
+
+<div class="recipe">
+<h4>Atualizar o código manualmente (fora do CI/CD automático)</h4>
+<pre><code>cd ~/agente-atendimento
+git pull
+npm ci
+npm run build
+pm2 restart agente-atendimento --update-env
+pm2 save</code></pre>
+</div>
+
+<div class="recipe">
+<h4>Conferir se o certificado HTTPS está válido</h4>
+<pre><code>sudo certbot certificates
+curl -sI https://rizzato-tech.rizzatotech.com | head -1</code></pre>
+</div>
+
+</section>
+
+<section id="seguranca">
+<h2>11. Segurança e boas práticas</h2>
+<ul class="checklist">
+<li><span class="box"></span><span>Nunca cole senha, token ou chave de API direto no terminal de um jeito que fique salvo no histórico sem necessidade — prefira variável de ambiente ou o Key Vault</span></li>
+<li><span class="box"></span><span><code>sudo</code> só quando o comando realmente precisar — não vire hábito de colocar na frente de tudo</span></li>
+<li><span class="box"></span><span>Antes de qualquer <code>rm -r</code>, confirme com <code>pwd</code> e <code>ls</code> que está na pasta certa</span></li>
+<li><span class="box"></span><span>A chave privada (<code>~/.ssh/id_rsa</code>) é pessoal — nunca envie por chat, email ou deixe em repositório</span></li>
+<li><span class="box"></span><span>Depois de qualquer mudança que deva sobreviver a um reboot da VM, rode <code>pm2 save</code></span></li>
+</ul>
+</section>
+
+</body>
+</html>
