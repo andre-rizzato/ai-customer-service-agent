@@ -30,6 +30,7 @@
     "windowSeconds": 60
   },
   "handoffNotifier": "console",
+  "handoffTimeoutHours": 4,
   "enabledCapabilities": ["order", "scheduling", "sales"],
   "orderKeywords": ["status do pedido", "status do meu pedido", "cancelar pedido", "rastrear pedido"],
   "schedulingKeywords": ["marcar horário", "marcar um horário", "agendar", "tem horário"],

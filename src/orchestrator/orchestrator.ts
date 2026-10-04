@@ -6,9 +6,17 @@
 // do adapter de teste "web". Cada ChannelAdapter só precisa normalizar seu
 // payload específico em um InboundMessage e chamar handleMessage(); todo o
 // resto (RAG, prompt, LLM, log, handoff, rate limit) é compartilhado.
+//
+// Revisão de segurança de 04/10/2026 (docs/SECURITY_REVIEW.md) acrescentou
+// dois comportamentos novos: PASSO 0 (silenciar o bot enquanto a conversa
+// está em atendimento humano — item #5) e a intenção cancel_order vindo do
+// AgentService agora SEMPRE vira handoff, nunca executa o cancelamento
+// sozinha (item #4 — "o agente não cancela pedido, só confirma intenção e
+// passa pra um humano").
 import { agentConfig } from "../config.js";
 import { ConversationStore } from "../conversation/store.js";
 import { createHandoffNotifier, type HandoffNotifier } from "../handoffNotifier/index.js";
+import { HandoffStateStore } from "./handoffState.js";
 import { KnowledgeBase } from "../knowledge/knowledgeBase.js";
 import { createLLMProvider, type LLMProvider } from "../llm/index.js";
 import type { InboundMessage } from "../types.js";
@@ -35,6 +43,15 @@ const RATE_LIMIT_REPLY =
 // orquestração — "sem integração real, não finge que resolveu".
 const CAPABILITY_NOT_WIRED_REPLY =
   "Vou te conectar com um atendente humano para resolver isso com você. Só um instante.";
+// Mensagem fixa pra quando a intenção é cancelar um pedido — item #4 da
+// revisão de segurança: o agente NUNCA executa o cancelamento sozinho,
+// mesmo que a intenção tenha sido classificada com confiança alta e o
+// AgentService tecnicamente consiga chamar o backend. Cancelamento é
+// sempre uma ação humana, porque (a) é destrutivo e irreversível do lado
+// do cliente, e (b) hoje não existe verificação forte o bastante de que
+// quem está pedindo é o dono do pedido (ver docs/SECURITY_REVIEW.md #4).
+const CANCEL_ORDER_HANDOFF_REPLY =
+  "Entendi que você quer cancelar um pedido — para confirmar isso com segurança, vou te conectar com um atendente humano. Só um instante.";
 
 // Preâmbulo: a classe Orchestrator é instanciada UMA VEZ por processo
 // (ver src/server.ts e scripts/simulate.ts) e reaproveitada para todas as
@@ -63,17 +80,47 @@ export class Orchestrator {
     agentConfig.rateLimit.maxMessagesPerWindow,
     agentConfig.rateLimit.windowSeconds
   );
+  // Estado de "conversa em atendimento humano" (ver handoffState.ts) —
+  // adicionado na revisão de segurança de 04/10/2026, item #5. Timeout
+  // configurável por negócio em agent.config.json.handoffTimeoutHours.
+  private readonly handoffState = new HandoffStateStore(agentConfig.handoffTimeoutHours);
 
   // Preâmbulo: handleMessage() é o ÚNICO método público desta classe e o
   // ponto de entrada de todo o pipeline — é chamado por cada ChannelAdapter
   // (Telegram, WhatsApp, Web) uma vez por mensagem recebida, sempre com um
   // InboundMessage já normalizado. Devolve o texto da resposta que o
-  // adapter deve enviar de volta ao usuário pelo mesmo canal.
+  // adapter deve enviar de volta ao usuário pelo mesmo canal — ou uma
+  // STRING VAZIA, que os adapters (ver whatsapp.ts/telegram.ts) tratam como
+  // "não responda nada" (usado no PASSO 0 abaixo e no rate limit... não, o
+  // rate limit continua respondendo algo; só o PASSO 0 devolve vazio).
   async handleMessage(message: InboundMessage): Promise<string> {
-    // Desestrutura só os campos que este método usa; `channel` e `userId`
-    // não são necessários aqui (o pipeline não ramifica por canal nem
-    // precisa do userId separado do conversationId).
-    const { conversationId, text, timestamp } = message;
+    // Desestrutura os campos usados por este método. `channel` e `userId`
+    // entraram na revisão de segurança de 04/10/2026 (item #4) só para
+    // montar requesterPhone logo abaixo — fora isso, o pipeline continua
+    // agnóstico de canal.
+    const { channel, userId, conversationId, text, timestamp } = message;
+    // Groundwork de verificação de identidade (item #4): no WhatsApp, o
+    // próprio userId JÁ É o número de telefone verificado de quem mandou a
+    // mensagem (ver whatsapp.ts — conversationId/userId = message.from).
+    // Em qualquer outro canal (hoje só Telegram), não existe um número de
+    // telefone verificado disponível — um chat id do Telegram não prova
+    // que quem está do outro lado é dono daquele número, então passamos
+    // `undefined` em vez de inventar uma correspondência. Ver
+    // agentServiceClient.ts e docs/SECURITY_REVIEW.md item #4 para como
+    // esse valor é usado (ou não) do outro lado.
+    const requesterPhone = channel === "whatsapp" ? userId : undefined;
+
+    // PASSO 0 — Silêncio durante atendimento humano: roda ANTES até do
+    // rate limiter, porque se a conversa já foi transferida pra um humano,
+    // não faz sentido nenhum gastar uma chamada de API pra decidir se
+    // bloqueia por excesso de mensagens — a resposta é sempre "não
+    // responde nada" independente de qualquer outra coisa. A mensagem do
+    // cliente ainda é gravada no histórico (pro atendente ter o contexto
+    // completo quando for olhar), só não gera nenhuma resposta automática.
+    if (this.handoffState.isActive(conversationId)) {
+      this.conversations.append(conversationId, { role: "user", text, timestamp });
+      return "";
+    }
 
     // PASSO 1 — Rate limit: roda antes de QUALQUER outra coisa, inclusive
     // antes de gravar a mensagem no histórico, para que uma mensagem
@@ -115,6 +162,10 @@ export class Orchestrator {
         timestamp: Date.now(),
         handoff: true,
       });
+      // Marca a conversa como "em atendimento humano" — a partir daqui, o
+      // PASSO 0 silencia o bot nas próximas mensagens desta conversa, até
+      // alguém liberar (scripts/releaseHandoff.ts) ou o timeout expirar.
+      this.handoffState.activate(conversationId);
       // Encerra o pipeline aqui — não faz busca no RAG nem chama o LLM para
       // esta mensagem, exatamente como o diagrama da Fase 1 descreve
       // ("Sim -> transfere para humano" é um ramo que pula direto para o
@@ -134,7 +185,28 @@ export class Orchestrator {
       // pro ChannelAdapter, mesma filosofia de "nunca deixar o usuário sem
       // resposta" do resto do pipeline.
       try {
-        const agentResponse = await callAgentService(text, conversationId);
+        const agentResponse = await callAgentService(text, conversationId, requesterPhone);
+
+        // Item #4 da revisão de segurança: cancelamento é SEMPRE handoff,
+        // nunca uma ação que o bot executa sozinho — mesmo que o
+        // AgentService tenha classificado a intenção com confiança alta e
+        // tecnicamente pudesse ter chamado o backend de cancelamento.
+        // intent já vem pronto no AgentResponse (classify_intent_node, do
+        // lado do AgentService, preenche esse campo) — não precisa de
+        // nenhuma lógica nova pra detectar isso aqui, só checar o valor.
+        if (agentResponse.intent === "cancel_order") {
+          const history = this.conversations.getHistory(conversationId);
+          await this.handoffNotifier.notify(conversationId, "explicit_request", history);
+          this.conversations.append(conversationId, {
+            role: "system-note",
+            text: `Handoff acionado: cancel_order (cancelamento sempre passa por humano, order_id=${agentResponse.order_id ?? "não informado"})`,
+            timestamp: Date.now(),
+            handoff: true,
+          });
+          this.handoffState.activate(conversationId);
+          return CANCEL_ORDER_HANDOFF_REPLY;
+        }
+
         this.conversations.append(conversationId, {
           role: "assistant",
           text: agentResponse.reply,
@@ -151,6 +223,7 @@ export class Orchestrator {
           timestamp: Date.now(),
           handoff: true,
         });
+        this.handoffState.activate(conversationId);
         return HANDOFF_REPLY;
       }
     }
@@ -167,6 +240,7 @@ export class Orchestrator {
         timestamp: Date.now(),
         handoff: true,
       });
+      this.handoffState.activate(conversationId);
       return CAPABILITY_NOT_WIRED_REPLY;
     }
 

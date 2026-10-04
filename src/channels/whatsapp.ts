@@ -2,10 +2,24 @@
 // "API oficial direta"). Traduz o formato de webhook da Meta para
 // InboundMessage, chama o Orchestrator, e envia a resposta via endpoint de
 // mensagens da Graph API.
+//
+// Revisão de segurança de 04/10/2026 (docs/SECURITY_REVIEW.md) acrescentou
+// duas camadas que não existiam antes: validação de assinatura HMAC em
+// cada POST (item #3 — o WHATSAPP_VERIFY_TOKEN sozinho só protegia o
+// handshake único de registro do webhook, nunca cada mensagem individual)
+// e deduplicação por id de mensagem (item #1 — a Meta pode reentregar o
+// mesmo webhook mais de uma vez).
+import { createHmac, timingSafeEqual } from "node:crypto";
 import type { Request, Response } from "express";
 import { env } from "../config.js";
 import type { InboundMessage } from "../types.js";
 import type { ChannelAdapter } from "./types.js";
+import { DedupeCache } from "../orchestrator/dedupeCache.js";
+
+// 10 minutos: generoso o bastante pra cobrir qualquer janela de reenvio
+// real da Meta, sem guardar id de mensagem em memória por mais tempo do
+// que o necessário — ver DedupeCache para o raciocínio completo.
+const DEDUPE_TTL_MS = 10 * 60 * 1000;
 
 // Formato (parcial) do corpo que a Meta envia em cada POST de webhook. A
 // estrutura é deliberadamente aninhada (entry -> changes -> value ->
@@ -17,6 +31,11 @@ interface WhatsAppWebhookBody {
     changes?: {
       value?: {
         messages?: {
+          // Identificador único da mensagem (o "wamid") — gerado pela
+          // Meta, estável entre reentregas do MESMO evento. É a chave
+          // usada pelo DedupeCache (ver handleWebhook abaixo) pra
+          // detectar quando a Meta está reenviando algo que já processamos.
+          id: string;
           // Número de telefone de origem, no formato que a Meta usa
           // (sem "+", com código do país) — vira o conversationId/userId.
           from: string;
@@ -32,8 +51,7 @@ interface WhatsAppWebhookBody {
 
 // Preâmbulo: WhatsAppAdapter implementa ChannelAdapter para o canal
 // WhatsApp via Meta Cloud API. Só é instanciado (via createWhatsAppAdapter,
-// no final do arquivo) se as três credenciais necessárias estiverem
-// configuradas.
+// no final do arquivo) se as credenciais necessárias estiverem configuradas.
 //
 // Setup fora deste código: no painel do Meta for Developers, aponte o
 // webhook do app para <sua-url-pública>/webhook/whatsapp — a Meta faz uma
@@ -43,16 +61,28 @@ interface WhatsAppWebhookBody {
 export class WhatsAppAdapter implements ChannelAdapter {
   readonly name = "whatsapp" as const;
 
+  // Instância própria de DedupeCache — cada adapter (WhatsApp, Telegram)
+  // guarda seus próprios ids vistos, sem risco de colisão entre os dois
+  // formatos de id (wamid vs. update_id numérico), então não há motivo
+  // pra compartilhar uma instância única entre canais diferentes.
+  private readonly dedupe = new DedupeCache(DEDUPE_TTL_MS);
+
   constructor(
     // Token de acesso à Graph API, usado para AUTENTICAR o envio de
-    // mensagens (não a recepção — recepção usa o verify token abaixo).
+    // mensagens (não a recepção — recepção usa o app secret abaixo).
     private readonly accessToken: string,
     // Id do número de telefone comercial configurado no Meta for
     // Developers — vai na URL do endpoint de envio de mensagens.
     private readonly phoneNumberId: string,
     // Token arbitrário definido por quem configura o app, usado só durante
-    // o handshake de verificação do webhook (não é o mesmo que accessToken).
-    private readonly verifyToken: string
+    // o handshake de verificação do webhook (não é o mesmo que accessToken
+    // nem que appSecret).
+    private readonly verifyToken: string,
+    // "App Secret" do app no Meta for Developers — usado para validar a
+    // assinatura HMAC-SHA256 de CADA POST recebido (ver verifySignature
+    // abaixo). Diferente de verifyToken: este protege toda mensagem
+    // individual, não só o handshake inicial.
+    private readonly appSecret: string
   ) {}
 
   // Preâmbulo: handleWebhook() é chamado por src/server.ts para toda
@@ -72,6 +102,16 @@ export class WhatsAppAdapter implements ChannelAdapter {
       return;
     }
 
+    // Valida a assinatura ANTES de confiar em qualquer byte do corpo —
+    // diferente do resto do pipeline (que responde 200 rápido e processa
+    // depois), uma assinatura inválida precisa interromper tudo aqui,
+    // porque não temos nenhuma garantia de que o payload veio da Meta.
+    if (!this.verifySignature(req)) {
+      console.error("WhatsApp webhook: assinatura inválida, requisição rejeitada.");
+      res.sendStatus(401);
+      return;
+    }
+
     const body = req.body as WhatsAppWebhookBody;
     // Navega a estrutura aninhada até a lista de mensagens; `?? []` cobre
     // qualquer nível ausente (ex.: um webhook de "status de entrega" que
@@ -81,7 +121,8 @@ export class WhatsAppAdapter implements ChannelAdapter {
 
     // Confirma recebimento imediatamente, mesmo raciocínio do
     // TelegramAdapter: evita que a Meta reenvie o webhook por demora na
-    // resposta do LLM.
+    // resposta do LLM. A deduplicação abaixo cobre o caso de a Meta
+    // reenviar mesmo assim (por qualquer outro motivo de rede do lado dela).
     res.sendStatus(200);
 
     // Um único webhook pode trazer mais de uma mensagem (ex.: usuário
@@ -91,6 +132,14 @@ export class WhatsAppAdapter implements ChannelAdapter {
       // Ignora mensagens sem corpo de texto (áudio, imagem, figurinha,
       // etc.) — mesmo critério do TelegramAdapter.
       if (!message.text?.body) continue;
+
+      // Deduplicação: se já vimos este wamid dentro da janela de TTL,
+      // isto é uma reentrega da Meta — pula sem chamar o Orchestrator de
+      // novo (evita resposta duplicada pro cliente e custo de API em dobro).
+      if (this.dedupe.hasSeenAndRecord(message.id)) {
+        console.warn(`WhatsApp: mensagem ${message.id} já processada, ignorando reentrega.`);
+        continue;
+      }
 
       const inbound: InboundMessage = {
         channel: this.name,
@@ -106,7 +155,44 @@ export class WhatsAppAdapter implements ChannelAdapter {
       };
 
       const reply = await onMessage(inbound);
-      await this.sendMessage(message.from, reply);
+      // Reply vazio é o sinal do Orchestrator pra "não responda nada" —
+      // acontece quando a conversa está em handoff ativo (bot silenciado,
+      // ver src/orchestrator/handoffState.ts, item #5 da revisão de
+      // segurança) e também no caso de rate limit (ver orchestrator.ts).
+      // Sem este if, mandaríamos uma mensagem vazia pro cliente real.
+      if (reply) await this.sendMessage(message.from, reply);
+    }
+  }
+
+  // Preâmbulo: verifySignature() calcula o HMAC-SHA256 dos bytes BRUTOS do
+  // corpo da requisição (req.rawBody, capturado pelo hook `verify` do
+  // express.json() em src/server.ts) usando o appSecret como chave, e
+  // compara com o valor que a Meta manda no header
+  // X-Hub-Signature-256 (formato "sha256=<hex>"). Só chamada a partir de
+  // handleWebhook(), antes de qualquer processamento do corpo.
+  private verifySignature(req: Request): boolean {
+    const header = req.header("X-Hub-Signature-256");
+    // Sem header nenhum, ou sem o corpo bruto capturado (não deveria
+    // acontecer — server.ts sempre captura rawBody — mas defensivo contra
+    // uma mudança futura que remova esse hook sem querer): rejeita.
+    if (!header || !req.rawBody) return false;
+
+    // O header vem como "sha256=<hex>" — separa o prefixo do hash em si.
+    const [scheme, receivedHex] = header.split("=");
+    if (scheme !== "sha256" || !receivedHex) return false;
+
+    // Recalcula o HMAC esperado sobre os mesmos bytes que a Meta assinou.
+    const expectedHex = createHmac("sha256", this.appSecret).update(req.rawBody).digest("hex");
+
+    // timingSafeEqual em vez de comparação direta (===) — evita um ataque
+    // de timing onde alguém descobriria o hash correto byte a byte
+    // medindo quanto tempo cada comparação errada leva. Exige buffers do
+    // MESMO tamanho, por isso o try/catch: tamanhos diferentes já são
+    // prova de assinatura inválida, não um erro de programação.
+    try {
+      return timingSafeEqual(Buffer.from(receivedHex, "hex"), Buffer.from(expectedHex, "hex"));
+    } catch {
+      return false;
     }
   }
 
@@ -138,14 +224,14 @@ export class WhatsAppAdapter implements ChannelAdapter {
   // Preâmbulo: sendMessage() encapsula a chamada HTTP ao endpoint de envio
   // de mensagens da Graph API. Chamado por handleWebhook() para cada
   // mensagem recebida, depois que o Orchestrator devolve o texto de
-  // resposta.
+  // resposta (só quando esse texto não é vazio — ver handleWebhook).
   async sendMessage(to: string, text: string): Promise<void> {
     const res = await fetch(`https://graph.facebook.com/v20.0/${this.phoneNumberId}/messages`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         // Autenticação da Graph API é via Bearer token (accessToken), não
-        // relacionada ao verifyToken usado só na verificação do webhook.
+        // relacionada ao appSecret/verifyToken usados só na recepção.
         Authorization: `Bearer ${this.accessToken}`,
       },
       // Formato exigido pela Graph API para uma mensagem de texto simples —
@@ -169,11 +255,25 @@ export class WhatsAppAdapter implements ChannelAdapter {
 
 // Preâmbulo: createWhatsAppAdapter() é a factory usada por src/server.ts
 // para decidir se o canal WhatsApp deve ser habilitado — só instancia o
-// adapter se as TRÊS credenciais necessárias estiverem presentes;
-// diferente do Telegram (que só depende de um token), o WhatsApp precisa
-// dos três valores para funcionar de ponta a ponta (enviar, receber e
-// verificar), então exigimos todos juntos.
+// adapter se TODAS as credenciais necessárias estiverem presentes.
+// appSecret entrou nessa lista na revisão de segurança de 04/10/2026 —
+// antes disso o canal podia subir sem validação de assinatura nenhuma; a
+// checagem cruzada em src/config.ts já impede o processo de nem chegar
+// aqui sem WHATSAPP_APP_SECRET configurado quando o access token está
+// presente, mas o `!env.WHATSAPP_APP_SECRET` abaixo também é checado
+// porque este factory é a última linha de defesa antes de criar o adapter.
 export function createWhatsAppAdapter(): WhatsAppAdapter | null {
-  if (!env.WHATSAPP_ACCESS_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID || !env.WHATSAPP_VERIFY_TOKEN) return null;
-  return new WhatsAppAdapter(env.WHATSAPP_ACCESS_TOKEN, env.WHATSAPP_PHONE_NUMBER_ID, env.WHATSAPP_VERIFY_TOKEN);
+  if (
+    !env.WHATSAPP_ACCESS_TOKEN ||
+    !env.WHATSAPP_PHONE_NUMBER_ID ||
+    !env.WHATSAPP_VERIFY_TOKEN ||
+    !env.WHATSAPP_APP_SECRET
+  )
+    return null;
+  return new WhatsAppAdapter(
+    env.WHATSAPP_ACCESS_TOKEN,
+    env.WHATSAPP_PHONE_NUMBER_ID,
+    env.WHATSAPP_VERIFY_TOKEN,
+    env.WHATSAPP_APP_SECRET
+  );
 }

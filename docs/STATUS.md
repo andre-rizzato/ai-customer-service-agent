@@ -54,6 +54,17 @@ institucional). Para os passos manuais de domínio/email/WhatsApp, ver
 - [x] `AgentService` implantado na VM, rodando em paralelo ao agente Node
 - [x] Fallback público (`dummyjson.com/carts`) configurado enquanto o `GatewayBff` não está acessível da VM
 
+### Revisão de segurança (04/10/2026)
+
+- [x] Deduplicação de mensagem por id (`wamid`/`update_id`) nos dois canais
+- [x] Validação de assinatura HMAC-SHA256 em cada webhook do WhatsApp (`X-Hub-Signature-256`)
+- [x] Cancelamento de pedido é sempre handoff humano — agente nunca cancela sozinho (duas camadas: Node e `AgentService`)
+- [x] Groundwork de verificação de identidade pra consulta de status (`requester_phone` trafegando ponta a ponta) — comparação real ainda não implementada em nenhum conector genérico
+- [x] Bot fica em silêncio total depois de um handoff (`HandoffStateStore`, persistido em disco), com liberação manual (`scripts/releaseHandoff.ts`) e timeout de segurança (4h, configurável)
+- [x] `agent-service` na VM mudado de `--host 0.0.0.0` pra `127.0.0.1` — porta 8100 não é mais alcançável de fora da VM
+- [x] Regra anti-alucinação de status de pedido no system prompt (RAG nunca inventa status)
+- Detalhe completo dos 8 pontos revisados, o que foi corrigido e o que ficou pendente: [`SECURITY_REVIEW.md`](SECURITY_REVIEW.md)
+
 ### CI/CD
 
 - [x] `deploy.yml` (Node) e `deploy-agent-service.yml` (`AgentService`) — GitHub Actions, deploy automático no push
@@ -90,6 +101,12 @@ institucional). Para os passos manuais de domínio/email/WhatsApp, ver
 - [ ] Chip `+55` registrado na API do WhatsApp (planejado semana de 11/10/2026)
 - [ ] DNS + teste via canal real pro tenant `DistributedOrderSystem` (só validado via `/webhook/web` até agora)
 - [ ] Catálogo real do negócio (hoje ainda é `catalog.example.json`)
+
+### Técnico — segurança (ver `SECURITY_REVIEW.md`)
+
+- [ ] Pergunta de verificação (fallback de identidade pra canais sem telefone confiável, ex. Telegram) — desenho ainda não feito (item #4)
+- [ ] Mecanismo de relay em tempo real pro atendente humano (Opção B do item #5) — adiado deliberadamente, decisão entre Opção A (já funciona) e B fica pra depois
+- [ ] LGPD pro vertical de clínica (dado de saúde) — checklist jurídico/técnico em aberto (item #8), não bloqueia o vertical testado hoje
 
 ### Técnico — capacidades
 

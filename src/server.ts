@@ -11,12 +11,51 @@ import { createWhatsAppAdapter } from "./channels/whatsapp.js";
 import { WebAdapter } from "./channels/web.js";
 import type { ChannelAdapter } from "./channels/types.js";
 
+// Augmenta o tipo Request do Express com o campo rawBody (ver o hook
+// `verify` do express.json() logo abaixo) — fazer isso via "declare
+// global" em vez de um cast solto em cada lugar que lê req.rawBody (ex.:
+// src/channels/whatsapp.ts) dá autocomplete/checagem de tipo em todo
+// módulo que precisar desse campo, e documenta num lugar só de onde ele
+// vem.
+declare global {
+  namespace Express {
+    interface Request {
+      rawBody?: Buffer;
+    }
+  }
+}
+
 // Cria a aplicação Express — o framework HTTP usado para expor os webhooks.
 const app = express();
 // Middleware que faz o parse automático do corpo de requisições com
 // Content-Type: application/json para um objeto JS acessível em req.body —
 // sem isso, cada adapter teria que fazer esse parse manualmente.
-app.use(express.json());
+//
+// `verify` é um hook do express.json() chamado com os BYTES BRUTOS do
+// corpo, antes do parse — guardamos eles em req.rawBody porque a
+// validação de assinatura HMAC do WhatsApp (ver
+// src/channels/whatsapp.ts verifySignature(), revisão de segurança de
+// 04/10/2026 item #3) precisa calcular o hash sobre os bytes EXATOS que a
+// Meta enviou, byte a byte — JSON.stringify(req.body) não é garantidamente
+// idêntico ao corpo original (ordem de chaves, espaçamento, etc. podem
+// diferir depois de um parse+serialize), então usar req.body pra validar
+// assinatura seria um bug sutil que falharia a validação de requisições
+// legítimas. Sem este hook, express.json() descarta os bytes brutos depois
+// do parse e não haveria como recuperá-los depois.
+app.use(
+  express.json({
+    // O tipo de `req` aqui vem do body-parser (http.IncomingMessage), não
+    // de Express.Request — por isso a augmentação "declare global" acima
+    // não se aplica automaticamente a este parâmetro, e o cast abaixo é
+    // necessário para gravar rawBody nele. Em tempo de execução é SEMPRE
+    // o mesmo objeto Request que os handlers de rota recebem depois (o
+    // Express reaproveita a mesma instância do início ao fim do ciclo de
+    // vida da requisição), então o cast é seguro.
+    verify: (req, _res, buf) => {
+      (req as express.Request).rawBody = buf;
+    },
+  })
+);
 
 // Instancia o Orchestrator UMA VEZ para todo o processo — ele por sua vez
 // instancia (também uma vez) o ConversationStore, KnowledgeBase, LLMProvider
@@ -40,7 +79,7 @@ else console.warn("TELEGRAM_BOT_TOKEN not set — Telegram channel disabled.");
 // (ver createWhatsAppAdapter em src/channels/whatsapp.ts).
 const whatsapp = createWhatsAppAdapter();
 if (whatsapp) adapters.push(whatsapp);
-else console.warn("WHATSAPP_ACCESS_TOKEN/PHONE_NUMBER_ID/VERIFY_TOKEN not set — WhatsApp channel disabled.");
+else console.warn("WHATSAPP_ACCESS_TOKEN/PHONE_NUMBER_ID/VERIFY_TOKEN/APP_SECRET not set — WhatsApp channel disabled.");
 
 // Para cada adapter habilitado, monta uma rota HTTP em /webhook/<nome> que
 // aceita QUALQUER método (app.all) — necessário porque o WhatsApp usa GET

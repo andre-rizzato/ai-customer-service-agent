@@ -98,6 +98,16 @@ const AgentConfigSchema = z.object({
   orderKeywords: z.array(z.string()).default([]),
   schedulingKeywords: z.array(z.string()).default([]),
   salesKeywords: z.array(z.string()).default([]),
+
+  // Quantas horas uma conversa fica "em atendimento humano" (bot
+  // silenciado, ver src/orchestrator/handoffState.ts) antes de o bot
+  // voltar sozinho a responder — rede de segurança pro caso de um
+  // atendente esquecer de liberar a conversa manualmente (ver
+  // scripts/releaseHandoff.ts). Adicionado na revisão de segurança de
+  // 04/10/2026 (docs/SECURITY_REVIEW.md item #5). Default de 4h: tempo
+  // generoso pra um atendimento humano real, mas curto o suficiente pra
+  // não deixar um cliente sem resposta nenhuma por dias.
+  handoffTimeoutHours: z.number().positive().default(4),
 });
 
 // Tipo TypeScript derivado do schema acima — z.infer lê a definição do zod
@@ -168,6 +178,15 @@ const EnvSchema = z.object({
   WHATSAPP_ACCESS_TOKEN: z.string().optional(),
   WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
   WHATSAPP_VERIFY_TOKEN: z.string().optional(),
+  // "App Secret" do app no Meta for Developers (Configurações do app →
+  // Básico) — NÃO é o mesmo valor que WHATSAPP_ACCESS_TOKEN. Usado só para
+  // validar a assinatura HMAC-SHA256 (header X-Hub-Signature-256) de cada
+  // POST recebido em /webhook/whatsapp — ver src/channels/whatsapp.ts
+  // verifySignature(). Antes da revisão de segurança de 04/10/2026
+  // (docs/SECURITY_REVIEW.md item #3), o único "segredo" do lado de
+  // recepção era o WHATSAPP_VERIFY_TOKEN, que só protege o handshake
+  // ÚNICO de registro do webhook — não cada mensagem individual.
+  WHATSAPP_APP_SECRET: z.string().optional(),
 
   // URL para onde o WebhookNotifier faz POST quando um handoff dispara
   // (ex.: Incoming Webhook do Slack). Só é obrigatória se
@@ -232,6 +251,7 @@ const SECRET_ENV_VARS = [
   "WHATSAPP_ACCESS_TOKEN",
   "WHATSAPP_PHONE_NUMBER_ID",
   "WHATSAPP_VERIFY_TOKEN",
+  "WHATSAPP_APP_SECRET",
   "HANDOFF_WEBHOOK_URL",
 ] as const;
 
@@ -313,6 +333,19 @@ if (agentConfig.handoffNotifier === "webhook" && !env.HANDOFF_WEBHOOK_URL) {
 if (agentConfig.enabledCapabilities.includes("order") && !env.AGENT_SERVICE_URL) {
   throw new Error(
     'agent.config.json tem "order" em enabledCapabilities mas AGENT_SERVICE_URL não está definido no ambiente.'
+  );
+}
+
+// Revisão de segurança 04/10/2026, item #3: se o canal WhatsApp está
+// configurado (token de acesso presente — mesma condição que
+// createWhatsAppAdapter() usa pra habilitar o canal), WHATSAPP_APP_SECRET
+// TEM que estar presente também, senão o processo sobe aceitando POST de
+// qualquer um que descubra a URL do webhook, sem validar que a requisição
+// veio mesmo da Meta — preferível recusar o boot a rodar em produção sem
+// essa proteção.
+if (env.WHATSAPP_ACCESS_TOKEN && !env.WHATSAPP_APP_SECRET) {
+  throw new Error(
+    "WHATSAPP_ACCESS_TOKEN está definido mas WHATSAPP_APP_SECRET não — obrigatório para validar a assinatura de cada webhook recebido (ver docs/SECURITY_REVIEW.md item #3)."
   );
 }
 

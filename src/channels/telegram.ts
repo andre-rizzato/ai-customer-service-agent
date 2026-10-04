@@ -1,16 +1,30 @@
 // Adapter de canal para o Telegram Bot API. Traduz o formato de "update" do
 // Telegram para InboundMessage, chama o Orchestrator, e envia a resposta de
 // volta usando o método sendMessage da API do Telegram.
+//
+// Revisão de segurança de 04/10/2026 (docs/SECURITY_REVIEW.md) acrescentou
+// deduplicação por update_id (item #1 — o Telegram também pode reentregar
+// um webhook, mesmo raciocínio do WhatsApp).
 import type { Request, Response } from "express";
 import { env } from "../config.js";
 import type { InboundMessage } from "../types.js";
 import type { ChannelAdapter } from "./types.js";
+import { DedupeCache } from "../orchestrator/dedupeCache.js";
+
+// Mesmo valor e mesmo raciocínio do WhatsAppAdapter (ver
+// src/channels/whatsapp.ts) — 10 minutos cobre qualquer janela real de
+// reenvio sem guardar id em memória além do necessário.
+const DEDUPE_TTL_MS = 10 * 60 * 1000;
 
 // Formato (parcial — só os campos que este adapter usa) de um "update" que
 // o Telegram envia via webhook. O Telegram manda updates de vários tipos
 // (mensagem editada, membro do grupo mudou, etc.); só nos interessa
 // `message`, e dentro dele só mensagens de texto.
 interface TelegramUpdate {
+  // Identificador único e crescente de cada update, atribuído pelo
+  // próprio Telegram — estável entre reentregas do MESMO evento. Usado
+  // pelo DedupeCache (ver handleWebhook abaixo) pra detectar reenvio.
+  update_id: number;
   message?: {
     chat: { id: number };
     text?: string;
@@ -35,13 +49,17 @@ export class TelegramAdapter implements ChannelAdapter {
   // /webhook/telegram.
   readonly name = "telegram" as const;
 
+  // Instância própria de DedupeCache — ver comentário equivalente em
+  // WhatsAppAdapter sobre por que cada canal guarda a sua, sem compartilhar.
+  private readonly dedupe = new DedupeCache(DEDUPE_TTL_MS);
+
   constructor(private readonly botToken: string, private readonly webhookSecret?: string) {}
 
   // Preâmbulo: handleWebhook() é chamado por src/server.ts para toda
-  // requisição HTTP recebida em /webhook/telegram. Faz três coisas em
-  // sequência: valida o segredo do webhook (se configurado), extrai o texto
-  // da mensagem, e — se houver texto — chama o Orchestrator e envia a
-  // resposta de volta via API do Telegram.
+  // requisição HTTP recebida em /webhook/telegram. Faz quatro coisas em
+  // sequência: valida o segredo do webhook (se configurado), confirma
+  // recebimento, deduplica por update_id, e — se houver texto novo — chama
+  // o Orchestrator e envia a resposta de volta via API do Telegram.
   async handleWebhook(
     req: Request,
     res: Response,
@@ -65,14 +83,23 @@ export class TelegramAdapter implements ChannelAdapter {
     // Faz o cast do corpo da requisição (já parseado como JSON pelo
     // middleware express.json() em server.ts) para o formato esperado.
     const update = req.body as TelegramUpdate;
-    const message = update.message;
 
     // Responde 200 ao Telegram IMEDIATAMENTE, antes de processar a
     // mensagem — o Telegram reenvia o webhook se não receber um 200
     // rapidamente, e como a resposta do LLM pode demorar alguns segundos,
     // confirmamos o recebimento primeiro para evitar reenvios duplicados
-    // do mesmo update.
+    // do mesmo update. A deduplicação abaixo cobre o caso de o Telegram
+    // reenviar mesmo assim, por outro motivo de rede do lado dele.
     res.sendStatus(200);
+
+    // Deduplicação: se já vimos este update_id dentro da janela de TTL,
+    // isto é uma reentrega — pula sem chamar o Orchestrator de novo.
+    if (this.dedupe.hasSeenAndRecord(String(update.update_id))) {
+      console.warn(`Telegram: update ${update.update_id} já processado, ignorando reentrega.`);
+      return;
+    }
+
+    const message = update.message;
     // Ignora updates sem texto (figurinha, foto, membro entrou no grupo,
     // etc.) — este agente só sabe lidar com texto.
     if (!message?.text) return;
@@ -99,8 +126,12 @@ export class TelegramAdapter implements ChannelAdapter {
     // handoff, log) — este adapter não sabe nem precisa saber o que
     // acontece dentro de onMessage.
     const reply = await onMessage(inbound);
-    // Envia a resposta de volta ao MESMO chat de onde a mensagem veio.
-    await this.sendMessage(chatId, reply);
+    // Reply vazio é o sinal do Orchestrator pra "não responda nada" —
+    // acontece quando a conversa está em handoff ativo (bot silenciado,
+    // ver src/orchestrator/handoffState.ts, item #5 da revisão de
+    // segurança) e também no caso de rate limit. Sem este if, mandaríamos
+    // uma mensagem vazia pro chat real.
+    if (reply) await this.sendMessage(chatId, reply);
   }
 
   // Preâmbulo: sendMessage() encapsula a chamada HTTP ao método
