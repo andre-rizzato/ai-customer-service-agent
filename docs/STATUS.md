@@ -1,15 +1,24 @@
 # Status do projeto
 
-Checklist consolidado de tudo que foi feito e do que falta, cobrindo os dois
-repositórios envolvidos: `ai-customer-service-agent` (este) e
-`DistributedOrderSystem` (o `AgentService`, Python). Para os passos manuais
-de domínio/email/WhatsApp, ver [`GO_LIVE_CHECKLIST.md`](GO_LIVE_CHECKLIST.md).
+Checklist consolidado de tudo que foi feito e do que falta, cobrindo os três
+repositórios envolvidos: `ai-customer-service-agent` (este),
+`DistributedOrderSystem` (o `AgentService`, Python) e `rizzatotech-site` (site
+institucional). Para os passos manuais de domínio/email/WhatsApp, ver
+[`GO_LIVE_CHECKLIST.md`](GO_LIVE_CHECKLIST.md).
 
-Última atualização: 03/10/2026.
+Última atualização: 04/10/2026.
 
 ---
 
 ## Feito
+
+### Site institucional (`rizzatotech-site`)
+
+- [x] Domínio `rizzatotech.com` registrado (Hostinger) + email `contato@rizzatotech.com` (DKIM ativo)
+- [x] Site Next.js + Tailwind v4 (export estático) — [repo](https://github.com/andre-rizzato/rizzatotech-site), [www.rizzatotech.com](https://www.rizzatotech.com)
+- [x] Implantado em Azure Static Web Apps (`rg-rizzatotech-site`, plano gratuito), deploy automático via GitHub Actions a cada push
+- [x] Domínio customizado + certificado TLS próprio ativos
+- [ ] Login é só interface — sem autenticação/backend real ainda (deliberado, ver README do repo)
 
 ### Infraestrutura Azure (ambiente de teste)
 
@@ -62,8 +71,8 @@ de domínio/email/WhatsApp, ver [`GO_LIVE_CHECKLIST.md`](GO_LIVE_CHECKLIST.md).
 
 ### Manual — só você consegue fazer (ver [`GO_LIVE_CHECKLIST.md`](GO_LIVE_CHECKLIST.md))
 
-- [ ] Domínio, site mínimo, email corporativo
-- [ ] DNS (subdomínio por tenant apontando pra VM)
+- [x] ~~Domínio, site mínimo, email corporativo~~ — feito, ver seção acima
+- [ ] DNS dos tenants de teste do agente (`rizzato-systems`/`distributed-order`.rizzatotech.com → IP da VM) — separado do `www` do site institucional
 - [ ] Conta no Meta for Developers + número de teste do WhatsApp
 - [ ] Webhook registrado (Telegram e/ou WhatsApp)
 - [ ] Catálogo real do negócio (hoje ainda é `catalog.example.json`)
