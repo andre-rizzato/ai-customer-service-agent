@@ -36,6 +36,30 @@ sem limite genuinamente arriscado — ver "Implantação multi-tenant" em
 User-Assigned Managed Identity + Key Vault por cliente, já pronto pra
 quando isso fizer sentido.
 
+## Toda chave SSH gerada no Windows precisa de ACL restrita manualmente
+
+`ssh-keygen` no Git Bash (Windows) **não** aplica uma permissão equivalente
+ao `chmod 600` do Linux — o arquivo da chave privada sai com a ACL herdada
+da pasta, que no normal inclui `SYSTEM`, `Administrators` e às vezes um SID
+não resolvido, todos com controle total. Isso já aconteceu duas vezes neste
+projeto: com `id_rsa` (achado e corrigido numa sessão anterior) e de novo
+com `deploy_key_ci` (achado em 04/10/2026, só quando o usuário pediu pra
+conferir — `icacls` mostrava 4 contas com `(F)` por herança).
+
+**Sempre que gerar uma chave privada nova neste projeto** (`ssh-keygen -f
+~/.ssh/nome_da_chave`), rodar na sequência, sem esperar dar erro de "Bad
+permissions" ou alguém pedir pra conferir:
+
+```powershell
+icacls "C:\Users\work\.ssh\nome_da_chave" /inheritance:r
+icacls "C:\Users\work\.ssh\nome_da_chave" /grant:r "$($env:USERNAME):(R)"
+```
+
+Não confiar no `ls -la` do Git Bash pra validar isso — ele traduz a ACL do
+NTFS pra uma permissão POSIX aproximada (mostrou `644` pras duas chaves,
+mesmo uma estando certa e a outra não). A fonte de verdade no Windows é
+sempre `icacls`.
+
 ## Outros documentos relevantes
 
 - `docs/STATUS.md` — checklist consolidado do que está feito/pendente, nos três repositórios do projeto.
