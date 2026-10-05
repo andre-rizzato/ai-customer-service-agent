@@ -145,7 +145,10 @@ for (const adapter of adapters) {
   // domínio (o widget embarcável) — Telegram e WhatsApp chamam o webhook
   // deles mesmos, server-to-server, sem CORS envolvido.
   const middlewares = adapter.name === "web" ? [widgetCors] : [];
-  app.all(`/webhook/${adapter.name}`, ...middlewares, (req, res) => {
+  // Extraído como função nomeada (em vez de inline só em um app.all) porque
+  // o canal "web" precisa dela montada em DOIS caminhos — ver o alias
+  // /webhook/web/message logo abaixo.
+  const handleAdapterWebhook = (req: express.Request, res: express.Response) => {
     // Chama o adapter, repassando uma função que só encaminha a mensagem
     // normalizada para o Orchestrator — isso é o que "conecta" o canal ao
     // pipeline central sem o adapter precisar importar o Orchestrator
@@ -159,11 +162,23 @@ for (const adapter of adapters) {
       console.error(`Error handling ${adapter.name} webhook:`, err);
       if (!res.headersSent) res.sendStatus(500);
     });
-  });
+  };
+  app.all(`/webhook/${adapter.name}`, ...middlewares, handleAdapterWebhook);
   // Log de inicialização — confirma quais canais ficaram ativos nesta
   // execução do processo, útil ao subir em produção para conferir que a
   // configuração esperada realmente carregou.
   console.log(`Mounted channel adapter: /webhook/${adapter.name}`);
+
+  // Alias só pro canal "web": o widget embarcável do DistributedOrderSystem
+  // (chat-widget.min.js) sempre faz POST em "<chatbotServiceUrl>/message" —
+  // sufixo fixo no código dele, não configurável. Montar o MESMO handler
+  // também em /webhook/web/message permite apontar `chatbotServiceUrl` pra
+  // ".../webhook/web" sem editar o JS do widget (ver
+  // docs/artifacts/widget-embarcavel.html, Fase 3).
+  if (adapter.name === "web") {
+    app.all("/webhook/web/message", ...middlewares, handleAdapterWebhook);
+    console.log("Mounted widget alias: /webhook/web/message");
+  }
 }
 
 // GET /api/config — devolve a configuração de negócio atual (agentConfig),

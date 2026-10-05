@@ -77,7 +77,7 @@ institucional). Para os passos manuais de domínio/email/WhatsApp, ver
 - [x] [`Blueprint do Agente`](artifacts/blueprint-do-agente.html) — arquitetura de deploy, fluxo de mensagem, Key Vault
 - [x] [`Mapa de Capacidades`](artifacts/mapa-capacidades.html) — capacidades plugáveis, decisões de pagamento/implantação/roteamento
 - [x] [`Fluxo da Requisição`](artifacts/fluxo-da-requisicao.html) — Nginx/PM2/serviços, módulo por módulo, do webhook do WhatsApp até a resposta
-- [x] [`Widget Embarcável`](artifacts/widget-embarcavel.html) — decisão de unificar o widget de chat do DistributedOrderSystem sob o Node Orchestrator (um cérebro, duas mãos); fases 1 e 2 já executadas
+- [x] [`Widget Embarcável`](artifacts/widget-embarcavel.html) — decisão de unificar o widget de chat do DistributedOrderSystem sob o Node Orchestrator (um cérebro, duas mãos); fases 1 a 4 já executadas
 - [x] [`SSH_LINUX_GUIDE.pdf`](SSH_LINUX_GUIDE.pdf) — conectar na VM, comandos essenciais, receitas da rotina real do projeto
 - [x] Diagramas exportados como SVG standalone em `artifacts/images/` (abaixo)
 - [x] `GO_LIVE_CHECKLIST.md` — passos de domínio/email/DNS/Meta Developers + plano de teste com 2 tenants
@@ -119,7 +119,7 @@ institucional). Para os passos manuais de domínio/email/WhatsApp, ver
 
 ### Técnico — widget embarcável
 
-- [ ] Fases 3–5 do [`Widget Embarcável`](artifacts/widget-embarcavel.html): repontar o widget JS do DistributedOrderSystem pro canal `web` do Node, validar que o AgentService continua só para intenção de pedido, provisionar o par container+UAMI+KV por cliente quando houver 1º cliente pagante do gadget
+- [ ] Fase 5 do [`Widget Embarcável`](artifacts/widget-embarcavel.html): provisionar o par container+UAMI+KV por cliente quando houver 1º cliente pagante do gadget (fases 1–4 já concluídas)
 
 ### Técnico — infraestrutura
 

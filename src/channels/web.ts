@@ -27,16 +27,25 @@ export class WebAdapter implements ChannelAdapter {
     res: Response,
     onMessage: (msg: InboundMessage) => Promise<string>
   ): Promise<void> {
-    // Extrai os dois campos esperados do corpo da requisição (já parseado
-    // como JSON pelo middleware express.json() em server.ts).
-    const { conversationId, text } = req.body as { conversationId?: string; text?: string };
+    // Extrai os campos do corpo da requisição (já parseado como JSON pelo
+    // middleware express.json() em server.ts). Aceita DOIS contratos no
+    // mesmo endpoint: o nosso original ({conversationId, text} — usado por
+    // public/whatsapp.html) e o do widget embarcável do DistributedOrderSystem
+    // ({sessionId, message} — o mesmo payload que o chat-widget.min.js já
+    // manda pra API da ChatbotService em C#), pra reaproveitar aquele widget
+    // sem precisar editar o JS dele (ver docs/artifacts/widget-embarcavel.html,
+    // Fase 3). Os dois pares são conceitualmente a mesma coisa: id da
+    // conversa + texto da mensagem.
+    const body = req.body as { conversationId?: string; text?: string; sessionId?: string; message?: string };
+    const conversationId = body.conversationId ?? body.sessionId;
+    const text = body.text ?? body.message;
 
     // Validação mínima de entrada: sem os dois campos não há como montar um
     // InboundMessage válido — devolve 400 Bad Request com uma mensagem
     // explicando o que falta, em vez de deixar o restante do código falhar
     // com um erro menos claro mais adiante.
     if (!conversationId || !text) {
-      res.status(400).json({ error: "conversationId and text are required" });
+      res.status(400).json({ error: "conversationId/sessionId and text/message are required" });
       return;
     }
 
@@ -57,6 +66,10 @@ export class WebAdapter implements ChannelAdapter {
     // 200 imediatamente e enviam a resposta de forma assíncrona por uma
     // chamada HTTP separada à API da plataforma.
     const reply = await onMessage(inbound);
-    res.json({ reply });
+    // `message` é alias de `reply` pelo mesmo motivo do parsing acima — o
+    // chat-widget.min.js do DistributedOrderSystem lê `response.message`
+    // (ou `.response`), não `.reply`; devolver os dois nomes evita ter que
+    // editar o JS do widget pra apontá-lo pra cá.
+    res.json({ reply, message: reply });
   }
 }

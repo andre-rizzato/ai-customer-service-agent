@@ -173,7 +173,7 @@
     </div>
     <div class="meta-strip mono">
       <div class="meta-cell"><span class="k">Motivação</span>contornar burocracia de WhatsApp/Telegram, vender como serviço</div>
-      <div class="meta-cell"><span class="k">Status</span>decidido — fases 1 e 2 concluídas</div>
+      <div class="meta-cell"><span class="k">Status</span>decidido — fases 1 a 4 concluídas, fase 5 aguarda 1º cliente</div>
       <div class="meta-cell"><span class="k">Repos</span>ai-customer-service-agent + DistributedOrderSystem</div>
       <div class="meta-cell"><span class="k">Atualizado</span>04 out 2026</div>
     </div>
@@ -291,7 +291,7 @@
           <tr><th>Achado</th><th>Onde</th><th>Implicação</th></tr>
         </thead>
         <tbody>
-          <tr><td>Widget "Direct mode" já existe e já funciona</td><td><span class="mono">ChatbotService/wwwroot/chat-widget</span> + <span class="mono">PythonAgentChatbotService</span></td><td>Não reconstruir a UI — só repontar o endpoint (Fase 3)</td></tr>
+          <tr><td>Widget "Direct mode" já existe e já funciona</td><td><span class="mono">ChatbotService/wwwroot/chat-widget</span> + <span class="mono">PythonAgentChatbotService</span></td><td><strong>Reaproveitado sem alteração — Fase 3</strong>, Node ganhou alias de contrato pra compatibilidade</td></tr>
           <tr><td>AgentService é estreito por desenho, não por limitação</td><td><span class="mono">AgentService/graph.py</span> — "Order Orchestrator Agent"</td><td>Continua existindo exatamente como está, reutilizado via capabilityRouter</td></tr>
           <tr><td>Terceiro front-end esquecido</td><td><span class="mono">ChatController.GetChatInterfaceHtml()</span></td><td><strong>Removido — Fase 1</strong>, build validado (0 erros)</td></tr>
           <tr><td>Multi-tenant já é "par por cliente", não tenant-id compartilhado</td><td><a href="mapa-capacidades.html">mapa-capacidades.html</a> — "Um VM, N clientes"</td><td>Vender o gadget não exige código novo de tenant — só provisionar o par já desenhado (Fase 5)</td></tr>
@@ -345,8 +345,8 @@
     <ul class="checklist">
       <li class="done"><span class="box"></span><span><strong>Fase 1</strong> — remover o HTML legado hardcoded em <span class="mono">ChatController.cs</span> (DistributedOrderSystem) e a referência morta na documentação. Build do <span class="mono">ChatbotService</span> validado (0 erros, 0 avisos).</span></li>
       <li class="done"><span class="box"></span><span><strong>Fase 2</strong> — endurecer o canal <span class="mono">web</span> do Node pra uso público: CORS por allowlist de origem (<span class="mono">WIDGET_ALLOWED_ORIGINS</span>), aplicado só em <span class="mono">/webhook/web</span>. Testado: preflight OPTIONS, origem autorizada (headers corretos), origem não autorizada (sem headers — browser bloqueia sozinho), e same-origin local (sem regressão no <span class="mono">whatsapp.html</span>).</span></li>
-      <li><span class="box"></span><span><strong>Fase 3</strong> — repontar o <span class="mono">chatbotServiceUrl</span> do widget JS (hoje <span class="mono">/api/chat</span>, via <span class="mono">ChatbotService</span>) pro endpoint público novo do Node; confirmar que nada no widget assume a marca "DistributedOrderSystem" de forma fixa.</span></li>
-      <li><span class="box"></span><span><strong>Fase 4</strong> — nenhuma mudança esperada no <span class="mono">AgentService</span>: validar que o fluxo de intenção de pedido continua idêntico depois da Fase 3 (chamado pelo Node, não mais pelo widget direto).</span></li>
+      <li class="done"><span class="box"></span><span><strong>Fase 3</strong> — <span class="mono">src/channels/web.ts</span> (Node) agora aceita o contrato fixo do widget (<span class="mono">{message, sessionId, userId}</span> → <span class="mono">{reply, message}</span>) como alias do contrato original, e <span class="mono">/webhook/web/message</span> foi montado (o widget sempre faz POST em <span class="mono">${chatbotServiceUrl}/message</span>, sufixo fixo no JS). O widget em si não foi alterado — ganhou um "Mode 3" documentado no <span class="mono">README.md</span> mostrando como apontar <span class="mono">chatbotServiceUrl</span> pra um Node por cliente, sem tocar em marca/config fixa.</span></li>
+      <li class="done"><span class="box"></span><span><strong>Fase 4</strong> — confirmado: nenhuma mudança no <span class="mono">AgentService</span>. Node continua chamando-o server-to-server só quando <span class="mono">capabilityRouter</span> detecta intenção de pedido — o widget, mesmo repontado, nunca fala com ele diretamente.</span></li>
       <li><span class="box"></span><span><strong>Fase 5</strong> — quando aparecer o 1º cliente pagante do gadget: provisionar o par container + User-Assigned Managed Identity + Key Vault já desenhado, aproveitando a janela da migração do DistributedOrderSystem pro Azure em vez de fazer essa migração duas vezes.</span></li>
     </ul>
   </section>

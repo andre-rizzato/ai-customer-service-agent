@@ -230,6 +230,14 @@ const EnvSchema = z.object({
   // KEY_VAULT_ENABLED=true, checado em loadSecretsFromKeyVault().
   KEY_VAULT_NAME: z.string().optional(),
 
+  // URL base do AgentService (Python/FastAPI, standalone — ver
+  // DistributedOrderSystem/src/AgentService) — obrigatória quando "order"
+  // está em agentConfig.enabledCapabilities (checado mais abaixo). Esse
+  // serviço é quem de fato consulta o backend de pedidos do cliente; este
+  // processo Node só decide SE uma mensagem deve ir pra lá
+  // (capabilityRouter.ts) e repassa a resposta.
+  AGENT_SERVICE_URL: z.string().optional(),
+
   // Lista de origens (separadas por vírgula, ex.:
   // "https://site-do-cliente.com,https://outro-dominio.com") autorizadas a
   // chamar /webhook/web via browser vindo de FORA deste domínio — é o que
@@ -240,14 +248,6 @@ const EnvSchema = z.object({
   // origem externa permitida (comportamento de hoje: só mesmo-origin
   // funciona, como o whatsapp.html local já faz).
   WIDGET_ALLOWED_ORIGINS: z.string().optional(),
-
-  // URL base do AgentService (Python/FastAPI, standalone — ver
-  // DistributedOrderSystem/src/AgentService) — obrigatória quando "order"
-  // está em agentConfig.enabledCapabilities (checado mais abaixo). Esse
-  // serviço é quem de fato consulta o backend de pedidos do cliente; este
-  // processo Node só decide SE uma mensagem deve ir pra lá
-  // (capabilityRouter.ts) e repassa a resposta.
-  AGENT_SERVICE_URL: z.string().optional(),
 });
 
 // Tipo TypeScript derivado do schema de ambiente, mesmo raciocínio do
