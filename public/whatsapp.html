@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>WhatsApp — Simulador local</title>
+<style>
+  :root {
+    --wa-header: #075E54;
+    --wa-header-dark: #054c42;
+    --wa-accent: #25D366;
+    --wa-bg: #E5DDD5;
+    --wa-sent: #DCF8C6;
+    --wa-received: #FFFFFF;
+    --wa-text: #111B21;
+    --wa-text-dim: #667781;
+    --wa-check-read: #34B7F1;
+    --wa-input-bar: #F0F0F0;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+    margin: 0;
+    font-family: "Segoe UI", Helvetica, Roboto, Arial, sans-serif;
+    background: #0b141a;
+  }
+
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* "Moldura de celular" — só estética, centraliza o chat na tela */
+  .phone {
+    width: 100%;
+    max-width: 460px;
+    height: 100vh;
+    max-height: 900px;
+    background: var(--wa-bg);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+  }
+
+  @media (min-width: 500px) {
+    .phone { border-radius: 16px; margin: 20px 0; }
+  }
+
+  /* Padrão sutil de fundo do chat, estilo "doodle" do WhatsApp */
+  .messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px 6% 14px;
+    background-color: var(--wa-bg);
+    background-image:
+      radial-gradient(rgba(0,0,0,0.035) 1px, transparent 1px),
+      radial-gradient(rgba(0,0,0,0.035) 1px, transparent 1px);
+    background-size: 26px 26px;
+    background-position: 0 0, 13px 13px;
+  }
+
+  /* ---------- Header ---------- */
+  header {
+    background: var(--wa-header);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    flex: 0 0 auto;
+    user-select: none;
+  }
+
+  header .back {
+    width: 24px;
+    height: 24px;
+    fill: #fff;
+    flex: 0 0 auto;
+    opacity: 0.9;
+    cursor: default;
+  }
+
+  .avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: #cfd8dc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #546e7a;
+    font-weight: 600;
+    flex: 0 0 auto;
+    overflow: hidden;
+  }
+
+  .header-info { flex: 1; min-width: 0; }
+  .header-info .name {
+    font-size: 16px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .header-info .status {
+    font-size: 12.5px;
+    color: rgba(255,255,255,0.8);
+    height: 16px;
+  }
+  .header-info .status.offline { color: #ffb4ab; }
+
+  .header-icons { display: flex; gap: 18px; align-items: center; }
+  .header-icons svg { width: 22px; height: 22px; fill: #fff; cursor: pointer; }
+  .header-icons svg:active { opacity: 0.6; }
+
+  /* ---------- Bolhas de mensagem ---------- */
+  .row { display: flex; margin: 2px 0; }
+  .row.sent { justify-content: flex-end; }
+  .row.received { justify-content: flex-start; }
+
+  .bubble {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    max-width: 75%;
+    padding: 6px 7px 8px 9px;
+    border-radius: 7.5px;
+    font-size: 14.2px;
+    line-height: 1.35;
+    box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);
+  }
+
+  .bubble .text {
+    word-wrap: break-word;
+    white-space: pre-wrap;
+  }
+
+  .bubble.received { background: var(--wa-received); color: var(--wa-text); border-top-left-radius: 0; }
+  .bubble.sent { background: var(--wa-sent); color: var(--wa-text); border-top-right-radius: 0; }
+
+  .bubble.received::before {
+    content: "";
+    position: absolute;
+    top: 0; left: -8px;
+    border-width: 0 8px 8px 0;
+    border-style: solid;
+    border-color: transparent var(--wa-received) transparent transparent;
+  }
+  .bubble.sent::before {
+    content: "";
+    position: absolute;
+    top: 0; right: -8px;
+    border-width: 0 0 8px 8px;
+    border-style: solid;
+    border-color: transparent transparent transparent var(--wa-sent);
+  }
+
+  .bubble .meta {
+    align-self: flex-end;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    margin-top: 2px;
+    margin-left: 10px;
+  }
+  .bubble .time { font-size: 11px; color: var(--wa-text-dim); }
+  .bubble .check { width: 15px; height: 10px; fill: var(--wa-check-read); }
+
+  .bubble.error { background: #ffe4e1; color: #a1260d; border-top-left-radius: 0; }
+  .bubble.error::before { border-color: transparent #ffe4e1 transparent transparent; }
+
+  /* Divisor de data, tipo pílula "HOJE" */
+  .day-divider {
+    display: flex;
+    justify-content: center;
+    margin: 10px 0;
+  }
+  .day-divider span {
+    background: #E1F2FA;
+    color: #54656f;
+    font-size: 12.5px;
+    padding: 5px 12px;
+    border-radius: 8px;
+    box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);
+  }
+
+  /* Indicador de "digitando" */
+  .typing-bubble { display: flex; gap: 3px; align-items: center; height: 14px; padding: 2px 2px; }
+  .typing-bubble span {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #93918f;
+    animation: blink 1.2s infinite ease-in-out both;
+  }
+  .typing-bubble span:nth-child(2) { animation-delay: 0.18s; }
+  .typing-bubble span:nth-child(3) { animation-delay: 0.36s; }
+  @keyframes blink { 0%, 80%, 100% { opacity: 0.25; transform: scale(0.85); } 40% { opacity: 1; transform: scale(1); } }
+
+  /* ---------- Barra de input ---------- */
+  .input-bar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 8px;
+    background: var(--wa-input-bar);
+  }
+
+  .input-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #fff;
+    border-radius: 24px;
+    padding: 8px 12px;
+  }
+
+  .input-wrap svg { width: 22px; height: 22px; fill: #54656f; flex: 0 0 auto; cursor: pointer; }
+
+  #text-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    font-size: 15px;
+    resize: none;
+    max-height: 90px;
+    font-family: inherit;
+    line-height: 1.3;
+    padding: 2px 0;
+  }
+
+  .send-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: var(--wa-header);
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex: 0 0 auto;
+  }
+  .send-btn svg { width: 20px; height: 20px; fill: #fff; }
+  .send-btn:active { filter: brightness(0.9); }
+
+  /* Scrollbar discreta */
+  .messages::-webkit-scrollbar { width: 6px; }
+  .messages::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <header>
+    <svg class="back" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20z"/></svg>
+    <div class="avatar" id="avatar">🤖</div>
+    <div class="header-info">
+      <div class="name" id="contact-name">Assistente Virtual</div>
+      <div class="status" id="status-text">conectando...</div>
+    </div>
+    <div class="header-icons">
+      <svg viewBox="0 0 24 24" title="Chamada de vídeo"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+      <svg viewBox="0 0 24 24" title="Chamada de voz"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
+      <svg viewBox="0 0 24 24" id="menu-btn" title="Reiniciar conversa"><path d="M12 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm0 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg>
+    </div>
+  </header>
+
+  <div class="messages" id="messages"></div>
+
+  <div class="input-bar">
+    <div class="input-wrap">
+      <svg viewBox="0 0 24 24" title="Emoji"><path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/></svg>
+      <textarea id="text-input" rows="1" placeholder="Digite uma mensagem"></textarea>
+      <svg viewBox="0 0 24 24" title="Áudio"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5-3c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+    </div>
+    <button class="send-btn" id="send-btn" title="Enviar">
+      <svg viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg>
+    </button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const WEBHOOK_URL = "/webhook/web";
+  const STORAGE_KEY_CONV = "wa-sim-conversation-id";
+  const STORAGE_KEY_HISTORY_PREFIX = "wa-sim-history-";
+
+  const messagesEl = document.getElementById("messages");
+  const inputEl = document.getElementById("text-input");
+  const sendBtn = document.getElementById("send-btn");
+  const statusEl = document.getElementById("status-text");
+  const menuBtn = document.getElementById("menu-btn");
+
+  function uuid() {
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === "x" ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  }
+
+  function getConversationId() {
+    let id = localStorage.getItem(STORAGE_KEY_CONV);
+    if (!id) {
+      id = uuid();
+      localStorage.setItem(STORAGE_KEY_CONV, id);
+    }
+    return id;
+  }
+
+  let conversationId = getConversationId();
+
+  function historyKey() {
+    return STORAGE_KEY_HISTORY_PREFIX + conversationId;
+  }
+
+  function loadHistory() {
+    try {
+      return JSON.parse(localStorage.getItem(historyKey()) || "[]");
+    } catch {
+      return [];
+    }
+  }
+
+  function saveHistory(history) {
+    localStorage.setItem(historyKey(), JSON.stringify(history));
+  }
+
+  function escapeHtml(str) {
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  // Converte um subconjunto simples de markdown (**negrito**, *itálico*)
+  // vindo da resposta do LLM — texto já escapado antes, então é seguro.
+  function renderText(raw) {
+    let safe = escapeHtml(raw);
+    safe = safe.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    safe = safe.replace(/(?<!\*)\*(?!\*)(.+?)\*(?!\*)/g, "<em>$1</em>");
+    return safe;
+  }
+
+  function formatTime(ts) {
+    return new Date(ts).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  }
+
+  function formatDay(ts) {
+    const d = new Date(ts);
+    const today = new Date();
+    const isToday = d.toDateString() === today.toDateString();
+    if (isToday) return "HOJE";
+    return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" }).toUpperCase();
+  }
+
+  let lastDay = null;
+
+  function maybeInsertDayDivider(ts) {
+    const day = new Date(ts).toDateString();
+    if (day === lastDay) return;
+    lastDay = day;
+    const div = document.createElement("div");
+    div.className = "day-divider";
+    div.innerHTML = `<span>${formatDay(ts)}</span>`;
+    messagesEl.appendChild(div);
+  }
+
+  function scrollToBottom() {
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function appendBubble({ role, text, ts, isError }) {
+    maybeInsertDayDivider(ts);
+
+    const row = document.createElement("div");
+    row.className = "row " + (role === "user" ? "sent" : "received");
+
+    const bubble = document.createElement("div");
+    bubble.className = "bubble " + (role === "user" ? "sent" : "received") + (isError ? " error" : "");
+
+    const textSpan = document.createElement("span");
+    textSpan.className = "text";
+    textSpan.innerHTML = renderText(text);
+    bubble.appendChild(textSpan);
+
+    const meta = document.createElement("span");
+    meta.className = "meta";
+    const time = document.createElement("span");
+    time.className = "time";
+    time.textContent = formatTime(ts);
+    meta.appendChild(time);
+
+    if (role === "user" && !isError) {
+      meta.insertAdjacentHTML(
+        "beforeend",
+        '<svg class="check" viewBox="0 0 16 11"><path d="M11.1 0.6 4.6 7.1 2 4.5 0.6 5.9l4 4 1 1 7.9-7.9z"/><path d="M15.1 0.6 8.6 7.1 7.8 6.3 6.4 7.7l1.8 1.8 1-1 7.9-7.9z"/></svg>'
+      );
+    }
+
+    bubble.appendChild(meta);
+    row.appendChild(bubble);
+    messagesEl.appendChild(row);
+    scrollToBottom();
+  }
+
+  function renderAll(history) {
+    messagesEl.innerHTML = "";
+    lastDay = null;
+    for (const m of history) appendBubble(m);
+  }
+
+  // Estado real de conexão com o backend — null enquanto o primeiro check
+  // não respondeu, true/false depois disso. Atualizado por checkHealth()
+  // (polling periódico contra GET /health) e por qualquer falha de rede ao
+  // enviar uma mensagem, pra não depender só do polling pra notar queda.
+  let appOnline = null;
+  let isTyping = false;
+
+  function renderStatus() {
+    if (isTyping) {
+      statusEl.textContent = "digitando...";
+      statusEl.classList.remove("offline");
+      return;
+    }
+    if (appOnline === null) {
+      statusEl.textContent = "conectando...";
+      statusEl.classList.remove("offline");
+    } else if (appOnline) {
+      statusEl.textContent = "online";
+      statusEl.classList.remove("offline");
+    } else {
+      statusEl.textContent = "offline — servidor não responde";
+      statusEl.classList.add("offline");
+    }
+  }
+
+  async function checkHealth() {
+    try {
+      const res = await fetch("/health", { signal: AbortSignal.timeout(4000) });
+      appOnline = res.ok;
+    } catch {
+      appOnline = false;
+    }
+    renderStatus();
+  }
+
+  let typingRow = null;
+  function showTyping() {
+    isTyping = true;
+    renderStatus();
+    typingRow = document.createElement("div");
+    typingRow.className = "row received";
+    typingRow.innerHTML = `
+      <div class="bubble received">
+        <div class="typing-bubble"><span></span><span></span><span></span></div>
+      </div>`;
+    messagesEl.appendChild(typingRow);
+    scrollToBottom();
+  }
+
+  function hideTyping() {
+    isTyping = false;
+    renderStatus();
+    if (typingRow) {
+      typingRow.remove();
+      typingRow = null;
+    }
+  }
+
+  async function sendMessage() {
+    const text = inputEl.value.trim();
+    if (!text) return;
+
+    inputEl.value = "";
+    autoResize();
+
+    const history = loadHistory();
+    const userMsg = { role: "user", text, ts: Date.now() };
+    history.push(userMsg);
+    saveHistory(history);
+    appendBubble(userMsg);
+
+    showTyping();
+
+    try {
+      const res = await fetch(WEBHOOK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId, text }),
+      });
+
+      hideTyping();
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      const botMsg = { role: "bot", text: data.reply ?? "(sem resposta)", ts: Date.now() };
+      const h2 = loadHistory();
+      h2.push(botMsg);
+      saveHistory(h2);
+      appendBubble(botMsg);
+    } catch (err) {
+      hideTyping();
+      // Uma falha ao enviar é o sinal mais rápido de queda — não espera o
+      // próximo tick do polling pra atualizar o status do header.
+      checkHealth();
+      const errMsg = {
+        role: "bot",
+        text: "⚠️ Não foi possível falar com o servidor em " + WEBHOOK_URL +
+          ". Confirme que \"npm run dev\" está rodando. (" + err.message + ")",
+        ts: Date.now(),
+        isError: true,
+      };
+      appendBubble(errMsg);
+    }
+  }
+
+  function autoResize() {
+    inputEl.style.height = "auto";
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 90) + "px";
+  }
+
+  inputEl.addEventListener("input", autoResize);
+  inputEl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+  sendBtn.addEventListener("click", sendMessage);
+
+  menuBtn.addEventListener("click", () => {
+    if (!confirm("Iniciar uma nova conversa? O histórico local desta será apagado.")) return;
+    localStorage.removeItem(historyKey());
+    conversationId = uuid();
+    localStorage.setItem(STORAGE_KEY_CONV, conversationId);
+    lastDay = null;
+    messagesEl.innerHTML = "";
+  });
+
+  renderAll(loadHistory());
+  inputEl.focus();
+
+  checkHealth();
+  setInterval(checkHealth, 10000);
+})();
+</script>
+
+</body>
+</html>

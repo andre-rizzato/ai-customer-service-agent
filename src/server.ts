@@ -4,6 +4,7 @@
 // deliberadamente "burro" — toda a lógica de negócio vive no Orchestrator e
 // nos adapters; aqui só existe fiação (wiring).
 import express from "express";
+import { resolve } from "node:path";
 import { env } from "./config.js";
 import { Orchestrator } from "./orchestrator/orchestrator.js";
 import { createTelegramAdapter } from "./channels/telegram.js";
@@ -56,6 +57,13 @@ app.use(
     },
   })
 );
+
+// Serve a pasta public/ como arquivos estáticos — hoje contém só
+// whatsapp.html, uma interface de teste que imita visualmente o WhatsApp e
+// fala com o canal "web" (POST /webhook/web, montado mais abaixo) pelo mesmo
+// origin, sem precisar de CORS. Puramente uma ferramenta de debug local; não
+// faz parte do pipeline de negócio.
+app.use(express.static(resolve("./public")));
 
 // Instancia o Orchestrator UMA VEZ para todo o processo — ele por sua vez
 // instancia (também uma vez) o ConversationStore, KnowledgeBase, LLMProvider
