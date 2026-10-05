@@ -91,6 +91,49 @@ const whatsapp = createWhatsAppAdapter();
 if (whatsapp) adapters.push(whatsapp);
 else console.warn("WHATSAPP_ACCESS_TOKEN/PHONE_NUMBER_ID/VERIFY_TOKEN/APP_SECRET not set — WhatsApp channel disabled.");
 
+// Lista de origens externas autorizadas a chamar /webhook/web de um
+// browser (ver WIDGET_ALLOWED_ORIGINS em src/config.ts e
+// docs/artifacts/widget-embarcavel.html) — o que faz desse canal um widget
+// embarcável de verdade no site de um cliente, não só um endpoint de teste
+// local. Calculada uma vez, fora do middleware, pra não reprocessar a
+// string a cada requisição.
+const widgetAllowedOrigins = (env.WIDGET_ALLOWED_ORIGINS ?? "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+// Preâmbulo: widgetCors() é um middleware mínimo escrito à mão em vez de
+// instalar o pacote `cors` — a regra é simples o bastante (refletir a
+// origem SE ela estiver na allowlist, e responder o preflight OPTIONS) que
+// uma dependência nova não se paga só por isso. Aplicado SÓ na rota
+// /webhook/web (não em /webhook/telegram, /webhook/whatsapp, /api/config ou
+// /health) porque é a ÚNICA rota pensada pra ser chamada por JavaScript
+// rodando no browser de um domínio diferente — as outras são server-to-
+// server (Telegram/Meta) ou ferramentas de uso local (config/health), que
+// não precisam e não devem ganhar CORS aberto.
+function widgetCors(req: express.Request, res: express.Response, next: express.NextFunction): void {
+  const origin = req.headers.origin;
+  // Requisição same-origin (ex.: whatsapp.html local) não manda um Origin
+  // que precise de liberação — o browser já permite por padrão. Só
+  // definimos os headers de CORS quando a origem está explicitamente na
+  // allowlist configurada; qualquer outra origem simplesmente não recebe
+  // Access-Control-Allow-Origin, e o browser do visitante bloqueia a
+  // resposta sozinho, sem o servidor precisar rejeitar nada manualmente.
+  if (origin && widgetAllowedOrigins.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  }
+  // Todo browser manda um preflight OPTIONS antes de um POST com
+  // Content-Type: application/json cross-origin — responde 204 aqui em vez
+  // de deixar cair no handler do WebAdapter, que não sabe lidar com OPTIONS.
+  if (req.method === "OPTIONS") {
+    res.sendStatus(204);
+    return;
+  }
+  next();
+}
+
 // Para cada adapter habilitado, monta uma rota HTTP em /webhook/<nome> que
 // aceita QUALQUER método (app.all) — necessário porque o WhatsApp usa GET
 // para verificação e POST para mensagens no mesmo caminho, enquanto
@@ -98,7 +141,11 @@ else console.warn("WHATSAPP_ACCESS_TOKEN/PHONE_NUMBER_ID/VERIFY_TOKEN/APP_SECRET
 // com cada método (ver WhatsAppAdapter.handleWebhook) evita ter que
 // registrar rotas diferentes por canal aqui.
 for (const adapter of adapters) {
-  app.all(`/webhook/${adapter.name}`, (req, res) => {
+  // Só o canal "web" é pensado pra ser chamado de um browser em outro
+  // domínio (o widget embarcável) — Telegram e WhatsApp chamam o webhook
+  // deles mesmos, server-to-server, sem CORS envolvido.
+  const middlewares = adapter.name === "web" ? [widgetCors] : [];
+  app.all(`/webhook/${adapter.name}`, ...middlewares, (req, res) => {
     // Chama o adapter, repassando uma função que só encaminha a mensagem
     // normalizada para o Orchestrator — isso é o que "conecta" o canal ao
     // pipeline central sem o adapter precisar importar o Orchestrator

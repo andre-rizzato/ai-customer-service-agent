@@ -230,6 +230,17 @@ const EnvSchema = z.object({
   // KEY_VAULT_ENABLED=true, checado em loadSecretsFromKeyVault().
   KEY_VAULT_NAME: z.string().optional(),
 
+  // Lista de origens (separadas por vírgula, ex.:
+  // "https://site-do-cliente.com,https://outro-dominio.com") autorizadas a
+  // chamar /webhook/web via browser vindo de FORA deste domínio — é o que
+  // transforma o canal "web" (hoje só testado localmente via whatsapp.html,
+  // mesmo origin) num widget embarcável de verdade no site de um cliente
+  // (ver docs/artifacts/widget-embarcavel.html). Lido em src/server.ts, que
+  // monta o middleware de CORS só nessa rota. Vazio/ausente = nenhuma
+  // origem externa permitida (comportamento de hoje: só mesmo-origin
+  // funciona, como o whatsapp.html local já faz).
+  WIDGET_ALLOWED_ORIGINS: z.string().optional(),
+
   // URL base do AgentService (Python/FastAPI, standalone — ver
   // DistributedOrderSystem/src/AgentService) — obrigatória quando "order"
   // está em agentConfig.enabledCapabilities (checado mais abaixo). Esse

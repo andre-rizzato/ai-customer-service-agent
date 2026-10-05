@@ -1,0 +1,356 @@
+<title>Widget Embarcável</title>
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #F3F6FA;
+    --surface: #FFFFFF;
+    --surface-2: #E7ECF3;
+    --ink: #152138;
+    --ink-muted: #58698A;
+    --accent: #1C5FCC;
+    --accent-2: #B5701E;
+    --good: #2F8F62;
+    --warn: #B4432E;
+    --border: #C7D2E0;
+    --border-strong: #9FB0C8;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0B1830;
+      --surface: #11213F;
+      --surface-2: #162A4E;
+      --ink: #E2E9F6;
+      --ink-muted: #92A6C9;
+      --accent: #6CA0FF;
+      --accent-2: #E3A857;
+      --good: #5FCB94;
+      --warn: #E08670;
+      --border: #2B3E66;
+      --border-strong: #3C5280;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #0B1830;
+    --surface: #11213F;
+    --surface-2: #162A4E;
+    --ink: #E2E9F6;
+    --ink-muted: #92A6C9;
+    --accent: #6CA0FF;
+    --accent-2: #E3A857;
+    --good: #5FCB94;
+    --warn: #E08670;
+    --border: #2B3E66;
+    --border-strong: #3C5280;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    margin: 0;
+    padding: 56px 24px 96px;
+  }
+
+  .page {
+    max-width: 1000px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 48px;
+  }
+
+  .prose { max-width: 720px; }
+
+  a { color: var(--accent); }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .mono { font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace; }
+
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 10px;
+  }
+
+  h1 {
+    font-size: clamp(1.9rem, 1.5rem + 1.6vw, 2.5rem);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    margin: 0 0 8px;
+  }
+
+  h2 { font-size: 1.4rem; font-weight: 600; text-wrap: balance; margin: 0 0 14px; }
+
+  p { margin: 0 0 14px; }
+  p:last-child { margin-bottom: 0; }
+  .muted { color: var(--ink-muted); }
+
+  header.titleblock { display: flex; flex-direction: column; gap: 18px; }
+
+  .meta-strip {
+    display: flex; flex-wrap: wrap;
+    border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
+    background: var(--surface);
+  }
+  .meta-cell { flex: 1 1 200px; padding: 10px 16px; border-right: 1px solid var(--border); font-family: "IBM Plex Mono", monospace; font-size: 12.5px; }
+  .meta-cell:last-child { border-right: none; }
+  .meta-cell .k { display: block; color: var(--ink-muted); font-size: 10.5px; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 3px; }
+
+  figure.diagram { margin: 0; animation: rise 0.5s ease-out both; }
+  @media (prefers-reduced-motion: reduce) { figure.diagram { animation: none; } }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  .diagram-frame { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; overflow-x: auto; }
+  .diagram-frame svg { display: block; width: 100%; min-width: 760px; height: auto; color: var(--ink); }
+
+  figcaption { margin-top: 14px; font-size: 13.5px; color: var(--ink-muted); max-width: 720px; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 20px; margin-top: 16px; font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--ink-muted); }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  .legend-dot.good { background: var(--good); }
+  .legend-dot.accent { background: var(--accent); }
+  .legend-dot.warn { background: var(--warn); }
+
+  .decision {
+    border: 1px solid var(--border-strong);
+    border-left: 4px solid var(--accent-2);
+    border-radius: 6px;
+    background: var(--surface);
+    padding: 22px 26px;
+  }
+  .decision .tag {
+    display: inline-block;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+    color: var(--accent-2);
+    background: color-mix(in srgb, var(--accent-2) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent-2) 40%, transparent);
+    border-radius: 4px; padding: 3px 9px; margin-bottom: 12px;
+  }
+  .decision ul { margin: 12px 0 0; padding-left: 20px; }
+  .decision li { margin-bottom: 7px; }
+  .decision li:last-child { margin-bottom: 0; }
+
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; min-width: 640px; font-family: "IBM Plex Mono", monospace; font-size: 12.5px; }
+  thead th { text-align: left; font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-muted); background: var(--surface-2); padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  tbody td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+
+  .checklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  .checklist li { display: flex; gap: 12px; align-items: flex-start; padding: 12px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
+  .checklist .box { width: 15px; height: 15px; margin-top: 2px; border: 1.5px solid var(--border-strong); border-radius: 3px; flex: none; position: relative; }
+  .checklist li.done .box { background: var(--good); border-color: var(--good); }
+  .checklist li.done .box::after {
+    content: ""; position: absolute; left: 3px; top: 0px; width: 5px; height: 9px;
+    border: solid white; border-width: 0 2px 2px 0; transform: rotate(45deg);
+  }
+  .checklist li.done { opacity: 0.8; }
+
+  footer { font-family: "IBM Plex Mono", monospace; font-size: 11px; color: var(--ink-muted); border-top: 1px solid var(--border); padding-top: 18px; }
+</style>
+
+<div class="page">
+
+  <header class="titleblock">
+    <div>
+      <p class="eyebrow">Decisão de arquitetura · canal novo</p>
+      <h1>Widget embarcável: um cérebro, duas mãos</h1>
+    </div>
+    <div class="meta-strip mono">
+      <div class="meta-cell"><span class="k">Motivação</span>contornar burocracia de WhatsApp/Telegram, vender como serviço</div>
+      <div class="meta-cell"><span class="k">Status</span>decidido — fases 1 e 2 concluídas</div>
+      <div class="meta-cell"><span class="k">Repos</span>ai-customer-service-agent + DistributedOrderSystem</div>
+      <div class="meta-cell"><span class="k">Atualizado</span>04 out 2026</div>
+    </div>
+  </header>
+
+  <section class="prose">
+    <p>
+      A pergunta que originou este documento: se o <span class="mono">DistributedOrderSystem</span> (Python +
+      .NET) e o agente de atendimento (Node, este repo) são "dois mundos" crescendo em paralelo, qual a estratégia
+      pra adicionar um <strong>widget de chat embarcável</strong> — algo que um cliente plante no próprio site,
+      contornando a burocracia de aprovação do WhatsApp/Telegram — sem duplicar trabalho entre os dois?
+    </p>
+    <p class="muted">
+      Investigação direta nos dois repositórios (não só documentação) mostrou que o problema real não é "duas
+      linguagens crescendo" — é <strong>três portas de entrada conversacionais já existentes</strong>, apontando
+      pra cérebros de qualidade desigual. O widget que o <span class="mono">DistributedOrderSystem</span> já tem
+      (<span class="mono">ChatbotService/wwwroot/chat-widget</span>, JS puro, sem build, com modo "Direct"
+      documentado explicitamente para "External Projects/Corporate Website") já serve o caso de uso — só aponta
+      pro cérebro errado: o <span class="mono">AgentService</span> (Python/LangGraph) é um microsserviço estreito
+      de status/cancelamento de pedido, prompt fixo em inglês, sem RAG nem tom configurável — nunca foi desenhado
+      pra ser um agente de atendimento geral.
+    </p>
+  </section>
+
+  <figure class="diagram">
+    <div class="diagram-frame">
+      <svg viewBox="0 0 1160 380" role="img" aria-label="Diagrama comparando o estado antes e depois. Antes: WhatsApp/Telegram/Web aponta para o Node Orchestrator, que aponta para o AgentService só para pedidos; separadamente, o Widget do site do cliente aponta direto para o mesmo AgentService, pulando RAG, tom e handoff. Depois: todos os canais, incluindo o widget embarcável, passam pelo Node Orchestrator único, que continua roteando só intenção de pedido para o AgentService, sem mudança nele.">
+        <defs>
+          <marker id="arrowW1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor" />
+          </marker>
+          <marker id="arrowW2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--warn)" />
+          </marker>
+        </defs>
+
+        <!-- divisor central -->
+        <line x1="595" y1="10" x2="595" y2="350" stroke="var(--border-strong)" stroke-width="1.5" stroke-dasharray="5 4" />
+
+        <!-- ===== ANTES ===== -->
+        <text x="295" y="22" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12" font-weight="700" fill="var(--warn)">ANTES — duas portas, cérebro inconsistente</text>
+
+        <g font-family="IBM Plex Mono, monospace">
+          <rect x="30" y="40" width="250" height="50" rx="6" fill="var(--surface)" stroke="var(--border-strong)" />
+          <text x="155" y="69" text-anchor="middle" font-size="11.5" font-weight="600" fill="var(--ink)">WhatsApp / Telegram / Web</text>
+
+          <rect x="310" y="40" width="250" height="50" rx="6" fill="var(--surface)" stroke="var(--warn)" stroke-width="1.5" />
+          <text x="435" y="62" text-anchor="middle" font-size="11.5" font-weight="600" fill="var(--ink)">Widget (site do cliente)</text>
+          <text x="435" y="78" text-anchor="middle" font-size="9" fill="var(--ink-muted)">modo "Direct" já existente</text>
+        </g>
+
+        <line x1="155" y1="90" x2="155" y2="143" stroke="var(--accent)" stroke-width="2" marker-end="url(#arrowW1)" color="var(--accent)" />
+        <path d="M435,90 L435,180 L300,230" fill="none" stroke="var(--warn)" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#arrowW2)" color="var(--warn)" />
+        <text x="440" y="150" font-family="IBM Plex Mono, monospace" font-size="9" fill="var(--warn)">bypassa RAG · tom · handoff</text>
+
+        <g font-family="IBM Plex Mono, monospace">
+          <rect x="30" y="145" width="250" height="58" rx="6" fill="var(--surface-2)" stroke="var(--border-strong)" />
+          <text x="155" y="170" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--ink)">Node Orchestrator</text>
+          <text x="155" y="187" text-anchor="middle" font-size="9" fill="var(--ink-muted)">canal · RAG · tom · handoff</text>
+        </g>
+
+        <line x1="155" y1="203" x2="155" y2="258" stroke="var(--accent)" stroke-width="2" marker-end="url(#arrowW1)" color="var(--accent)" />
+        <text x="166" y="235" font-family="IBM Plex Mono, monospace" font-size="9" fill="var(--ink-muted)">capabilityRouter: só pedido</text>
+
+        <g font-family="IBM Plex Mono, monospace">
+          <rect x="30" y="262" width="530" height="66" rx="6" fill="var(--surface)" stroke="var(--border-strong)" />
+          <text x="295" y="288" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--ink)">AgentService (Python · LangGraph)</text>
+          <text x="295" y="305" text-anchor="middle" font-size="9.5" fill="var(--ink-muted)">status/cancelar pedido · prompt fixo em inglês · sem RAG</text>
+          <text x="295" y="319" text-anchor="middle" font-size="9" fill="var(--warn)">widget funciona, mas sem personalização de negócio</text>
+        </g>
+
+        <!-- ===== DEPOIS ===== -->
+        <text x="860" y="22" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12" font-weight="700" fill="var(--good)">DEPOIS — uma porta por canal, um cérebro</text>
+
+        <g font-family="IBM Plex Mono, monospace">
+          <rect x="630" y="40" width="460" height="50" rx="6" fill="var(--surface)" stroke="var(--border-strong)" />
+          <text x="860" y="62" text-anchor="middle" font-size="11.5" font-weight="600" fill="var(--ink)">WhatsApp · Telegram · Widget embarcável</text>
+          <text x="860" y="78" text-anchor="middle" font-size="9" fill="var(--ink-muted)">mesmo widget JS, endpoint repontado</text>
+        </g>
+
+        <line x1="860" y1="90" x2="860" y2="143" stroke="var(--accent)" stroke-width="2" marker-end="url(#arrowW1)" color="var(--accent)" />
+
+        <g font-family="IBM Plex Mono, monospace">
+          <rect x="630" y="145" width="460" height="58" rx="6" fill="var(--surface-2)" stroke="var(--good)" stroke-width="1.5" />
+          <text x="860" y="170" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--ink)">Node Orchestrator</text>
+          <text x="860" y="187" text-anchor="middle" font-size="9" fill="var(--ink-muted)">canal · RAG · tom · handoff (único)</text>
+        </g>
+
+        <line x1="860" y1="203" x2="860" y2="258" stroke="var(--accent)" stroke-width="2" marker-end="url(#arrowW1)" color="var(--accent)" />
+        <text x="871" y="235" font-family="IBM Plex Mono, monospace" font-size="9" fill="var(--ink-muted)">capabilityRouter: só pedido</text>
+
+        <g font-family="IBM Plex Mono, monospace">
+          <rect x="630" y="262" width="460" height="58" rx="6" fill="var(--surface)" stroke="var(--border-strong)" />
+          <text x="860" y="286" text-anchor="middle" font-size="11.5" font-weight="700" fill="var(--ink)">AgentService (Python)</text>
+          <text x="860" y="303" text-anchor="middle" font-size="9.5" fill="var(--ink-muted)">status/cancelar pedido — sem nenhuma mudança</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>
+      Um terceiro front-end — HTML legado hardcoded em <span class="mono">ChatController.cs</span> — existia além
+      dos dois mostrados acima; removido na Fase 1 (ver checklist), não aparece no diagrama por já não existir mais.
+    </figcaption>
+    <div class="legend">
+      <div class="legend-item"><span class="legend-dot accent"></span>fluxo correto, mantido</div>
+      <div class="legend-item"><span class="legend-dot warn"></span>bypass identificado — eliminado na Fase 3</div>
+    </div>
+  </figure>
+
+  <section class="prose" style="max-width: 100%;">
+    <p class="eyebrow">Investigação</p>
+    <h2>Achados</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Achado</th><th>Onde</th><th>Implicação</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Widget "Direct mode" já existe e já funciona</td><td><span class="mono">ChatbotService/wwwroot/chat-widget</span> + <span class="mono">PythonAgentChatbotService</span></td><td>Não reconstruir a UI — só repontar o endpoint (Fase 3)</td></tr>
+          <tr><td>AgentService é estreito por desenho, não por limitação</td><td><span class="mono">AgentService/graph.py</span> — "Order Orchestrator Agent"</td><td>Continua existindo exatamente como está, reutilizado via capabilityRouter</td></tr>
+          <tr><td>Terceiro front-end esquecido</td><td><span class="mono">ChatController.GetChatInterfaceHtml()</span></td><td><strong>Removido — Fase 1</strong>, build validado (0 erros)</td></tr>
+          <tr><td>Multi-tenant já é "par por cliente", não tenant-id compartilhado</td><td><a href="mapa-capacidades.html">mapa-capacidades.html</a> — "Um VM, N clientes"</td><td>Vender o gadget não exige código novo de tenant — só provisionar o par já desenhado (Fase 5)</td></tr>
+          <tr><td>Documentação desatualizada nos dois repos, mesmo padrão</td><td><span class="mono">CLAUDE.md</span> (DistributedOrderSystem) e <span class="mono">CHATBOT_SERVICE_DOCUMENTATION.md</span></td><td>Este último corrigido nesta sessão (DI do <span class="mono">IChatbotService</span> já estava resolvida, doc dizia o contrário)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="prose">
+    <p class="eyebrow">Decisões</p>
+    <h2>Um cérebro, duas mãos</h2>
+
+    <div class="decision" style="margin-bottom: 20px;">
+      <span class="tag">Decisão · cérebro único</span>
+      <p>
+        O <span class="mono">Node Orchestrator</span> continua sendo a única porta conversacional — WhatsApp,
+        Telegram e agora o widget embarcável, todos normalizados pro mesmo pipeline (<span class="mono">ChannelAdapter</span>
+        já existe pra isso). O <span class="mono">AgentService</span> não vira um "cérebro geral": continua
+        estreito, chamado pelo Node só quando <span class="mono">capabilityRouter</span> detecta intenção de
+        pedido — exatamente o papel que já exerce hoje, sem nenhuma mudança necessária nele.
+      </p>
+    </div>
+
+    <div class="decision" style="margin-bottom: 20px;">
+      <span class="tag">Decisão · não fundir runtimes</span>
+      <p>
+        Reescrever um dos dois lados (TypeScript ↔ Python/.NET) pra eliminar "dois mundos" seria trabalho grande,
+        caro e arriscado, sem ganho real — a fronteira de responsabilidade já é limpa (Node = conversa/canal;
+        AgentService/.NET = execução de domínio). Mesmo critério de custo/benefício já registrado no
+        <span class="mono">CLAUDE.md</span> deste repo pra decisões de infraestrutura se aplica aqui a decisões de
+        runtime.
+      </p>
+    </div>
+
+    <div class="decision">
+      <span class="tag">Decisão · multi-tenant</span>
+      <p>
+        Vender o widget como serviço não exige lógica nova de "qual tenant é esse" dentro de um processo
+        compartilhado — o desenho multi-tenant já registrado (par <span class="mono">agente-node</span> +
+        <span class="mono">agent-service</span> por cliente, Managed Identity e Key Vault próprios) já cobre
+        exatamente este caso. Só precisa ser <em>provisionado</em> quando aparecer o primeiro cliente pagante do
+        gadget — mesma condição de gatilho já registrada em <span class="mono">docs/STATUS.md</span>.
+      </p>
+    </div>
+  </section>
+
+  <section class="prose" style="max-width: 100%;">
+    <p class="eyebrow">Execução</p>
+    <h2>Plano faseado</h2>
+    <ul class="checklist">
+      <li class="done"><span class="box"></span><span><strong>Fase 1</strong> — remover o HTML legado hardcoded em <span class="mono">ChatController.cs</span> (DistributedOrderSystem) e a referência morta na documentação. Build do <span class="mono">ChatbotService</span> validado (0 erros, 0 avisos).</span></li>
+      <li class="done"><span class="box"></span><span><strong>Fase 2</strong> — endurecer o canal <span class="mono">web</span> do Node pra uso público: CORS por allowlist de origem (<span class="mono">WIDGET_ALLOWED_ORIGINS</span>), aplicado só em <span class="mono">/webhook/web</span>. Testado: preflight OPTIONS, origem autorizada (headers corretos), origem não autorizada (sem headers — browser bloqueia sozinho), e same-origin local (sem regressão no <span class="mono">whatsapp.html</span>).</span></li>
+      <li><span class="box"></span><span><strong>Fase 3</strong> — repontar o <span class="mono">chatbotServiceUrl</span> do widget JS (hoje <span class="mono">/api/chat</span>, via <span class="mono">ChatbotService</span>) pro endpoint público novo do Node; confirmar que nada no widget assume a marca "DistributedOrderSystem" de forma fixa.</span></li>
+      <li><span class="box"></span><span><strong>Fase 4</strong> — nenhuma mudança esperada no <span class="mono">AgentService</span>: validar que o fluxo de intenção de pedido continua idêntico depois da Fase 3 (chamado pelo Node, não mais pelo widget direto).</span></li>
+      <li><span class="box"></span><span><strong>Fase 5</strong> — quando aparecer o 1º cliente pagante do gadget: provisionar o par container + User-Assigned Managed Identity + Key Vault já desenhado, aproveitando a janela da migração do DistributedOrderSystem pro Azure em vez de fazer essa migração duas vezes.</span></li>
+    </ul>
+  </section>
+
+  <footer class="mono">Documento de arquitetura · ai-customer-service-agent (Node) + DistributedOrderSystem (ChatbotService, AgentService)</footer>
+
+</div>
