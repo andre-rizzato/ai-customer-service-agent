@@ -71,8 +71,10 @@ export class Orchestrator {
   // LLMProvider, nunca a classe concreta.
   private readonly llm: LLMProvider = createLLMProvider();
   // Notificador de handoff concreto (console ou webhook), decidido pela
-  // factory a partir de agentConfig.handoffNotifier.
-  private readonly handoffNotifier: HandoffNotifier = createHandoffNotifier();
+  // factory a partir de agentConfig.handoffNotifier. Não é mais `readonly`
+  // porque reloadConfig() (abaixo) o recria quando a tela de configuração
+  // salva um handoffNotifier diferente do que estava ativo.
+  private handoffNotifier: HandoffNotifier = createHandoffNotifier();
   // Limitador de taxa, configurado com os limites vindos de
   // agent.config.json (rateLimit.maxMessagesPerWindow /
   // rateLimit.windowSeconds).
@@ -272,7 +274,13 @@ export class Orchestrator {
     // PASSO 5 — Chama o LLM configurado (Claude ou OpenAI) com o system
     // prompt montado e o histórico da conversa; `generate` devolve só o
     // texto da resposta (ver LLMProvider.generate).
-    const reply = await this.llm.generate(systemPrompt, history);
+    const reply = await this.llm.generate(systemPrompt, history, {
+      // Lidos frescos a cada mensagem (não capturados num construtor) —
+      // uma mudança salva pela tela de configuração vale a partir da
+      // próxima mensagem, sem reiniciar o processo.
+      temperature: agentConfig.temperature,
+      maxTokens: agentConfig.maxTokens,
+    });
 
     // PASSO 6 — Log: grava a resposta do assistente no histórico/auditoria,
     // incluindo QUAIS itens da base foram usados para gerar essa resposta
@@ -288,5 +296,20 @@ export class Orchestrator {
     // PASSO 7 — Devolve o texto da resposta; quem chamou (o ChannelAdapter)
     // é responsável por enviá-la de volta ao usuário pelo canal de origem.
     return reply;
+  }
+
+  // Preâmbulo: reloadConfig() propaga uma mudança em agentConfig (já
+  // atualizado em memória pela rota POST /api/config — ver src/server.ts)
+  // para as três peças deste Orchestrator que capturam valores de
+  // configuração em construtores, em vez de lê-los sob demanda a cada
+  // mensagem como o resto do pipeline (promptBuilder, handoff,
+  // capabilityRouter, knowledgeBase já leem agentConfig.* direto, então não
+  // precisam de nenhum passo extra aqui). Chamada uma vez, logo depois de
+  // qualquer save bem-sucedido pela tela de configuração — é o que permite
+  // "salvar e já valer" sem reiniciar `npm run dev`.
+  reloadConfig(): void {
+    this.rateLimiter.updateLimits(agentConfig.rateLimit.maxMessagesPerWindow, agentConfig.rateLimit.windowSeconds);
+    this.handoffState.updateTimeout(agentConfig.handoffTimeoutHours);
+    this.handoffNotifier = createHandoffNotifier();
   }
 }

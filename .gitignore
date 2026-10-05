@@ -3,4 +3,5 @@ dist/
 .env
 data/
 config/agent.config.json
+config/agent.config.json.bak
 *.log

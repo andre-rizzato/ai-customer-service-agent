@@ -5,6 +5,11 @@ sua máquina, sem precisar de VM, Telegram ou WhatsApp configurados. Útil
 tanto para debugar um bug quanto para testar uma mudança antes de subir pra
 produção.
 
+Além do `curl`, o projeto tem duas interfaces visuais pra isso (seções 5 e
+6): um simulador de chat que imita o WhatsApp (`whatsapp.html`) e uma tela
+pra configurar o comportamento do agente sem editar JSON na mão
+(`settings.html`) — as duas sobem sozinhas junto com `npm run dev`.
+
 Última atualização: 04/10/2026.
 
 ---
@@ -99,7 +104,63 @@ se quiser manter o repo limpo entre sessões de debug, apague os arquivos de
 teste manualmente (`rm data/conversations/teste-*.json`) e remova as linhas
 correspondentes do `audit-log.jsonl`.
 
-## 5. Breakpoint de verdade (VS Code)
+Se preferir não ficar montando JSON de `curl` na mão, as duas seções
+seguintes cobrem o mesmo canal `web` por uma interface visual.
+
+## 5. Interface visual: simulador de chat (`whatsapp.html`)
+
+Com o servidor rodando (`npm run dev`), abra no navegador:
+
+```
+http://localhost:3000/whatsapp.html
+```
+
+É uma página estática (`public/whatsapp.html`, servida pelo próprio
+Express) que imita visualmente o WhatsApp e conversa com o mesmo
+`/webhook/web` da seção 4 — só que com bolhas de mensagem, indicador de
+"digitando..." e um status real de conexão no cabeçalho ("online" /
+"offline — servidor não responde", baseado em polling de `GET /health`, não
+um texto fixo).
+
+Detalhes úteis pra quem for debugar com ela:
+- `conversationId` e histórico ficam salvos no `localStorage` do navegador —
+  sobrevive a reload da página, mas é por aba/navegador, não compartilhado.
+- O ícone de menu (⋮) no cabeçalho reinicia a conversa (novo
+  `conversationId`, limpa o histórico local) — útil pra testar do zero sem
+  recarregar a página.
+- O ícone de engrenagem (⚙️) no cabeçalho leva direto pra tela de
+  configuração (seção 6).
+- Se o `npm run dev` cair, aparece uma bolha de erro explicando o problema
+  em vez de travar silenciosamente.
+
+## 6. Tela de configuração (`settings.html`)
+
+```
+http://localhost:3000/settings.html
+```
+
+Formulário pra editar `config/agent.config.json` sem mexer no arquivo na
+mão: nome do negócio, tom de voz, `temperature`/limite de tokens do LLM,
+parâmetros de RAG (`topK`, nota mínima de relevância), limite de mensagens,
+regras de handoff (palavras-gatilho, notificador, timeout) e capacidades
+extras (order/scheduling/sales). Tem um link no topo pra voltar direto ao
+simulador de chat da seção 5.
+
+Como funciona por baixo (útil saber ao debugar):
+- **Salvar** faz `POST /api/config`, que valida com o mesmo schema (zod) que
+  já protege o arquivo, grava um backup em
+  `config/agent.config.json.bak` e sobrescreve `config/agent.config.json`.
+- A mudança já vale na próxima mensagem — **não precisa reiniciar**
+  `npm run dev`. Teste isso mudando a `temperature` e mandando uma mensagem
+  logo em seguida no `whatsapp.html`, na mesma sessão do servidor.
+- Alguns campos ficam fora da tela de propósito: credenciais/tokens
+  (continuam só no `.env`) e os caminhos do catálogo/índice vetorial
+  (mostrados como somente leitura — trocar exige rodar `npm run ingest` de
+  novo, não é um toggle).
+- Um payload inválido (ex.: `temperature` fora de 0–1) volta como erro 400
+  com a mensagem de qual campo falhou, em vez de salvar algo quebrado.
+
+## 7. Breakpoint de verdade (VS Code)
 
 O projeto já vem com `.vscode/launch.json` configurado — não precisa criar
 nada. Abra o arquivo `.ts` onde quer investigar, coloque um breakpoint, vá
@@ -122,18 +183,18 @@ configurado, então qualquer `node`/`tsx` rodado no terminal integrado já sobe
 com o debugger anexado automaticamente (é por isso que `npm run dev` imprime
 `Debugger listening on ws://...` mesmo sem pedir explicitamente).
 
-## 6. Testando Telegram/WhatsApp de verdade (opcional)
+## 8. Testando Telegram/WhatsApp de verdade (opcional)
 
 Só necessário se o bug for específico de um desses canais (parsing de
 payload, assinatura HMAC, etc.) — pra debugar a lógica do agente (RAG,
-prompt, handoff), o canal `web` da seção 4 é suficiente e mais rápido.
+prompt, handoff), o canal `web` das seções 4–6 é suficiente e mais rápido.
 
 1. Exponha o servidor local publicamente: `ngrok http 3000`.
 2. Siga as instruções de registro de webhook no `README.md`, seção
    "Telegram" / "WhatsApp (Meta Cloud API)", usando a URL do ngrok como
    `<sua-url-publica>`.
 
-## 7. Problemas comuns
+## 9. Problemas comuns
 
 - **`npm run ingest` falha com erro de autenticação** — confira se
   `VOYAGE_API_KEY` (ou `OPENAI_API_KEY`, se `EMBEDDING_PROVIDER=openai`) está
@@ -147,3 +208,13 @@ prompt, handoff), o canal `web` da seção 4 é suficiente e mais rápido.
   (`taskkill //PID <pid> //F //T`) se precisar liberar a porta.
 - **`KEY_VAULT_ENABLED=true` localmente** — não é necessário em dev; deixe
   `false` e preencha o `.env` direto. Key Vault é só pra produção na VM.
+- **`npm run dev` trava logo depois de `Debugger attached`, sem nenhuma
+  linha depois** (nem `Mounted channel adapter`, nem erro nenhum) — não é
+  bug do projeto: é o auto-attach do debugger do VS Code
+  (`debug.javascript.autoAttachFilter: "smart"`, ver seção 7) ficando preso
+  tentando negociar a conexão, geralmente depois de várias instâncias de
+  `npm run dev` abertas e nunca fechadas direito na mesma sessão do VS Code.
+  Contorno rápido: rode com o auto-attach desligado
+  (`NODE_OPTIONS= npm run dev` no Git Bash) ou feche os processos `node`
+  zumbis (`tasklist /FI "IMAGENAME eq node.exe"` + `taskkill /PID <pid> /F
+  /T` pelos que sobraram de sessões anteriores) antes de tentar de novo.

@@ -18,10 +18,24 @@ export class RateLimiter {
   constructor(
     // Quantas mensagens uma mesma conversa pode mandar dentro de uma janela
     // antes de ser bloqueada.
-    private readonly maxMessagesPerWindow: number,
+    private maxMessagesPerWindow: number,
     // Duração da janela, em segundos.
-    private readonly windowSeconds: number
+    private windowSeconds: number
   ) {}
+
+  // Preâmbulo: updateLimits() permite ajustar os limites de um RateLimiter
+  // já instanciado — chamado por Orchestrator.reloadConfig() depois que a
+  // tela de configuração (public/settings.html) salva um novo
+  // rateLimit.maxMessagesPerWindow/windowSeconds, sem precisar recriar o
+  // RateLimiter (o que perderia as janelas já em andamento de cada
+  // conversa). Não limpa `windows` — janelas ativas continuam valendo com
+  // os limites antigos até expirar; só a PRÓXIMA janela de cada conversa
+  // nasce já com os valores novos, consistente com o próprio desenho de
+  // "janela fixa" da classe.
+  updateLimits(maxMessagesPerWindow: number, windowSeconds: number): void {
+    this.maxMessagesPerWindow = maxMessagesPerWindow;
+    this.windowSeconds = windowSeconds;
+  }
 
   // Preâmbulo: isAllowed() é chamado pelo Orchestrator no início do
   // pipeline, antes de qualquer outro processamento (inclusive antes de

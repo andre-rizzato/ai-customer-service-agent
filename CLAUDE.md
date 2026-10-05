@@ -60,6 +60,42 @@ NTFS pra uma permissão POSIX aproximada (mostrou `644` pras duas chaves,
 mesmo uma estando certa e a outra não). A fonte de verdade no Windows é
 sempre `icacls`.
 
+## Estilo de código: comentar generosamente, com preâmbulo
+
+Diferente do padrão genérico de "comentar só quando o PORQUÊ não é óbvio",
+**neste repositório o código é fortemente comentado** — é assim que o
+projeto inteiro já está escrito (`src/config.ts`, `src/orchestrator/*.ts`,
+`src/server.ts`, etc.) e é assim que deve continuar, inclusive em código
+novo (telas HTML/JS novas como `public/whatsapp.html` e
+`public/settings.html` seguiram a mesma regra). Esta instrução SOBRESCREVE
+qualquer padrão default de "evite comentários" para este projeto.
+
+Concretamente:
+
+1. **Toda função/método/classe não trivial ganha um bloco "Preâmbulo:"**
+   logo acima (ou como primeira linha do corpo, quando o preâmbulo precisa
+   ficar dentro da função) explicando: o que a peça faz, quem chama ela e
+   quando, e por que ela existe/por que foi desenhada assim — não só "o
+   quê", mas o raciocínio por trás.
+2. **Comentários linha a linha dentro do corpo**, explicando decisões não
+   óbvias à medida que aparecem — tipo de dado escolhido, por que uma
+   ordem de operações importa, qual bug/incidente motivou uma checagem
+   específica, trade-off considerado e descartado. Uma linha de código só
+   fica sem comentário quando o que ela faz já é auto-evidente a partir do
+   nome das variáveis/funções.
+3. **Comentários em português**, no mesmo tom explicativo e detalhado do
+   resto do código já existente — não frases telegráficas tipo "// loop
+   principal", e sim o contexto de verdade (ex.: por que um campo é
+   `readonly`, por que uma validação roda ANTES de outra, o que quebraria
+   se o comentário fosse ignorado).
+4. Isso vale tanto pra arquivos `.ts` quanto pra HTML/CSS/JS das telas em
+   `public/` — comentar blocos de CSS não óbvios e funções JS do mesmo
+   jeito.
+
+Motivo: o código aqui é lido e mantido por alguém (humano ou Claude) sem
+contexto prévio de por que cada decisão foi tomada — o comentário é o que
+preserva esse raciocínio entre sessões, em vez de ele se perder.
+
 ## Outros documentos relevantes
 
 - `docs/STATUS.md` — checklist consolidado do que está feito/pendente, nos três repositórios do projeto.

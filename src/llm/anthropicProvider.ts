@@ -2,7 +2,7 @@
 // oficial @anthropic-ai/sdk. É o provedor padrão do projeto
 // (LLM_PROVIDER=anthropic).
 import Anthropic from "@anthropic-ai/sdk";
-import type { ChatMessage, LLMProvider } from "./types.js";
+import type { ChatMessage, GenerateOptions, LLMProvider } from "./types.js";
 
 // Preâmbulo: AnthropicProvider implementa LLMProvider chamando o endpoint
 // de Messages da Anthropic. Instanciada por src/llm/index.ts quando
@@ -21,14 +21,16 @@ export class AnthropicProvider implements LLMProvider {
   // texto da resposta. Chamado uma vez por mensagem do usuário, pelo
   // Orchestrator (src/orchestrator/orchestrator.ts), depois que o
   // system prompt e o histórico já foram montados.
-  async generate(systemPrompt: string, history: ChatMessage[]): Promise<string> {
+  async generate(systemPrompt: string, history: ChatMessage[], options: GenerateOptions): Promise<string> {
     const res = await this.client.messages.create({
       model: this.model,
       // A API da Anthropic exige um limite máximo de tokens de saída
-      // explícito; 1024 é generoso o bastante para respostas de
-      // atendimento (curtas) sem permitir respostas descontroladamente
-      // longas (o que também protege contra custo).
-      max_tokens: 1024,
+      // explícito — vem de agentConfig.maxTokens (configurável pela tela de
+      // configuração), não mais um valor fixo no código.
+      max_tokens: options.maxTokens,
+      // Controla aleatoriedade da resposta (0 = mais determinística, 1 =
+      // mais variada) — vem de agentConfig.temperature.
+      temperature: options.temperature,
       // Diferente da OpenAI, a Anthropic recebe o "system prompt" como um
       // parâmetro próprio (`system`), separado do array `messages` — é por
       // isso que LLMProvider.generate recebe systemPrompt e history como

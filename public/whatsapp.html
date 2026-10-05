@@ -116,6 +116,13 @@
   .header-icons { display: flex; gap: 18px; align-items: center; }
   .header-icons svg { width: 22px; height: 22px; fill: #fff; cursor: pointer; }
   .header-icons svg:active { opacity: 0.6; }
+  .header-icons a.settings-link {
+    font-size: 19px;
+    line-height: 1;
+    text-decoration: none;
+    opacity: 0.95;
+  }
+  .header-icons a.settings-link:active { opacity: 0.6; }
 
   /* ---------- Bolhas de mensagem ---------- */
   .row { display: flex; margin: 2px 0; }
@@ -267,6 +274,7 @@
       <svg viewBox="0 0 24 24" title="Chamada de vídeo"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z"/></svg>
       <svg viewBox="0 0 24 24" title="Chamada de voz"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
       <svg viewBox="0 0 24 24" id="menu-btn" title="Reiniciar conversa"><path d="M12 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm0 2a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm0 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/></svg>
+      <a class="settings-link" href="settings.html" title="Configurações do agente">⚙️</a>
     </div>
   </header>
 

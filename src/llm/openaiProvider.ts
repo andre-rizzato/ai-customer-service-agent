@@ -3,7 +3,7 @@
 // alternativa ao Claude Haiku, mantida como provedor plugável
 // (LLM_PROVIDER=openai).
 import OpenAI from "openai";
-import type { ChatMessage, LLMProvider } from "./types.js";
+import type { ChatMessage, GenerateOptions, LLMProvider } from "./types.js";
 
 // Preâmbulo: OpenAIProvider implementa LLMProvider chamando
 // chat.completions.create via SDK oficial. Instanciada por
@@ -19,7 +19,7 @@ export class OpenAIProvider implements LLMProvider {
   // AnthropicProvider.generate, mas usando o formato da API da OpenAI, que
   // — diferente da Anthropic — trata o "system prompt" como só mais uma
   // mensagem no mesmo array, com role "system".
-  async generate(systemPrompt: string, history: ChatMessage[]): Promise<string> {
+  async generate(systemPrompt: string, history: ChatMessage[], options: GenerateOptions): Promise<string> {
     const res = await this.client.chat.completions.create({
       model: this.model,
       // Monta um único array: primeiro a mensagem de sistema (regras +
@@ -27,6 +27,11 @@ export class OpenAIProvider implements LLMProvider {
       // aconteceu — é assim que a API de Chat Completions espera receber o
       // prompt inteiro.
       messages: [{ role: "system", content: systemPrompt }, ...history],
+      // Mesmos dois parâmetros do AnthropicProvider, vindos de
+      // agentConfig.temperature/maxTokens — mantém os dois providers
+      // configuráveis pelos mesmos campos da tela de configuração.
+      temperature: options.temperature,
+      max_tokens: options.maxTokens,
     });
     // A resposta vem em `choices` (a API suporta pedir múltiplas
     // completions alternativas); como não pedimos mais de uma, usamos

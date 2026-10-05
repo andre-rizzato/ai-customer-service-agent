@@ -37,7 +37,11 @@ import { SecretClient } from "@azure/keyvault-secrets";
 // handoff) e não muda entre deploys da mesma instância do agente.
 // Cada campo abaixo tem um comentário dizendo para que ele é usado e em
 // qual outro módulo ele é consumido.
-const AgentConfigSchema = z.object({
+// Exportado (em vez de interno ao módulo) porque src/server.ts reusa este
+// MESMO schema pra validar o payload de POST /api/config — nunca confiar em
+// dados vindos do browser sem passar pela mesma validação que já protege a
+// leitura do arquivo em disco.
+export const AgentConfigSchema = z.object({
   // Nome do negócio, injetado no prompt (promptBuilder.ts) tanto na frase de
   // abertura ("Você é o assistente virtual de X") quanto na regra de
   // transparência ("Sou um assistente virtual de X").
@@ -108,6 +112,19 @@ const AgentConfigSchema = z.object({
   // generoso pra um atendimento humano real, mas curto o suficiente pra
   // não deixar um cliente sem resposta nenhuma por dias.
   handoffTimeoutHours: z.number().positive().default(4),
+
+  // Controles de geração do LLM, expostos na tela de configuração
+  // (public/settings.html) — "o máximo configurável possível" pedido junto
+  // com essa tela. Ficam aqui (config de negócio) e não no .env porque não
+  // são segredo nem infra: são comportamento do bot, do mesmo jeito que
+  // toneAdjectives/minRelevanceScore. temperature controla aleatoriedade da
+  // resposta (0 = sempre a resposta mais provável, 1 = mais variada);
+  // maxTokens limita o tamanho máximo de uma resposta gerada. Lidos por
+  // src/orchestrator/orchestrator.ts a cada mensagem (não capturados uma
+  // única vez em nenhum construtor), então mudar e salvar pela tela
+  // atualiza o comportamento sem reiniciar o processo.
+  temperature: z.number().min(0).max(1).default(0.7),
+  maxTokens: z.number().int().positive().default(1024),
 });
 
 // Tipo TypeScript derivado do schema acima — z.infer lê a definição do zod
@@ -118,14 +135,16 @@ export type AgentConfig = z.infer<typeof AgentConfigSchema>;
 // devolve um objeto já validado e tipado. É chamada uma única vez, abaixo,
 // para preencher a constante exportada `agentConfig` — nenhum outro módulo
 // deveria chamar esta função diretamente.
+// Caminho resolvido do agent.config.json, calculado uma vez e reexportado —
+// src/server.ts reaproveita EXATAMENTE este valor na rota POST /api/config
+// (tela de configuração) pra gravar no mesmo arquivo que loadAgentConfig()
+// lê, em vez de duplicar a regra "AGENT_CONFIG_PATH ?? default" num segundo
+// lugar que poderia divergir dela.
+export const agentConfigPath = resolve(process.env.AGENT_CONFIG_PATH ?? "./config/agent.config.json");
+
 function loadAgentConfig(): AgentConfig {
-  // Permite trocar o caminho do config via variável de ambiente
-  // AGENT_CONFIG_PATH (usado pelos testes, que apontam para o arquivo
-  // .example.json em vez do config real do negócio); se não setado, cai no
-  // caminho padrão de produção.
-  const path = process.env.AGENT_CONFIG_PATH ?? "./config/agent.config.json";
   // Lê o conteúdo bruto do arquivo como texto UTF-8.
-  const raw = readFileSync(resolve(path), "utf-8");
+  const raw = readFileSync(agentConfigPath, "utf-8");
   // JSON.parse converte o texto em objeto JS; AgentConfigSchema.parse valida
   // esse objeto contra o schema acima e LANÇA uma exceção detalhada se algo
   // estiver faltando ou com tipo errado — preferível a descobrir isso só
@@ -315,26 +334,37 @@ export const env = loadEnv();
 // Mesma ideia para a configuração do negócio.
 export const agentConfig = loadAgentConfig();
 
-// Checagem de consistência cruzada entre os dois arquivos de configuração:
-// se o negócio pediu notificação de handoff via webhook, o endereço desse
-// webhook TEM que existir no ambiente — sem isso o handoff dispararia e a
-// notificação falharia silenciosamente em produção, que é pior do que
-// falhar já na inicialização do processo.
-if (agentConfig.handoffNotifier === "webhook" && !env.HANDOFF_WEBHOOK_URL) {
-  throw new Error(
-    "agent.config.json sets handoffNotifier=webhook but HANDOFF_WEBHOOK_URL is not set in the environment."
-  );
+// Preâmbulo: validateCrossConfig() checa consistência entre agentConfig e
+// env que o zod sozinho não consegue expressar (depende dos dois arquivos
+// ao mesmo tempo). Extraída como função exportada — em vez de só um bloco
+// solto no load do módulo — porque src/server.ts reusa EXATAMENTE esta
+// mesma checagem na rota POST /api/config (tela de configuração): uma
+// mudança salva pela tela que deixaria o processo nesse estado inconsistente
+// tem que ser rejeitada ali, não só detectada no próximo restart.
+export function validateCrossConfig(config: AgentConfig): void {
+  // Se o negócio pediu notificação de handoff via webhook, o endereço desse
+  // webhook TEM que existir no ambiente — sem isso o handoff dispararia e a
+  // notificação falharia silenciosamente em produção, que é pior do que
+  // falhar já na inicialização do processo (ou, no caso da tela, recusar o
+  // save).
+  if (config.handoffNotifier === "webhook" && !env.HANDOFF_WEBHOOK_URL) {
+    throw new Error(
+      "handoffNotifier=webhook mas HANDOFF_WEBHOOK_URL não está definido no ambiente (.env)."
+    );
+  }
+
+  // Mesmo raciocínio: "order" habilitado sem AGENT_SERVICE_URL configurado
+  // significa que toda pergunta de pedido cairia num erro de rede em tempo de
+  // resposta, em produção, pro primeiro cliente real que perguntasse — melhor
+  // recusar o estado do que descobrir isso ao vivo.
+  if (config.enabledCapabilities.includes("order") && !env.AGENT_SERVICE_URL) {
+    throw new Error(
+      'enabledCapabilities inclui "order" mas AGENT_SERVICE_URL não está definido no ambiente (.env).'
+    );
+  }
 }
 
-// Mesmo raciocínio: "order" habilitado sem AGENT_SERVICE_URL configurado
-// significa que toda pergunta de pedido cairia num erro de rede em tempo de
-// resposta, em produção, pro primeiro cliente real que perguntasse — melhor
-// recusar subir o processo do que descobrir isso ao vivo.
-if (agentConfig.enabledCapabilities.includes("order") && !env.AGENT_SERVICE_URL) {
-  throw new Error(
-    'agent.config.json tem "order" em enabledCapabilities mas AGENT_SERVICE_URL não está definido no ambiente.'
-  );
-}
+validateCrossConfig(agentConfig);
 
 // Revisão de segurança 04/10/2026, item #3: se o canal WhatsApp está
 // configurado (token de acesso presente — mesma condição que

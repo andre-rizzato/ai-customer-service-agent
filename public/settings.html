@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Configurações do Agente</title>
+<style>
+  :root {
+    --header: #075E54;
+    --accent: #25D366;
+    --accent-dark: #1fa855;
+    --page-bg: #F0F2F1;
+    --card-bg: #FFFFFF;
+    --text: #111B21;
+    --text-dim: #667781;
+    --border: #E9EDEF;
+    --danger: #a1260d;
+    --danger-bg: #ffe4e1;
+    --success: #1b6e3c;
+    --success-bg: #dff5e4;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    font-family: "Segoe UI", Helvetica, Roboto, Arial, sans-serif;
+    background: var(--page-bg);
+    color: var(--text);
+  }
+
+  header {
+    background: var(--header);
+    color: #fff;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  header h1 { font-size: 18px; margin: 0; font-weight: 600; }
+  header p { margin: 2px 0 0; font-size: 12.5px; color: rgba(255,255,255,0.8); }
+
+  .sim-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255,255,255,0.15);
+    color: #fff;
+    text-decoration: none;
+    padding: 8px 14px;
+    border-radius: 20px;
+    font-size: 13.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: background 0.15s;
+  }
+  .sim-link:hover { background: rgba(255,255,255,0.28); }
+
+  main {
+    max-width: 720px;
+    margin: 24px auto 120px;
+    padding: 0 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .card {
+    background: var(--card-bg);
+    border-radius: 10px;
+    padding: 18px 20px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+  }
+
+  .card h2 {
+    font-size: 15px;
+    margin: 0 0 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card > .card-desc {
+    font-size: 12.5px;
+    color: var(--text-dim);
+    margin: 0 0 16px;
+  }
+
+  .field { margin-bottom: 16px; }
+  .field:last-child { margin-bottom: 0; }
+
+  .field label {
+    display: block;
+    font-size: 13.5px;
+    font-weight: 600;
+    margin-bottom: 3px;
+  }
+  .field .hint {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin: 0 0 6px;
+  }
+
+  input[type="text"],
+  input[type="number"],
+  select {
+    width: 100%;
+    font-size: 14px;
+    font-family: inherit;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--text);
+  }
+  input[type="text"]:focus,
+  input[type="number"]:focus,
+  select:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .range-row { display: flex; align-items: center; gap: 12px; }
+  .range-row input[type="range"] { flex: 1; accent-color: var(--accent); }
+  .range-row output {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    font-size: 13.5px;
+    min-width: 34px;
+    text-align: right;
+  }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+  .tag-input {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 8px;
+    background: #fff;
+  }
+  .tag-input:focus-within { border-color: var(--accent); }
+  .tag-input input {
+    border: none;
+    outline: none;
+    flex: 1;
+    min-width: 120px;
+    font-size: 13.5px;
+    padding: 4px 2px;
+  }
+  .tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: #e8f7ee;
+    color: var(--success);
+    border-radius: 14px;
+    padding: 3px 6px 3px 10px;
+    font-size: 12.5px;
+    white-space: nowrap;
+  }
+  .tag-chip button {
+    border: none;
+    background: none;
+    color: var(--success);
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    padding: 2px;
+    opacity: 0.7;
+  }
+  .tag-chip button:hover { opacity: 1; }
+
+  .readonly-info {
+    font-size: 12.5px;
+    color: var(--text-dim);
+    background: #F7F7F5;
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+  }
+  .readonly-info code { background: #ECECE9; padding: 1px 4px; border-radius: 4px; }
+
+  .checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .checkbox-row input { width: 16px; height: 16px; accent-color: var(--accent); }
+
+  .capability-block {
+    margin-left: 24px;
+    margin-bottom: 14px;
+    padding-left: 12px;
+    border-left: 2px solid var(--border);
+  }
+  .capability-block.hidden { display: none; }
+
+  .savebar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #fff;
+    border-top: 1px solid var(--border);
+    padding: 12px 16px;
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    align-items: center;
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.06);
+  }
+
+  .savebar-inner {
+    max-width: 720px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  #save-btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    font-size: 14.5px;
+    font-weight: 600;
+    padding: 10px 22px;
+    border-radius: 24px;
+    cursor: pointer;
+  }
+  #save-btn:hover { background: var(--accent-dark); }
+  #save-btn:disabled { opacity: 0.6; cursor: default; }
+
+  #save-status {
+    font-size: 13px;
+    flex: 1;
+  }
+  #save-status.success { color: var(--success); }
+  #save-status.error { color: var(--danger); }
+
+  .loading-banner {
+    max-width: 720px;
+    margin: 24px auto;
+    padding: 0 16px;
+    color: var(--text-dim);
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>⚙️ Configurações do Agente</h1>
+    <p>Mudanças salvas aqui valem na próxima mensagem — não precisa reiniciar o servidor.</p>
+  </div>
+  <a class="sim-link" href="whatsapp.html">💬 Abrir simulador de mensagens →</a>
+</header>
+
+<div id="loading" class="loading-banner">Carregando configuração atual...</div>
+
+<main id="form-root" style="display:none">
+
+  <section class="card">
+    <h2>🪪 Identidade</h2>
+    <p class="card-desc">Como o agente se apresenta e fala com o cliente.</p>
+
+    <div class="field">
+      <label for="businessName">Nome do negócio</label>
+      <p class="hint">Usado na saudação e na frase de transparência ("Sou um assistente virtual de ...").</p>
+      <input type="text" id="businessName" />
+    </div>
+
+    <div class="field">
+      <label>Tom de voz</label>
+      <p class="hint">Adjetivos que descrevem como o agente deve soar. Digite e pressione Enter.</p>
+      <div class="tag-input" id="tags-toneAdjectives"><input type="text" placeholder="ex.: cordial" /></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>🧠 Comportamento do LLM</h2>
+    <p class="card-desc">Controla o quão criativa/variada a resposta é, e o tamanho máximo dela.</p>
+
+    <div class="field">
+      <label for="temperature">Temperatura</label>
+      <p class="hint">0 = sempre a resposta mais provável e consistente. 1 = respostas mais variadas e criativas.</p>
+      <div class="range-row">
+        <input type="range" id="temperature" min="0" max="1" step="0.01" />
+        <output id="temperature-out">0.70</output>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="maxTokens">Limite de tokens por resposta</label>
+      <p class="hint">Tamanho máximo de uma resposta gerada. Valores muito baixos podem cortar respostas no meio.</p>
+      <input type="number" id="maxTokens" min="1" step="1" />
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>📚 Base de conhecimento (RAG)</h2>
+    <p class="card-desc">Como o agente busca e filtra trechos do catálogo antes de responder.</p>
+
+    <div class="two-col">
+      <div class="field">
+        <label for="topK">Trechos recuperados por pergunta</label>
+        <p class="hint">Quantos itens do catálogo buscar por mensagem (top-K).</p>
+        <input type="number" id="topK" min="1" step="1" />
+      </div>
+      <div class="field">
+        <label for="minRelevanceScore">Nota mínima de relevância</label>
+        <p class="hint">Trechos abaixo desta nota são descartados.</p>
+        <div class="range-row">
+          <input type="range" id="minRelevanceScore" min="0" max="1" step="0.01" />
+          <output id="minRelevanceScore-out">0.72</output>
+        </div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Arquivos (somente leitura)</label>
+      <p class="hint">Pra trocar, edite <code>config/agent.config.json</code> direto e rode <code>npm run ingest</code> de novo.</p>
+      <div class="readonly-info">
+        Catálogo: <code id="info-knowledgeBasePath"></code><br />
+        Índice vetorial: <code id="info-vectorStorePath"></code>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>🚦 Limite de mensagens</h2>
+    <p class="card-desc">Evita custo descontrolado em caso de mensagens em loop.</p>
+
+    <div class="two-col">
+      <div class="field">
+        <label for="maxMessagesPerWindow">Mensagens por janela</label>
+        <input type="number" id="maxMessagesPerWindow" min="1" step="1" />
+      </div>
+      <div class="field">
+        <label for="windowSeconds">Duração da janela (segundos)</label>
+        <input type="number" id="windowSeconds" min="1" step="1" />
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>🤝 Transferência para humano</h2>
+    <p class="card-desc">Quando e como o agente passa a conversa pra um atendente.</p>
+
+    <div class="two-col">
+      <div class="field">
+        <label for="handoffNotifier">Notificação de handoff</label>
+        <select id="handoffNotifier">
+          <option value="console">Console (log local)</option>
+          <option value="webhook">Webhook (Slack/Discord/custom)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="handoffTimeoutHours">Liberar sozinho após (horas)</label>
+        <p class="hint">Se ninguém liberar manualmente, o bot volta a responder sozinho.</p>
+        <input type="number" id="handoffTimeoutHours" min="0.1" step="0.1" />
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Palavras-gatilho de pedido explícito</label>
+      <p class="hint">Qualquer uma destas frases na mensagem dispara handoff imediato.</p>
+      <div class="tag-input" id="tags-handoffKeywords"><input type="text" placeholder="ex.: falar com atendente" /></div>
+    </div>
+
+    <div class="field">
+      <label>Palavras-gatilho de frustração</label>
+      <p class="hint">Sinais de reclamação/insatisfação que também disparam handoff.</p>
+      <div class="tag-input" id="tags-frustrationKeywords"><input type="text" placeholder="ex.: péssimo" /></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>🧩 Capacidades extras</h2>
+    <p class="card-desc">Além de responder com RAG, o agente pode detectar pedidos sobre pedido/agenda/venda.</p>
+
+    <div class="checkbox-row">
+      <input type="checkbox" id="cap-order" />
+      <label for="cap-order" style="margin:0">Pedido (order)</label>
+    </div>
+    <div class="capability-block hidden" id="block-order">
+      <div class="field">
+        <label>Palavras-chave de pedido</label>
+        <div class="tag-input" id="tags-orderKeywords"><input type="text" placeholder="ex.: status do pedido" /></div>
+      </div>
+    </div>
+
+    <div class="checkbox-row">
+      <input type="checkbox" id="cap-scheduling" />
+      <label for="cap-scheduling" style="margin:0">Agendamento (scheduling)</label>
+    </div>
+    <div class="capability-block hidden" id="block-scheduling">
+      <div class="field">
+        <label>Palavras-chave de agendamento</label>
+        <div class="tag-input" id="tags-schedulingKeywords"><input type="text" placeholder="ex.: marcar horário" /></div>
+      </div>
+    </div>
+
+    <div class="checkbox-row">
+      <input type="checkbox" id="cap-sales" />
+      <label for="cap-sales" style="margin:0">Venda (sales)</label>
+    </div>
+    <div class="capability-block hidden" id="block-sales">
+      <div class="field">
+        <label>Palavras-chave de venda</label>
+        <div class="tag-input" id="tags-salesKeywords"><input type="text" placeholder="ex.: quero comprar" /></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div class="savebar" id="savebar" style="display:none">
+  <div class="savebar-inner">
+    <span id="save-status"></span>
+    <button id="save-btn">Salvar configurações</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const CONFIG_URL = "/api/config";
+
+  // Guarda os campos somente-leitura (não têm input no formulário, mas
+  // precisam voltar no POST porque o schema exige os dois) e o restante do
+  // config original, pra reconstruir o payload completo na hora de salvar.
+  let loadedConfig = null;
+
+  const tagInputs = {};
+
+  function createTagInput(containerEl, initialTags) {
+    let tags = [...initialTags];
+    const input = containerEl.querySelector("input");
+
+    function render() {
+      containerEl.querySelectorAll(".tag-chip").forEach((el) => el.remove());
+      for (const tag of tags) {
+        const chip = document.createElement("span");
+        chip.className = "tag-chip";
+        chip.textContent = tag;
+        const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.textContent = "×";
+        removeBtn.title = "Remover";
+        removeBtn.addEventListener("click", () => {
+          tags = tags.filter((t) => t !== tag);
+          render();
+        });
+        chip.appendChild(removeBtn);
+        containerEl.insertBefore(chip, input);
+      }
+    }
+
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const val = input.value.trim();
+        if (val && !tags.includes(val)) {
+          tags.push(val);
+          input.value = "";
+          render();
+        }
+      } else if (e.key === "Backspace" && !input.value && tags.length) {
+        tags.pop();
+        render();
+      }
+    });
+
+    render();
+    return { getTags: () => [...tags], setTags: (newTags) => { tags = [...newTags]; render(); } };
+  }
+
+  function setupTagInput(fieldId, values) {
+    const el = document.getElementById("tags-" + fieldId);
+    tagInputs[fieldId] = createTagInput(el, values || []);
+  }
+
+  function setupRange(id, value) {
+    const input = document.getElementById(id);
+    const out = document.getElementById(id + "-out");
+    input.value = value;
+    out.textContent = Number(value).toFixed(2);
+    input.addEventListener("input", () => {
+      out.textContent = Number(input.value).toFixed(2);
+    });
+  }
+
+  function setupCapability(name) {
+    const checkbox = document.getElementById("cap-" + name);
+    const block = document.getElementById("block-" + name);
+    checkbox.addEventListener("change", () => {
+      block.classList.toggle("hidden", !checkbox.checked);
+    });
+  }
+
+  function populateForm(config) {
+    loadedConfig = config;
+
+    document.getElementById("businessName").value = config.businessName;
+    setupTagInput("toneAdjectives", config.toneAdjectives);
+
+    setupRange("temperature", config.temperature);
+    document.getElementById("maxTokens").value = config.maxTokens;
+
+    document.getElementById("topK").value = config.topK;
+    setupRange("minRelevanceScore", config.minRelevanceScore);
+    document.getElementById("info-knowledgeBasePath").textContent = config.knowledgeBasePath;
+    document.getElementById("info-vectorStorePath").textContent = config.vectorStorePath;
+
+    document.getElementById("maxMessagesPerWindow").value = config.rateLimit.maxMessagesPerWindow;
+    document.getElementById("windowSeconds").value = config.rateLimit.windowSeconds;
+
+    document.getElementById("handoffNotifier").value = config.handoffNotifier;
+    document.getElementById("handoffTimeoutHours").value = config.handoffTimeoutHours;
+    setupTagInput("handoffKeywords", config.handoffKeywords);
+    setupTagInput("frustrationKeywords", config.frustrationKeywords);
+
+    const caps = config.enabledCapabilities || [];
+    for (const name of ["order", "scheduling", "sales"]) {
+      const checked = caps.includes(name);
+      document.getElementById("cap-" + name).checked = checked;
+      document.getElementById("block-" + name).classList.toggle("hidden", !checked);
+    }
+    setupTagInput("orderKeywords", config.orderKeywords);
+    setupTagInput("schedulingKeywords", config.schedulingKeywords);
+    setupTagInput("salesKeywords", config.salesKeywords);
+
+    ["order", "scheduling", "sales"].forEach(setupCapability);
+
+    document.getElementById("loading").style.display = "none";
+    document.getElementById("form-root").style.display = "flex";
+    document.getElementById("savebar").style.display = "flex";
+  }
+
+  function buildPayload() {
+    const enabledCapabilities = ["order", "scheduling", "sales"].filter(
+      (name) => document.getElementById("cap-" + name).checked
+    );
+
+    return {
+      ...loadedConfig,
+      businessName: document.getElementById("businessName").value.trim(),
+      toneAdjectives: tagInputs.toneAdjectives.getTags(),
+      temperature: Number(document.getElementById("temperature").value),
+      maxTokens: Number(document.getElementById("maxTokens").value),
+      topK: Number(document.getElementById("topK").value),
+      minRelevanceScore: Number(document.getElementById("minRelevanceScore").value),
+      rateLimit: {
+        maxMessagesPerWindow: Number(document.getElementById("maxMessagesPerWindow").value),
+        windowSeconds: Number(document.getElementById("windowSeconds").value),
+      },
+      handoffNotifier: document.getElementById("handoffNotifier").value,
+      handoffTimeoutHours: Number(document.getElementById("handoffTimeoutHours").value),
+      handoffKeywords: tagInputs.handoffKeywords.getTags(),
+      frustrationKeywords: tagInputs.frustrationKeywords.getTags(),
+      enabledCapabilities,
+      orderKeywords: tagInputs.orderKeywords.getTags(),
+      schedulingKeywords: tagInputs.schedulingKeywords.getTags(),
+      salesKeywords: tagInputs.salesKeywords.getTags(),
+    };
+  }
+
+  function showStatus(message, type) {
+    const el = document.getElementById("save-status");
+    el.textContent = message;
+    el.className = type || "";
+  }
+
+  async function loadConfig() {
+    try {
+      const res = await fetch(CONFIG_URL);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const config = await res.json();
+      populateForm(config);
+    } catch (err) {
+      document.getElementById("loading").textContent =
+        "⚠️ Não foi possível carregar a configuração em " + CONFIG_URL +
+        ". Confirme que \"npm run dev\" está rodando. (" + err.message + ")";
+    }
+  }
+
+  async function saveConfig() {
+    const btn = document.getElementById("save-btn");
+    btn.disabled = true;
+    showStatus("Salvando...", "");
+
+    try {
+      const res = await fetch(CONFIG_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildPayload()),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data.error || "HTTP " + res.status);
+      }
+
+      loadedConfig = data.config;
+      showStatus("✓ Configurações salvas — já valem na próxima mensagem.", "success");
+    } catch (err) {
+      showStatus("⚠️ " + err.message, "error");
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  document.getElementById("save-btn").addEventListener("click", saveConfig);
+
+  loadConfig();
+})();
+</script>
+
+</body>
+</html>

@@ -42,10 +42,12 @@ const INACTIVE: HandoffState = { active: false, since: 0 };
 export class HandoffStateStore {
   // Pasta onde cada conversa vira um arquivo .json próprio de estado.
   private readonly dir: string;
-  // Timeout de segurança, em milissegundos — calculado uma vez no
-  // construtor a partir das horas configuradas, pra não refazer a
-  // multiplicação em toda chamada de isActive().
-  private readonly timeoutMs: number;
+  // Timeout de segurança, em milissegundos — calculado a partir das horas
+  // configuradas; não é mais `readonly` porque updateTimeout() (abaixo)
+  // recalcula esse valor quando a tela de configuração salva um novo
+  // handoffTimeoutHours, sem precisar recriar a store (o que faria
+  // mkdirSync rodar de novo à toa).
+  private timeoutMs: number;
 
   constructor(timeoutHours: number) {
     this.dir = resolve(env.CONVERSATIONS_DIR, "handoff-state");
@@ -53,6 +55,16 @@ export class HandoffStateStore {
     // recursive:true não falha se a pasta já existir — seguro chamar
     // sempre na inicialização, mesmo processo reiniciado.
     mkdirSync(this.dir, { recursive: true });
+  }
+
+  // Preâmbulo: updateTimeout() recalcula o timeout de segurança a partir de
+  // um novo valor em horas — chamado por Orchestrator.reloadConfig() depois
+  // que a tela de configuração salva um novo handoffTimeoutHours. Conversas
+  // já em handoff mantêm o `since` gravado (o instante em que a transferência
+  // ocorreu não muda), só o limite contra o qual isActive() compara passa a
+  // ser o novo.
+  updateTimeout(timeoutHours: number): void {
+    this.timeoutMs = timeoutHours * 60 * 60 * 1000;
   }
 
   // Preâmbulo: filePathFor() calcula o caminho do arquivo de estado de uma

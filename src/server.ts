@@ -5,7 +5,9 @@
 // nos adapters; aqui só existe fiação (wiring).
 import express from "express";
 import { resolve } from "node:path";
-import { env } from "./config.js";
+import { copyFileSync, existsSync, writeFileSync } from "node:fs";
+import { ZodError } from "zod";
+import { AgentConfigSchema, agentConfig, agentConfigPath, env, validateCrossConfig } from "./config.js";
 import { Orchestrator } from "./orchestrator/orchestrator.js";
 import { createTelegramAdapter } from "./channels/telegram.js";
 import { createWhatsAppAdapter } from "./channels/whatsapp.js";
@@ -116,6 +118,68 @@ for (const adapter of adapters) {
   // configuração esperada realmente carregou.
   console.log(`Mounted channel adapter: /webhook/${adapter.name}`);
 }
+
+// GET /api/config — devolve a configuração de negócio atual (agentConfig),
+// consumida pela tela de configuração (public/settings.html) pra preencher
+// o formulário. Nada em agentConfig é segredo (ver separação env/agentConfig
+// em src/config.ts — API keys e tokens vivem só no .env e nunca passam por
+// aqui), então devolver o objeto inteiro é seguro.
+app.get("/api/config", (_req, res) => {
+  res.json(agentConfig);
+});
+
+// POST /api/config — salva uma nova configuração vinda da tela. Reaproveita
+// o MESMO AgentConfigSchema (zod) e a MESMA validateCrossConfig() que
+// protegem a leitura do arquivo na inicialização do processo (ver
+// src/config.ts) — nunca confia no payload vindo do browser sem passar pela
+// mesma validação que já protege o arquivo em disco.
+app.post("/api/config", (req, res) => {
+  let candidate;
+  try {
+    candidate = AgentConfigSchema.parse(req.body);
+    validateCrossConfig(candidate);
+  } catch (err) {
+    // ZodError.message é o array de issues inteiro serializado em JSON —
+    // correto, mas ilegível numa tela de erro. Reformata como uma linha por
+    // campo ("campo: problema"), que é o que public/settings.html de fato
+    // mostra pro usuário. validateCrossConfig() lança um Error comum (não
+    // ZodError) com mensagem já pronta em uma linha — repassa direto.
+    const message =
+      err instanceof ZodError
+        ? err.issues.map((issue) => `${issue.path.join(".") || "(config)"}: ${issue.message}`).join("; ")
+        : (err as Error).message;
+    res.status(400).json({ error: message });
+    return;
+  }
+
+  try {
+    // Backup do conteúdo anterior antes de sobrescrever — rede de segurança
+    // barata, já que esta rota pode ser chamada por qualquer um com acesso
+    // à rede local (sem autenticação, mesma postura do resto da ferramenta
+    // de debug local).
+    if (existsSync(agentConfigPath)) {
+      copyFileSync(agentConfigPath, `${agentConfigPath}.bak`);
+    }
+    writeFileSync(agentConfigPath, JSON.stringify(candidate, null, 2) + "\n", "utf-8");
+  } catch (err) {
+    console.error("Failed to write agent.config.json:", err);
+    res.status(500).json({ error: "Falha ao gravar o arquivo de configuração no disco." });
+    return;
+  }
+
+  // Object.assign (em vez de reatribuir `agentConfig`, que é `const` e
+  // importado por referência em todo módulo do projeto) muta o MESMO objeto
+  // que promptBuilder/handoff/capabilityRouter/knowledgeBase já leem sob
+  // demanda a cada mensagem — é o que faz a mudança valer imediatamente,
+  // sem reiniciar `npm run dev`.
+  Object.assign(agentConfig, candidate);
+  // Propaga pras três peças que capturam valores em construtores (limites
+  // do rate limiter, timeout de handoff, tipo de handoff notifier) — ver
+  // Orchestrator.reloadConfig().
+  orchestrator.reloadConfig();
+
+  res.json({ ok: true, config: agentConfig });
+});
 
 // Endpoint simples de health check — usado por ferramentas de
 // monitoramento/orquestração de containers para saber se o processo está
