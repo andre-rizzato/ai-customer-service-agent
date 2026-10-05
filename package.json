@@ -9,6 +9,8 @@
   },
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "dev:ui": "tsx scripts/openUi.ts && npm run dev",
+    "stop": "tsx scripts/stopDev.ts",
     "start": "tsx src/server.ts",
     "build": "tsc -p tsconfig.json",
     "ingest": "tsx src/knowledge/ingest.ts",

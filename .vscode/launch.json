@@ -31,6 +31,35 @@
       "restart": false
     },
     {
+      // Mesma coisa que "Debug: Server" acima, só que também abre a tela de
+      // configuração sozinho assim que o servidor sobe — equivalente, no F5,
+      // a rodar "npm run dev:ui" no terminal (ver docs/DEBUG_LOCAL.md seção
+      // 4). serverReadyAction é um recurso nativo do debugger do VS Code:
+      // observa a saída do processo em debug e, quando uma linha bate com
+      // "pattern", abre "uriFormat" no navegador — nada de script externo
+      // envolvido aqui, diferente de scripts/openUi.ts (que abre ANTES do
+      // servidor existir, pensado pro terminal/npm, não pro debugger).
+      "type": "node",
+      "request": "launch",
+      "name": "Debug: Server + abrir config no navegador",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--import", "tsx"],
+      "program": "${workspaceFolder}/src/server.ts",
+      "envFile": "${workspaceFolder}/.env",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "restart": false,
+      "serverReadyAction": {
+        // Bate com a linha exata que src/server.ts imprime
+        // ("Agent server listening on port 3000") — o grupo capturado vira
+        // o %s em uriFormat.
+        "pattern": "listening on port ([0-9]+)",
+        "uriFormat": "http://localhost:%s/settings.html",
+        "action": "openExternally"
+      }
+    },
+    {
       // Debuga o chat de simulação no terminal (Fase 5 do runbook: testar
       // sem precisar de Telegram/WhatsApp). PRECISA de "integratedTerminal"
       // porque o script lê da stdin interativamente — no "internalConsole"

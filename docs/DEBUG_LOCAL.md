@@ -69,6 +69,15 @@ Suba o servidor com hot reload:
 npm run dev
 ```
 
+Pra já abrir a tela de configuração (seção 6) no navegador automaticamente
+junto com o servidor, use `npm run dev:ui` em vez de `npm run dev` —
+equivalente, só que também abre `http://localhost:3000/settings.html`
+sozinho. Dali tem um link direto pro simulador de chat (seção 5), então uma
+sessão de debug local completa cabe num comando só.
+
+Pra encerrar depois (sobretudo se `Ctrl+C` não for suficiente — ver seção
+9), use `npm run stop` em vez de caçar PID na mão.
+
 Confirme no log que subiu (`Agent server listening on port 3000`) e que o
 canal `web` foi montado. É normal ver `TELEGRAM_BOT_TOKEN not set` e
 `WHATSAPP_... not set` — isso só significa que esses dois canais ficaram
@@ -169,6 +178,7 @@ em **Run and Debug** (Ctrl+Shift+D) e escolha uma das configurações:
 | Configuração | O que debuga |
 |---|---|
 | **Debug: Server** | `src/server.ts` — mesmo processo do `npm run dev`, mas parado no breakpoint |
+| **Debug: Server + abrir config no navegador** | mesma coisa, mas já abre `settings.html` sozinho quando o servidor sobe (equivalente a `npm run dev:ui`, só que pelo F5) |
 | **Debug: Simulate (chat CLI)** | `scripts/simulate.ts` — útil pra debugar o Orchestrator sem HTTP |
 | **Debug: Ingest knowledge base** | `src/knowledge/ingest.ts` — pra inspecionar embeddings gerados |
 | **Debug: Current Test File (Vitest)** | só o arquivo de teste aberto no editor |
@@ -203,9 +213,11 @@ prompt, handoff), o canal `web` das seções 4–6 é suficiente e mais rápido.
   depois de qualquer mudança em `knowledge/catalog.json`; o vector store em
   `data/vector-store.json` não se atualiza sozinho.
 - **Processo não morre depois de `Ctrl+C` no `npm run dev`** — no Windows,
-  `tsx watch` às vezes deixa um processo `node` residente. Confira com
-  `netstat -ano | grep :3000` e finalize pelo PID do Windows
-  (`taskkill //PID <pid> //F //T`) se precisar liberar a porta.
+  `tsx watch` sobe um processo filho pra rodar `server.ts` de verdade e
+  reinicia só ele a cada arquivo salvo; matar só o processo da porta não
+  mata o processo "pai" do watcher, que fica órfão rodando sozinho. `npm
+  run stop` resolve os dois de uma vez (acha pela porta configurada E por
+  linha de comando) — rode isso em vez de caçar PID na mão.
 - **`KEY_VAULT_ENABLED=true` localmente** — não é necessário em dev; deixe
   `false` e preencha o `.env` direto. Key Vault é só pra produção na VM.
 - **`npm run dev` trava logo depois de `Debugger attached`, sem nenhuma
