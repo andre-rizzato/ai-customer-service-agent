@@ -3,7 +3,7 @@
 // automático (e-mail ou Slack) quando o handoff dispara, para o humano não
 // perder o gatilho." Usada em produção
 // (agentConfig.handoffNotifier === "webhook").
-import type { ConversationTurn } from "../types.js";
+import type { ChannelName, ConversationTurn } from "../types.js";
 import type { HandoffReason } from "../orchestrator/handoff.js";
 import type { HandoffNotifier } from "./types.js";
 
@@ -19,7 +19,7 @@ export class WebhookNotifier implements HandoffNotifier {
   // histórico completo da conversa e envia via POST para a URL configurada
   // (ex.: um Incoming Webhook do Slack, que exibe o campo `text` como
   // mensagem no canal).
-  async notify(conversationId: string, reason: HandoffReason, history: ConversationTurn[]): Promise<void> {
+  async notify(conversationId: string, reason: HandoffReason, history: ConversationTurn[], channel: ChannelName): Promise<void> {
     const res = await fetch(this.url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -28,8 +28,11 @@ export class WebhookNotifier implements HandoffNotifier {
         // Slack/Discord como a mensagem a exibir; quem apontar
         // HANDOFF_WEBHOOK_URL para um endpoint próprio pode simplesmente
         // ignorar este campo e usar os demais.
-        text: `Handoff (${reason}) na conversa ${conversationId}`,
+        text: `Handoff (${reason}) na conversa ${conversationId} [${channel}]`,
         conversationId,
+        // Canal de origem — campo novo (05/10/2026), aditivo: quem já
+        // consome este payload e não conhece o campo simplesmente o ignora.
+        channel,
         reason,
         // Histórico completo anexado — mesmo requisito da Fase 1 ("o
         // atendente humano recebe a conversa pronta") já comentado em

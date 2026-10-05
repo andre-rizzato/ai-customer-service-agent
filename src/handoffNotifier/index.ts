@@ -3,12 +3,15 @@
 // (vindo de agent.config.json, não do .env — é uma escolha do NEGÓCIO, não
 // um segredo de ambiente), qual implementação instanciar.
 import { agentConfig, env } from "../config.js";
+import { attendantChatIds } from "../handoff/attendants.js";
 import { ConsoleNotifier } from "./consoleNotifier.js";
+import { TelegramNotifier } from "./telegramNotifier.js";
 import { WebhookNotifier } from "./webhookNotifier.js";
 import type { HandoffNotifier } from "./types.js";
 
 // Preâmbulo: createHandoffNotifier() constrói a implementação apropriada de
-// HandoffNotifier. Chamada uma vez pelo Orchestrator na inicialização.
+// HandoffNotifier. Chamada pelo Orchestrator na inicialização e de novo em
+// reloadConfig() quando a tela de configuração troca o tipo de notifier.
 export function createHandoffNotifier(): HandoffNotifier {
   switch (agentConfig.handoffNotifier) {
     case "webhook":
@@ -18,6 +21,11 @@ export function createHandoffNotifier(): HandoffNotifier {
       // é "webhook" — se essa invariante for quebrada, o processo já teria
       // falhado antes de chegar a esta linha.
       return new WebhookNotifier(env.HANDOFF_WEBHOOK_URL!);
+    case "telegram":
+      // Mesma garantia: validateCrossConfig() (src/config.ts) recusa
+      // "telegram" sem TELEGRAM_BOT_TOKEN e sem HANDOFF_TELEGRAM_CHAT_IDS —
+      // tanto no boot quanto num save pela tela de configuração.
+      return new TelegramNotifier(env.TELEGRAM_BOT_TOKEN!, attendantChatIds, env.PUBLIC_BASE_URL);
     case "console":
       return new ConsoleNotifier();
   }

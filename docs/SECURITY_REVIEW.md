@@ -197,6 +197,25 @@ tempo real (live relay) FICA PRA DEPOIS, decisão explicitamente adiada.**
   possível via B (relay pelo sistema).
 - A escolha entre A e B fica pra depois — fora do escopo desta revisão.
 
+**Atualização 05/10/2026 — Opção B construída, com o atendente no Telegram:**
+o alerta chega no chat do atendente com o bot e termina com `🆔 <id>`. O
+atendente dá "Responder" nele e `src/handoff/relay.ts` entrega a resposta no
+canal original: API do Telegram ou do WhatsApp, ou o polling do widget web.
+Também há um Mini App opcional (`public/handoff-app.html`). Controles de
+segurança:
+
+- Só chat ids em `HANDOFF_TELEGRAM_CHAT_IDS` atuam como atendente, e o boot
+  exige `TELEGRAM_WEBHOOK_SECRET` quando a lista existe (sem ele, um update
+  "do atendente" poderia ser forjado).
+- O id do destino sai do texto de uma mensagem escrita pelo **bot**
+  (`reply_to_message.from.is_bot`). O texto do cliente citado no alerta tem
+  o 🆔 neutralizado, e vale a última ocorrência. Assim um cliente não
+  consegue desviar a resposta pra conversa de outra pessoa.
+- O Mini App é autenticado pelo HMAC do `initData` (chave derivada do token
+  do bot), com idade máxima de 24h e allowlist pelo `user.id`.
+- O polling do widget devolve só as falas `human-agent`, nunca o histórico
+  inteiro. O `sessionId` passou a ser `crypto.randomUUID()`.
+
 ## #6 — `agent-service` exposto em `0.0.0.0`
 
 **Risco:** o processo PM2 do `AgentService` escutava em `0.0.0.0:8100`,
@@ -285,8 +304,8 @@ entrar em produção.
 
 - **Pergunta de verificação** como fallback de identidade quando não há
   telefone confiável (ver #4) — desenho ainda não feito.
-- **Mecanismo de relay em tempo real** pro atendente humano (Opção B do
-  #5) — explicitamente adiado pelo usuário pra uma sessão futura.
+- ~~**Mecanismo de relay em tempo real** pro atendente humano (Opção B do
+  #5)~~ — construído em 05/10/2026, ver atualização no item #5.
 - Os itens de hardening já listados em `STATUS.md` (`#Pendente`) que não
   vieram desta revisão (retry/timeout em chamadas HTTP do `AgentService`,
   `/health` checando dependências reais, etc.) continuam pendentes, sem

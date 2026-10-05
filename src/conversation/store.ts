@@ -53,6 +53,18 @@ export class ConversationStore {
     return resolve(this.dir, `${safeId}.json`);
   }
 
+  // Preâmbulo: exists() diz se uma conversa já tem histórico (no cache ou
+  // em disco) SEM carregá-la nem criar entrada no cache. Existe por causa do
+  // endpoint público de polling do widget (GET /webhook/web/poll, ver
+  // src/server.ts): qualquer um na internet pode chamá-lo com um sessionId
+  // inventado, e se ele usasse getHistory() direto, cada id inventado
+  // viraria uma entrada nova (vazia) no `cache` — um jeito trivial de
+  // inflar a memória do processo numa VM de 892MB. Checando exists()
+  // antes, id desconhecido custa só um existsSync.
+  exists(conversationId: string): boolean {
+    return this.cache.has(conversationId) || existsSync(this.filePathFor(conversationId));
+  }
+
   // Preâmbulo: getHistory() devolve o array de turnos de uma conversa,
   // carregando do disco na primeira vez e servindo do cache em memória nas
   // chamadas seguintes. Chamado pelo Orchestrator tanto para montar o

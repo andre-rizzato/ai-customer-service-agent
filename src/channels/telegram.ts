@@ -10,6 +10,8 @@ import { env } from "../config.js";
 import type { InboundMessage } from "../types.js";
 import type { ChannelAdapter } from "./types.js";
 import { DedupeCache } from "../orchestrator/dedupeCache.js";
+import { callTelegram } from "./telegramApi.js";
+import type { DeskCallbackQuery, DeskMessage, TelegramDesk } from "../handoff/telegramDesk.js";
 
 // Mesmo valor e mesmo raciocínio do WhatsAppAdapter (ver
 // src/channels/whatsapp.ts) — 10 minutos cobre qualquer janela real de
@@ -25,14 +27,19 @@ interface TelegramUpdate {
   // próprio Telegram — estável entre reentregas do MESMO evento. Usado
   // pelo DedupeCache (ver handleWebhook abaixo) pra detectar reenvio.
   update_id: number;
-  message?: {
-    chat: { id: number };
-    text?: string;
+  // `DeskMessage` traz chat/text/reply_to_message (este último só usado
+  // quando quem escreve é um atendente — ver src/handoff/telegramDesk.ts).
+  message?: DeskMessage & {
     // Timestamp em SEGUNDOS desde epoch (padrão Unix) — diferente de
     // Date.now() do JS, que é em milissegundos; por isso é multiplicado por
     // 1000 mais abaixo ao montar o InboundMessage.
     date: number;
   };
+  // Clique num botão inline (ex.: "🤖 Devolver ao bot" no alerta de
+  // handoff). Só chega aqui se o setWebhook não tiver restringido
+  // allowed_updates a ["message"] — o default do Telegram inclui
+  // callback_query.
+  callback_query?: DeskCallbackQuery;
 }
 
 // Preâmbulo: TelegramAdapter implementa ChannelAdapter para o canal
@@ -52,6 +59,14 @@ export class TelegramAdapter implements ChannelAdapter {
   // Instância própria de DedupeCache — ver comentário equivalente em
   // WhatsAppAdapter sobre por que cada canal guarda a sua, sem compartilhar.
   private readonly dedupe = new DedupeCache(DEDUPE_TTL_MS);
+
+  // Balcão do atendente (relay de handoff, 05/10/2026). Atribuído por
+  // src/server.ts DEPOIS da construção — e não recebido no construtor —
+  // porque o desk depende do HumanRelay, que depende do sendMessage DESTE
+  // adapter: passar no construtor criaria uma dependência circular de
+  // inicialização. undefined = sem atendentes configurados, todo update é
+  // tratado como cliente (comportamento anterior).
+  desk?: TelegramDesk;
 
   constructor(private readonly botToken: string, private readonly webhookSecret?: string) {}
 
@@ -99,6 +114,14 @@ export class TelegramAdapter implements ChannelAdapter {
       return;
     }
 
+    // Clique em botão inline: só existe nos alertas de handoff, então vai
+    // direto pro desk (que confere se quem clicou é atendente). Sem desk
+    // configurado, ignora — nenhum botão nosso deveria existir.
+    if (update.callback_query) {
+      if (this.desk) await this.desk.handleCallback(update.callback_query);
+      return;
+    }
+
     const message = update.message;
     // Ignora updates sem texto (figurinha, foto, membro entrou no grupo,
     // etc.) — este agente só sabe lidar com texto.
@@ -109,6 +132,26 @@ export class TelegramAdapter implements ChannelAdapter {
     // pipeline (mantém o formato uniforme entre canais, já que o WhatsApp
     // usa string nativamente — o número de telefone).
     const chatId = String(message.chat.id);
+
+    // /meuid: responde o chat id de quem perguntou — é como um atendente
+    // descobre o valor pra pôr em HANDOFF_TELEGRAM_CHAT_IDS. Respondido pra
+    // QUALQUER pessoa (não só atendentes, que ainda nem estariam na lista):
+    // o chat id não é segredo nem dá acesso a nada sozinho. Interceptado
+    // antes do Orchestrator pra não gastar uma chamada de LLM com isso.
+    if (message.text.trim() === "/meuid") {
+      await this.sendMessage(chatId, `Seu chat id: ${chatId}`);
+      return;
+    }
+
+    // Mensagem de um atendente: vai pro balcão (relay), NUNCA pro
+    // Orchestrator — senão o bot responderia ao atendente como se ele fosse
+    // cliente, e um reply com "falar com atendente" abriria um handoff do
+    // próprio atendente. Efeito colateral conhecido: quem está na lista não
+    // consegue testar o bot como cliente por este mesmo chat.
+    if (this.desk?.isAttendant(chatId)) {
+      await this.desk.handleMessage(message);
+      return;
+    }
     const inbound: InboundMessage = {
       channel: this.name,
       userId: chatId,
@@ -134,23 +177,19 @@ export class TelegramAdapter implements ChannelAdapter {
     if (reply) await this.sendMessage(chatId, reply);
   }
 
-  // Preâmbulo: sendMessage() encapsula a chamada HTTP ao método
-  // sendMessage da API do Telegram. Método público (não só usado
-  // internamente por handleWebhook) para permitir, se necessário, enviar
-  // mensagens proativas fora do fluxo de resposta a um webhook.
-  async sendMessage(chatId: string, text: string): Promise<void> {
-    const res = await fetch(`https://api.telegram.org/bot${this.botToken}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, text }),
-    });
-    // Mesmo padrão dos outros clients HTTP do projeto: fetch só rejeita em
-    // falha de rede, então checamos res.ok manualmente e só logamos o erro
-    // (não lançamos) — uma falha ao ENVIAR a resposta não deveria derrubar
-    // o processo nem impedir o próximo webhook de ser processado.
-    if (!res.ok) {
-      console.error(`Telegram sendMessage failed (${res.status}): ${await res.text().catch(() => "")}`);
-    }
+  // Preâmbulo: sendMessage() encapsula a chamada ao método sendMessage da
+  // API do Telegram. Método público (não só usado internamente por
+  // handleWebhook) porque o relay de handoff (src/handoff/relay.ts) o usa
+  // pra entregar a resposta do atendente a um cliente do Telegram — mensagem
+  // proativa, fora do fluxo de resposta a um webhook.
+  //
+  // Devolve se o Telegram aceitou (antes era void): o relay precisa saber,
+  // pra não dizer "✅ Enviado" ao atendente quando a mensagem não chegou.
+  // Continua sem lançar — uma falha ao ENVIAR não deveria derrubar o
+  // processo nem impedir o próximo webhook de ser processado (ver
+  // callTelegram em telegramApi.ts, que centraliza esse tratamento).
+  async sendMessage(chatId: string, text: string): Promise<boolean> {
+    return callTelegram(this.botToken, "sendMessage", { chat_id: chatId, text });
   }
 }
 

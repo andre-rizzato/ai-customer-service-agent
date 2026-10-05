@@ -100,4 +100,5 @@ preserva esse raciocínio entre sessões, em vez de ele se perder.
 
 - `docs/STATUS.md` — checklist consolidado do que está feito/pendente, nos três repositórios do projeto.
 - `docs/GO_LIVE_CHECKLIST.md` — passos manuais de domínio/email/canais.
+- `docs/HANDOFF_RELAY.md` — relay de handoff: atendente responde ao cliente pelo Telegram (reply ou Mini App), configuração, segurança e limitações.
 - `docs/artifacts/` — docs de arquitetura publicados (Blueprint do Agente, Mapa de Capacidades).

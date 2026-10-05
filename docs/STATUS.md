@@ -66,6 +66,21 @@ institucional). Para os passos manuais de domínio/email/WhatsApp, ver
 - [x] **Incidente resolvido no deploy**: a nova checagem cruzada de `WHATSAPP_APP_SECRET` (item #3) derrubou o `agente-atendimento` na VM em crash-loop — o secret nunca tinha sido criado no Key Vault, porque não existia antes desta revisão. Corrigido adicionando `whatsapp-app-secret` em `kv-agente-atendimento` e reiniciando o processo; confirmado estável (sem mais restarts) e com os 3 canais montados. Lição: uma checagem fail-fast nova que depende de um secret precisa do secret já existir no Key Vault ANTES do deploy que introduz a checagem, não depois.
 - Detalhe completo dos 8 pontos revisados, o que foi corrigido e o que ficou pendente: [`SECURITY_REVIEW.md`](SECURITY_REVIEW.md)
 
+### Relay de handoff pelo Telegram (05/10/2026 — Opção B do item #5)
+
+Guia completo: [`HANDOFF_RELAY.md`](HANDOFF_RELAY.md).
+
+- [x] `handoffNotifier: "telegram"`: alerta com histórico no chat do atendente com o bot (`HANDOFF_TELEGRAM_CHAT_IDS`), terminando com `🆔 <conversationId>`
+- [x] Caminho principal: atendente dá **Responder** (reply) no alerta, ou em qualquer mensagem do bot com 🆔, e o texto vai pro cliente no canal original (`src/handoff/telegramDesk.ts` → `src/handoff/relay.ts`)
+- [x] Mensagens novas do cliente durante o handoff são repassadas ao atendente (`onCustomerMessage`)
+- [x] Mini App (`public/handoff-app.html`, botão "💬 Abrir conversa"): histórico completo + resposta + devolver ao bot, autenticado pelo `initData` assinado do Telegram (exige `PUBLIC_BASE_URL` https)
+- [x] Botão "🤖 Devolver ao bot" e `/liberar`, além do `scripts/releaseHandoff.ts`; resposta do atendente renova o timeout de 4h
+- [x] Widget web recebe a resposta por polling (`GET /webhook/web/poll`, só durante o handoff); `sessionId` agora é `crypto.randomUUID()` persistido por aba; `formatMessage` escapa HTML (era XSS)
+- [x] `GET /webhook/web/health` criado — o widget mostrava "Offline" sempre porque essa rota não existia
+- [x] Boot recusa `HANDOFF_TELEGRAM_CHAT_IDS` sem `TELEGRAM_WEBHOOK_SECRET` (senão dava pra forjar uma resposta de atendente pelo webhook)
+- [ ] Deploy: definir `HANDOFF_TELEGRAM_CHAT_IDS` e `PUBLIC_BASE_URL` no `.env` da VM (não estão no Key Vault, não são segredo), conferir que `TELEGRAM_WEBHOOK_SECRET` já existe lá e mudar o `handoffNotifier` para `telegram` pela tela de configuração
+- [ ] Deploy do widget atualizado no `rizzatotech-site` (cópia vendorizada; o original no `DistributedOrderSystem` não foi alterado)
+
 ### CI/CD
 
 - [x] `deploy.yml` (Node) e `deploy-agent-service.yml` (`AgentService`) — GitHub Actions, deploy automático no push
@@ -107,7 +122,7 @@ institucional). Para os passos manuais de domínio/email/WhatsApp, ver
 ### Técnico — segurança (ver `SECURITY_REVIEW.md`)
 
 - [ ] Pergunta de verificação (fallback de identidade pra canais sem telefone confiável, ex. Telegram) — desenho ainda não feito (item #4)
-- [ ] Mecanismo de relay em tempo real pro atendente humano (Opção B do item #5) — adiado deliberadamente, decisão entre Opção A (já funciona) e B fica pra depois
+- [x] ~~Mecanismo de relay em tempo real pro atendente humano (Opção B do item #5)~~ — feito em 05/10/2026 pelo Telegram, ver seção "Relay de handoff" acima
 - [ ] LGPD pro vertical de clínica (dado de saúde) — checklist jurídico/técnico em aberto (item #8), não bloqueia o vertical testado hoje
 
 ### Técnico — capacidades

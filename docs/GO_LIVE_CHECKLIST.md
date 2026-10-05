@@ -11,7 +11,7 @@ Dois tenants de teste cobrem os dois cenários do produto:
   (Node → AgentService → `RestOrderBackend` → GatewayBff). É o "cliente com
   backend real".
 
-Última atualização: 04/10/2026.
+Última atualização: 05/10/2026.
 
 ---
 
@@ -138,6 +138,20 @@ tenants isolados de verdade (o modelo multi-tenant com container +
 identidade por cliente, do Mapa de Capacidades, não foi provisionado ainda
 — ver `docs/STATUS.md`).
 
+## 6.1 Relay de handoff pelo Telegram — ⏳ código pronto, configuração pendente
+
+O atendente recebe o alerta no Telegram e responde ao cliente dali (widget,
+WhatsApp ou Telegram). Guia completo, incluindo o passo a passo de deploy:
+[`HANDOFF_RELAY.md`](HANDOFF_RELAY.md), seção 4. Resumo do que só você faz:
+
+1. Mandar `/meuid` pro `@rizzatotech_atendimento_bot` e pôr o número em
+   `HANDOFF_TELEGRAM_CHAT_IDS` no `.env` da VM, junto com
+   `PUBLIC_BASE_URL=https://rizzato-tech.rizzatotech.com`.
+2. Reiniciar o processo e trocar a notificação de handoff pra **Telegram**
+   na tela de configuração.
+3. Se o webhook do Telegram foi registrado com `allowed_updates`, registrar
+   de novo sem ele (senão o botão "Devolver ao bot" não chega).
+
 ## 7. Teste de ponta a ponta — o que confirmar em cada tenant
 
 | Tenant | Canal | Mensagem de teste | Resultado |
@@ -149,6 +163,7 @@ identidade por cliente, do Mapa de Capacidades, não foi provisionado ainda
 | DistributedOrderSystem | `/webhook/web` | "qual o status do pedido 99999?" (inexistente) | ✅ "não encontrado", honesto |
 | DistributedOrderSystem | `/webhook/web` | `AgentService` inalcançável | ✅ handoff em vez de erro cru |
 | DistributedOrderSystem | Telegram/WhatsApp | — | ⏳ pendente — só testado via `/webhook/web` até agora |
+| Rizzato Systems | widget do site + Telegram do atendente | "quero falar com atendente" → Responder no alerta | ⏳ pendente — validado localmente com token falso (ver `DEBUG_LOCAL.md` 8.1), falta em produção |
 
 ## Checklist
 
@@ -162,3 +177,4 @@ identidade por cliente, do Mapa de Capacidades, não foi provisionado ainda
 - [x] Tenant Rizzato Systems configurado (`businessName`) e testado via canal real (Telegram)
 - [ ] Chip `+55` registrado na API do WhatsApp (planejado semana de 11/10/2026)
 - [ ] Subdomínio + teste via canal real pro tenant DistributedOrderSystem
+- [ ] Relay de handoff: `HANDOFF_TELEGRAM_CHAT_IDS` + `PUBLIC_BASE_URL` na VM, notifier = Telegram, teste real widget → atendente → widget

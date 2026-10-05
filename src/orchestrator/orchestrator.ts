@@ -16,10 +16,10 @@
 import { agentConfig } from "../config.js";
 import { ConversationStore } from "../conversation/store.js";
 import { createHandoffNotifier, type HandoffNotifier } from "../handoffNotifier/index.js";
-import { HandoffStateStore } from "./handoffState.js";
+import { HandoffStateStore, type HandoffState } from "./handoffState.js";
 import { KnowledgeBase } from "../knowledge/knowledgeBase.js";
 import { createLLMProvider, type LLMProvider } from "../llm/index.js";
-import type { InboundMessage } from "../types.js";
+import type { ConversationTurn, InboundMessage } from "../types.js";
 import { callAgentService } from "./agentServiceClient.js";
 import { detectCapability } from "./capabilityRouter.js";
 import { detectHandoffTrigger } from "./handoff.js";
@@ -87,8 +87,10 @@ export class Orchestrator {
   // configurável por negócio em agent.config.json.handoffTimeoutHours.
   private readonly handoffState = new HandoffStateStore(agentConfig.handoffTimeoutHours);
 
-  // Preâmbulo: handleMessage() é o ÚNICO método público desta classe e o
-  // ponto de entrada de todo o pipeline — é chamado por cada ChannelAdapter
+  // Preâmbulo: handleMessage() é o ponto de entrada de todo o pipeline (os
+  // outros métodos públicos — reloadConfig() e os do relay de handoff, no
+  // fim da classe — são operações administrativas, não mensagens de
+  // cliente) — é chamado por cada ChannelAdapter
   // (Telegram, WhatsApp, Web) uma vez por mensagem recebida, sempre com um
   // InboundMessage já normalizado. Devolve o texto da resposta que o
   // adapter deve enviar de volta ao usuário pelo mesmo canal — ou uma
@@ -121,6 +123,16 @@ export class Orchestrator {
     // completo quando for olhar), só não gera nenhuma resposta automática.
     if (this.handoffState.isActive(conversationId)) {
       this.conversations.append(conversationId, { role: "user", text, timestamp });
+      // Repassa a mensagem ao atendente (relay — ver
+      // handoffNotifier/types.ts onCustomerMessage). Sem `await` de
+      // propósito: no canal web o cliente está com a requisição HTTP aberta
+      // esperando esta função terminar, e não há motivo pra ele esperar a
+      // API do Telegram responder pra ter sua mensagem "entregue" — o
+      // .catch() garante que uma falha do repasse vire só um log, nunca uma
+      // promise rejeitada solta derrubando o processo.
+      this.handoffNotifier
+        .onCustomerMessage?.(conversationId, text, channel)
+        .catch((err) => console.error("Handoff onCustomerMessage failed:", err));
       return "";
     }
 
@@ -151,7 +163,7 @@ export class Orchestrator {
       // notificação falhar, ela mesma trata o erro internamente sem lançar
       // (ver WebhookNotifier), então esta linha nunca impede a resposta
       // abaixo de ser enviada.
-      await this.handoffNotifier.notify(conversationId, handoffReason, history);
+      await this.handoffNotifier.notify(conversationId, handoffReason, history, channel);
       // Registra no histórico que um handoff ocorreu, como um turno de tipo
       // "system-note" — isso é só para fins de auditoria (aparece no log
       // JSONL com handoff:true), e é FILTRADO explicitamente mais abaixo
@@ -167,7 +179,7 @@ export class Orchestrator {
       // Marca a conversa como "em atendimento humano" — a partir daqui, o
       // PASSO 0 silencia o bot nas próximas mensagens desta conversa, até
       // alguém liberar (scripts/releaseHandoff.ts) ou o timeout expirar.
-      this.handoffState.activate(conversationId);
+      this.handoffState.activate(conversationId, channel);
       // Encerra o pipeline aqui — não faz busca no RAG nem chama o LLM para
       // esta mensagem, exatamente como o diagrama da Fase 1 descreve
       // ("Sim -> transfere para humano" é um ramo que pula direto para o
@@ -198,14 +210,14 @@ export class Orchestrator {
         // nenhuma lógica nova pra detectar isso aqui, só checar o valor.
         if (agentResponse.intent === "cancel_order") {
           const history = this.conversations.getHistory(conversationId);
-          await this.handoffNotifier.notify(conversationId, "explicit_request", history);
+          await this.handoffNotifier.notify(conversationId, "explicit_request", history, channel);
           this.conversations.append(conversationId, {
             role: "system-note",
             text: `Handoff acionado: cancel_order (cancelamento sempre passa por humano, order_id=${agentResponse.order_id ?? "não informado"})`,
             timestamp: Date.now(),
             handoff: true,
           });
-          this.handoffState.activate(conversationId);
+          this.handoffState.activate(conversationId, channel);
           return CANCEL_ORDER_HANDOFF_REPLY;
         }
 
@@ -218,14 +230,14 @@ export class Orchestrator {
         return agentResponse.reply;
       } catch (err) {
         console.error("AgentService call failed, falling back to handoff:", err);
-        await this.handoffNotifier.notify(conversationId, "explicit_request", this.conversations.getHistory(conversationId));
+        await this.handoffNotifier.notify(conversationId, "explicit_request", this.conversations.getHistory(conversationId), channel);
         this.conversations.append(conversationId, {
           role: "system-note",
           text: "Handoff acionado: order (AgentService indisponível)",
           timestamp: Date.now(),
           handoff: true,
         });
-        this.handoffState.activate(conversationId);
+        this.handoffState.activate(conversationId, channel);
         return HANDOFF_REPLY;
       }
     }
@@ -235,14 +247,14 @@ export class Orchestrator {
       // inventada, registrado do mesmo jeito que um handoff por palavra-
       // chave normal (ver PASSO 2 acima) pra aparecer igual na auditoria.
       const history = this.conversations.getHistory(conversationId);
-      await this.handoffNotifier.notify(conversationId, "explicit_request", history);
+      await this.handoffNotifier.notify(conversationId, "explicit_request", history, channel);
       this.conversations.append(conversationId, {
         role: "system-note",
         text: `Handoff acionado: ${capability} (capacidade sem conector ainda)`,
         timestamp: Date.now(),
         handoff: true,
       });
-      this.handoffState.activate(conversationId);
+      this.handoffState.activate(conversationId, channel);
       return CAPABILITY_NOT_WIRED_REPLY;
     }
 
@@ -264,10 +276,14 @@ export class Orchestrator {
       // do diálogo real entre usuário e assistente.
       .filter((turn) => turn.role !== "system-note")
       .map((turn) => ({
-        // Depois do filtro acima, turn.role só pode ser "user" ou
-        // "assistant" — o `as` documenta essa garantia para o TypeScript,
-        // que não consegue inferir sozinho o efeito do .filter() anterior.
-        role: turn.role as "user" | "assistant",
+        // Depois do filtro acima, turn.role só pode ser "user", "assistant"
+        // ou "human-agent". A fala do atendente humano (relay) vai pro LLM
+        // como "assistant": do ponto de vista do cliente é a mesma voz da
+        // empresa, e quando o bot volta a atender depois do handoff ele
+        // precisa saber o que o atendente já disse/prometeu, pra não se
+        // contradizer. O `as` documenta essa garantia pro TypeScript, que
+        // não consegue inferir sozinho o efeito do .filter() anterior.
+        role: (turn.role === "human-agent" ? "assistant" : turn.role) as "user" | "assistant",
         content: turn.text,
       }));
 
@@ -311,5 +327,84 @@ export class Orchestrator {
     this.rateLimiter.updateLimits(agentConfig.rateLimit.maxMessagesPerWindow, agentConfig.rateLimit.windowSeconds);
     this.handoffState.updateTimeout(agentConfig.handoffTimeoutHours);
     this.handoffNotifier = createHandoffNotifier();
+  }
+
+  // ---------------------------------------------------------------------
+  // Métodos usados pelo relay de handoff (src/handoff/relay.ts) e pelas
+  // rotas do Mini App / polling do widget (src/server.ts) — adicionados em
+  // 05/10/2026. Ficam aqui (e não numa classe à parte com suas próprias
+  // instâncias de ConversationStore/HandoffStateStore) porque o
+  // ConversationStore mantém um CACHE em memória: uma segunda instância
+  // gravando o turno do atendente em disco não atualizaria o cache desta,
+  // e o bot, ao voltar, montaria o prompt sem a fala do atendente.
+  // ---------------------------------------------------------------------
+
+  // Preâmbulo: getHandoffState() expõe o estado de handoff (ativo? qual
+  // canal?) de uma conversa — já com o timeout de segurança aplicado.
+  getHandoffState(conversationId: string): HandoffState {
+    return this.handoffState.getState(conversationId);
+  }
+
+  // Preâmbulo: hasConversation() diz se a conversa existe sem carregá-la no
+  // cache — ver ConversationStore.exists() sobre por que isso importa no
+  // endpoint público de polling.
+  hasConversation(conversationId: string): boolean {
+    return this.conversations.exists(conversationId);
+  }
+
+  // Preâmbulo: getHistory() devolve o histórico completo de uma conversa —
+  // usado só pelo Mini App do atendente (rota autenticada GET
+  // /api/handoff/:id). NUNCA exposto em rota pública: o widget usa
+  // getHumanRepliesSince(), que devolve só as falas do atendente.
+  getHistory(conversationId: string): ConversationTurn[] {
+    return this.conversations.getHistory(conversationId);
+  }
+
+  // Preâmbulo: recordHumanReply() grava no histórico uma resposta escrita
+  // pelo atendente e RENOVA o handoff (activate sem canal reaproveita o
+  // gravado — ver HandoffStateStore.activate). Renovar tem dois efeitos
+  // desejados: o timeout de segurança passa a contar da última atividade
+  // humana, e uma conversa que já tinha sido devolvida ao bot volta pro
+  // atendente se ele responder de novo (o bot não pode falar por cima de
+  // um humano que acabou de escrever). Chamado pelo HumanRelay DEPOIS de a
+  // entrega ao canal ter dado certo — se o envio falhar, nada é gravado.
+  recordHumanReply(conversationId: string, text: string): void {
+    this.conversations.append(conversationId, { role: "human-agent", text, timestamp: Date.now() });
+    this.handoffState.activate(conversationId);
+  }
+
+  // Preâmbulo: releaseHandoff() devolve a conversa ao bot — mesmo efeito de
+  // scripts/releaseHandoff.ts, agora acionável pelo botão "Devolver ao bot"
+  // do Telegram/Mini App. Grava uma system-note pra auditoria saber QUANDO
+  // o atendente encerrou (a liberação por timeout não grava, porque não é
+  // uma decisão de ninguém).
+  releaseHandoff(conversationId: string): void {
+    this.handoffState.release(conversationId);
+    this.conversations.append(conversationId, {
+      role: "system-note",
+      text: "Handoff encerrado pelo atendente — bot volta a responder",
+      timestamp: Date.now(),
+    });
+  }
+
+  // Preâmbulo: getHumanRepliesSince() alimenta o polling do widget web
+  // (GET /webhook/web/poll): devolve só os turnos "human-agent" a partir
+  // do índice `after`, mais o novo cursor (tamanho atual do histórico).
+  // O cursor é o ÍNDICE no array do histórico — estável porque o
+  // histórico é append-only (nada é removido ou reordenado), então "tudo
+  // depois do índice N" nunca pula nem repete mensagem entre dois polls.
+  // Um id desconhecido devolve vazio sem tocar no cache (hasConversation).
+  getHumanRepliesSince(
+    conversationId: string,
+    after: number
+  ): { messages: { id: number; text: string; timestamp: number }[]; cursor: number } {
+    if (!this.conversations.exists(conversationId)) return { messages: [], cursor: 0 };
+    const history = this.conversations.getHistory(conversationId);
+    const messages = history
+      .map((turn, index) => ({ turn, index }))
+      .slice(after)
+      .filter(({ turn }) => turn.role === "human-agent")
+      .map(({ turn, index }) => ({ id: index, text: turn.text, timestamp: turn.timestamp }));
+    return { messages, cursor: history.length };
   }
 }

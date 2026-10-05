@@ -224,8 +224,13 @@ export class WhatsAppAdapter implements ChannelAdapter {
   // Preâmbulo: sendMessage() encapsula a chamada HTTP ao endpoint de envio
   // de mensagens da Graph API. Chamado por handleWebhook() para cada
   // mensagem recebida, depois que o Orchestrator devolve o texto de
-  // resposta (só quando esse texto não é vazio — ver handleWebhook).
-  async sendMessage(to: string, text: string): Promise<void> {
+  // resposta (só quando esse texto não é vazio — ver handleWebhook) — e,
+  // desde 05/10/2026, pelo relay de handoff (src/handoff/relay.ts) pra
+  // entregar a resposta de um atendente humano. Devolve se a Graph API
+  // aceitou (antes era void) pro relay não confirmar ao atendente uma
+  // entrega que falhou — o caso típico é a janela de 24h do WhatsApp já ter
+  // fechado.
+  async sendMessage(to: string, text: string): Promise<boolean> {
     const res = await fetch(`https://graph.facebook.com/v20.0/${this.phoneNumberId}/messages`, {
       method: "POST",
       headers: {
@@ -250,6 +255,7 @@ export class WhatsAppAdapter implements ChannelAdapter {
     if (!res.ok) {
       console.error(`WhatsApp sendMessage failed (${res.status}): ${await res.text().catch(() => "")}`);
     }
+    return res.ok;
   }
 }
 

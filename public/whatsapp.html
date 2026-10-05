@@ -177,6 +177,13 @@
   .bubble .time { font-size: 11px; color: var(--wa-text-dim); }
   .bubble .check { width: 15px; height: 10px; fill: var(--wa-check-read); }
 
+  /*
+    Nome do remetente em cima da bolha, só pras mensagens de um atendente
+    humano (relay de handoff) — imita o nome colorido de um participante num
+    grupo do WhatsApp, pra ficar visível que quem respondeu foi uma pessoa e
+    não o bot.
+  */
+  .bubble .sender { display: block; font-size: 12.5px; font-weight: 600; color: #06a37e; margin-bottom: 2px; }
   .bubble.error { background: #ffe4e1; color: #a1260d; border-top-left-radius: 0; }
   .bubble.error::before { border-color: transparent #ffe4e1 transparent transparent; }
 
@@ -304,7 +311,14 @@
   const statusEl = document.getElementById("status-text");
   const menuBtn = document.getElementById("menu-btn");
 
+  // Preâmbulo: uuid() gera o conversationId. Desde o relay de handoff
+  // (05/10/2026) esse id funciona como CHAVE de leitura das respostas do
+  // atendente (GET /webhook/web/poll) — então usa crypto.randomUUID()
+  // (aleatoriedade criptográfica) sempre que o navegador oferece. Ele só
+  // existe em contexto seguro (https ou localhost); o fallback com
+  // Math.random fica só pra abrir a página por IP na rede local, uso de teste.
   function uuid() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
     return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
       const r = (Math.random() * 16) | 0;
       const v = c === "x" ? r : (r & 0x3) | 0x8;
@@ -391,6 +405,15 @@
 
     const bubble = document.createElement("div");
     bubble.className = "bubble " + (role === "user" ? "sent" : "received") + (isError ? " error" : "");
+
+    // role "agent" = resposta de um atendente humano chegada pelo polling
+    // (ver pollHumanReplies abaixo) — ganha o nome em cima da bolha.
+    if (role === "agent") {
+      const sender = document.createElement("span");
+      sender.className = "sender";
+      sender.textContent = "Atendente";
+      bubble.appendChild(sender);
+    }
 
     const textSpan = document.createElement("span");
     textSpan.className = "text";
@@ -511,11 +534,20 @@
       }
 
       const data = await res.json();
-      const botMsg = { role: "bot", text: data.reply ?? "(sem resposta)", ts: Date.now() };
-      const h2 = loadHistory();
-      h2.push(botMsg);
-      saveHistory(h2);
-      appendBubble(botMsg);
+      // Resposta vazia ("") é o sinal do Orchestrator de "não responda
+      // nada": a conversa está com um atendente humano (handoff ativo, bot
+      // em silêncio). Antes isto virava uma bolha vazia; agora não desenha
+      // nada — a resposta, quando vier, chega pelo polling.
+      if (data.reply) {
+        const botMsg = { role: "bot", text: data.reply, ts: Date.now() };
+        const h2 = loadHistory();
+        h2.push(botMsg);
+        saveHistory(h2);
+        appendBubble(botMsg);
+      }
+      // Toda resposta pode ter acabado de abrir um handoff — um poll logo
+      // em seguida descobre (handoffActive) e liga o polling periódico.
+      pollHumanReplies();
     } catch (err) {
       hideTyping();
       // Uma falha ao enviar é o sinal mais rápido de queda — não espera o
@@ -546,9 +578,62 @@
   });
   sendBtn.addEventListener("click", sendMessage);
 
+  // ---------------------------------------------------------------------
+  // Polling das respostas do atendente humano (relay de handoff,
+  // 05/10/2026) — mesmo mecanismo do widget embarcável do site. O canal web
+  // é request/response, então quando um atendente responde pelo Telegram o
+  // servidor só grava a resposta; quem vai buscar é esta página, em
+  // GET /webhook/web/poll, a cada 4s enquanto a conversa está em handoff.
+  // ---------------------------------------------------------------------
+  const STORAGE_KEY_CURSOR_PREFIX = "wa-sim-cursor-";
+  const POLL_INTERVAL_MS = 4000;
+  let pollTimer = null;
+
+  // Cursor = até onde do histórico do servidor já buscamos. Persistido por
+  // conversa no localStorage pra um reload da página não mostrar de novo
+  // respostas do atendente que já estão no histórico local.
+  function cursorKey() {
+    return STORAGE_KEY_CURSOR_PREFIX + conversationId;
+  }
+
+  // Preâmbulo: pollHumanReplies() faz UM poll: busca falas novas do
+  // atendente a partir do cursor, desenha cada uma, avança o cursor e
+  // decide se agenda o próximo (só se handoffActive). Chamada na abertura
+  // da página (retomar um handoff em andamento depois de um reload), depois
+  // de cada resposta do bot e por ela mesma via setTimeout.
+  async function pollHumanReplies() {
+    clearTimeout(pollTimer);
+    // Conversa da qual o poll foi disparado — se o usuário trocar de
+    // conversa (menu) enquanto a requisição está no ar, o resultado é
+    // descartado em vez de cair na conversa nova.
+    const polledConversation = conversationId;
+    try {
+      const after = Number(localStorage.getItem(cursorKey()) || 0);
+      const res = await fetch(`${WEBHOOK_URL}/poll?conversationId=${encodeURIComponent(polledConversation)}&after=${after}`);
+      if (!res.ok || polledConversation !== conversationId) return;
+      const data = await res.json();
+      for (const m of data.messages) {
+        const agentMsg = { role: "agent", text: m.text, ts: m.timestamp };
+        const history = loadHistory();
+        history.push(agentMsg);
+        saveHistory(history);
+        appendBubble(agentMsg);
+      }
+      localStorage.setItem(cursorKey(), String(data.cursor));
+      if (data.handoffActive) pollTimer = setTimeout(pollHumanReplies, POLL_INTERVAL_MS);
+    } catch {
+      // Falha de rede: tenta de novo no mesmo ritmo — o checkHealth() já
+      // cuida de mostrar "offline" no cabeçalho.
+      pollTimer = setTimeout(pollHumanReplies, POLL_INTERVAL_MS);
+    }
+  }
+
   menuBtn.addEventListener("click", () => {
     if (!confirm("Iniciar uma nova conversa? O histórico local desta será apagado.")) return;
     localStorage.removeItem(historyKey());
+    localStorage.removeItem(cursorKey());
+    // Para o polling da conversa antiga — a nova começa sem handoff.
+    clearTimeout(pollTimer);
     conversationId = uuid();
     localStorage.setItem(STORAGE_KEY_CONV, conversationId);
     lastDay = null;
@@ -557,6 +642,7 @@
 
   renderAll(loadHistory());
   inputEl.focus();
+  pollHumanReplies();
 
   checkHealth();
   setInterval(checkHealth, 10000);

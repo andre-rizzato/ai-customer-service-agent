@@ -10,7 +10,7 @@ Além do `curl`, o projeto tem duas interfaces visuais pra isso (seções 5 e
 pra configurar o comportamento do agente sem editar JSON na mão
 (`settings.html`) — as duas sobem sozinhas junto com `npm run dev`.
 
-Última atualização: 04/10/2026.
+Última atualização: 05/10/2026.
 
 ---
 
@@ -203,6 +203,40 @@ prompt, handoff), o canal `web` das seções 4–6 é suficiente e mais rápido.
 2. Siga as instruções de registro de webhook no `README.md`, seção
    "Telegram" / "WhatsApp (Meta Cloud API)", usando a URL do ngrok como
    `<sua-url-publica>`.
+
+### 8.1 Relay de handoff sem Telegram real
+
+Dá pra testar o relay inteiro (ver [`HANDOFF_RELAY.md`](HANDOFF_RELAY.md))
+sem bot de verdade: suba o servidor com um token **falso**. As chamadas à API
+do Telegram (alerta, confirmação) falham com 401 no log, o que é esperado, e
+o resto do fluxo funciona. Use uma pasta de dados separada pra não misturar
+com as suas conversas:
+
+```bash
+PORT=3999 TELEGRAM_BOT_TOKEN="111:FAKE" TELEGRAM_WEBHOOK_SECRET="sec" \
+HANDOFF_TELEGRAM_CHAT_IDS="555" CONVERSATIONS_DIR=/tmp/relay/conv \
+AUDIT_LOG_PATH=/tmp/relay/audit.jsonl npx tsx src/server.ts
+```
+
+1. Abra `http://localhost:3999/whatsapp.html` e mande "quero falar com
+   atendente". O bot responde que vai transferir, e as próximas mensagens
+   ficam sem resposta.
+2. Simule o atendente respondendo (reply) ao alerta, com o `conversationId`
+   da conversa (está no log `[HANDOFF] conversation=...`). **No Git Bash do
+   Windows, mande o JSON por arquivo**: o curl com o emoji 🆔 direto no
+   argumento corrompe a codificação e o servidor não acha o marcador.
+
+   ```bash
+   node -e 'require("fs").writeFileSync("reply.json", JSON.stringify({update_id:1,message:{chat:{id:555},date:1,text:"Oi, sou o atendente",reply_to_message:{from:{is_bot:true},text:"alerta\n🆔 <conversationId>"}}}))'
+   curl -X POST localhost:3999/webhook/telegram -H "Content-Type: application/json" \
+        -H "X-Telegram-Bot-Api-Secret-Token: sec" --data-binary @reply.json
+   ```
+
+3. Em até 4s a resposta aparece no `whatsapp.html` com o rótulo "Atendente".
+4. O Mini App (`/api/handoff/*`) exige um `initData` assinado com o token.
+   Para gerar um válido, use a função `buildInitData()` de
+   `tests/handoffRelay.test.ts` com o token falso e `user.id = 555`, e mande
+   no header `X-Telegram-Init-Data`.
 
 ## 9. Problemas comuns
 

@@ -81,7 +81,10 @@ export const AgentConfigSchema = z.object({
   // Qual implementação de HandoffNotifier usar quando um handoff dispara —
   // "console" só loga no terminal (bom para dev), "webhook" faz POST em
   // HANDOFF_WEBHOOK_URL (Fase 6: "alerta automático e-mail ou Slack").
-  handoffNotifier: z.enum(["console", "webhook"]).default("console"),
+  // "telegram" (05/10/2026) avisa os atendentes de HANDOFF_TELEGRAM_CHAT_IDS
+  // pelo bot do Telegram E permite responder ao cliente dali mesmo (relay —
+  // ver src/handoffNotifier/telegramNotifier.ts e src/handoff/relay.ts).
+  handoffNotifier: z.enum(["console", "webhook", "telegram"]).default("console"),
 
   // Quais capacidades além de RAG este cliente contratou — ver "Mapa de
   // Capacidades" (docs/artifacts/mapa-capacidades.html): cada uma vira uma
@@ -211,6 +214,23 @@ const EnvSchema = z.object({
   // (ex.: Incoming Webhook do Slack). Só é obrigatória se
   // agentConfig.handoffNotifier === "webhook" (checado abaixo).
   HANDOFF_WEBHOOK_URL: z.string().optional(),
+
+  // Chat ids do Telegram (separados por vírgula) dos ATENDENTES — quem
+  // recebe o alerta de handoff quando agentConfig.handoffNotifier ===
+  // "telegram", e os ÚNICOS autorizados a responder clientes pelo relay
+  // (reply no Telegram ou Mini App). Mensagens desses chats ao bot nunca
+  // passam pelo Orchestrator como se fossem de cliente (ver
+  // TelegramAdapter.handleWebhook). Pra descobrir o seu: mande /meuid pro
+  // bot. Lido por src/handoff/attendants.ts.
+  HANDOFF_TELEGRAM_CHAT_IDS: z.string().optional(),
+
+  // URL pública HTTPS deste servidor (ex.:
+  // "https://rizzato-tech.rizzatotech.com"), sem barra no final — usada só
+  // pra montar o link do Mini App (public/handoff-app.html) no botão
+  // "Abrir conversa" do alerta. Opcional: sem ela o alerta sai sem esse
+  // botão, e o atendente responde só por reply (caminho principal). O
+  // Telegram exige https pra Mini App — http é ignorado.
+  PUBLIC_BASE_URL: z.string().optional(),
 
   // Diretório onde o histórico de cada conversa é persistido em disco
   // (um arquivo .json por conversationId) — usado por
@@ -364,6 +384,15 @@ export function validateCrossConfig(config: AgentConfig): void {
     );
   }
 
+  // Notificação pelo Telegram precisa do bot (token) e de pelo menos um
+  // atendente pra avisar — sem isso o handoff dispararia, o cliente
+  // ouviria "vou te conectar com um atendente" e ninguém seria avisado.
+  if (config.handoffNotifier === "telegram" && (!env.TELEGRAM_BOT_TOKEN || !env.HANDOFF_TELEGRAM_CHAT_IDS)) {
+    throw new Error(
+      "handoffNotifier=telegram mas TELEGRAM_BOT_TOKEN e/ou HANDOFF_TELEGRAM_CHAT_IDS não estão definidos no ambiente (.env)."
+    );
+  }
+
   // Mesmo raciocínio: "order" habilitado sem AGENT_SERVICE_URL configurado
   // significa que toda pergunta de pedido cairia num erro de rede em tempo de
   // resposta, em produção, pro primeiro cliente real que perguntasse — melhor
@@ -387,6 +416,19 @@ validateCrossConfig(agentConfig);
 if (env.WHATSAPP_ACCESS_TOKEN && !env.WHATSAPP_APP_SECRET) {
   throw new Error(
     "WHATSAPP_ACCESS_TOKEN está definido mas WHATSAPP_APP_SECRET não — obrigatório para validar a assinatura de cada webhook recebido (ver docs/SECURITY_REVIEW.md item #3)."
+  );
+}
+
+// Relay de handoff (05/10/2026): se existem atendentes configurados, uma
+// mensagem que chega em /webhook/telegram vinda do chat id de um atendente
+// é tratada como RESPOSTA A UM CLIENTE (ver src/handoff/telegramDesk.ts).
+// Sem TELEGRAM_WEBHOOK_SECRET, qualquer um que descobrisse a URL do
+// webhook poderia forjar um update "do atendente" e mandar mensagens pros
+// clientes em nome da empresa — mesmo raciocínio do WHATSAPP_APP_SECRET
+// acima: recusar o boot é melhor do que rodar sem essa proteção.
+if (env.HANDOFF_TELEGRAM_CHAT_IDS && !env.TELEGRAM_WEBHOOK_SECRET) {
+  throw new Error(
+    "HANDOFF_TELEGRAM_CHAT_IDS está definido mas TELEGRAM_WEBHOOK_SECRET não — obrigatório pra que ninguém consiga forjar uma resposta de atendente pelo webhook do Telegram."
   );
 }
 

@@ -13,6 +13,11 @@ import { createTelegramAdapter } from "./channels/telegram.js";
 import { createWhatsAppAdapter } from "./channels/whatsapp.js";
 import { WebAdapter } from "./channels/web.js";
 import type { ChannelAdapter } from "./channels/types.js";
+import { HumanRelay, type ChannelSender } from "./handoff/relay.js";
+import { TelegramDesk } from "./handoff/telegramDesk.js";
+import { attendantChatIds } from "./handoff/attendants.js";
+import { validateTelegramInitData } from "./handoff/telegramInitData.js";
+import type { ChannelName } from "./types.js";
 
 // Augmenta o tipo Request do Express com o campo rawBody (ver o hook
 // `verify` do express.json() logo abaixo) — fazer isso via "declare
@@ -91,6 +96,24 @@ const whatsapp = createWhatsAppAdapter();
 if (whatsapp) adapters.push(whatsapp);
 else console.warn("WHATSAPP_ACCESS_TOKEN/PHONE_NUMBER_ID/VERIFY_TOKEN/APP_SECRET not set — WhatsApp channel disabled.");
 
+// Relay de handoff (05/10/2026, ver src/handoff/relay.ts): um "sender" por
+// canal habilitado que consegue mandar mensagem proativa. `.bind()` porque
+// sendMessage é método de instância e usa `this` (token, phoneNumberId) —
+// passar a referência solta perderia o `this`. "web" fica de fora de
+// propósito: a resposta do atendente é entregue pelo polling do widget.
+const senders: Partial<Record<ChannelName, ChannelSender>> = {};
+if (telegram) senders.telegram = telegram.sendMessage.bind(telegram);
+if (whatsapp) senders.whatsapp = whatsapp.sendMessage.bind(whatsapp);
+const relay = new HumanRelay(orchestrator, senders);
+
+// Balcão do atendente no Telegram: só existe se o bot está configurado E há
+// atendentes na allowlist. Atribuído ao adapter depois da construção (ver
+// comentário em TelegramAdapter.desk sobre a dependência circular).
+if (telegram && attendantChatIds.size > 0) {
+  telegram.desk = new TelegramDesk(env.TELEGRAM_BOT_TOKEN!, relay, attendantChatIds);
+  console.log(`Handoff relay: ${attendantChatIds.size} atendente(s) no Telegram.`);
+}
+
 // Lista de origens externas autorizadas a chamar /webhook/web de um
 // browser (ver WIDGET_ALLOWED_ORIGINS em src/config.ts e
 // docs/artifacts/widget-embarcavel.html) — o que faz desse canal um widget
@@ -121,7 +144,9 @@ function widgetCors(req: express.Request, res: express.Response, next: express.N
   // resposta sozinho, sem o servidor precisar rejeitar nada manualmente.
   if (origin && widgetAllowedOrigins.includes(origin)) {
     res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+    // GET entrou em 05/10/2026 junto com /webhook/web/health e
+    // /webhook/web/poll (ver mais abaixo).
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   }
   // Todo browser manda um preflight OPTIONS antes de um POST com
@@ -180,6 +205,134 @@ for (const adapter of adapters) {
     console.log("Mounted widget alias: /webhook/web/message");
   }
 }
+
+// GET /webhook/web/health — o widget embarcável chama "<chatbotServiceUrl>/
+// health" ao abrir (connectToService() no chat-widget.min.js) pra decidir se
+// mostra "Online" ou "Offline" no cabeçalho, e tenta de novo a cada 5s
+// enquanto falhar. Essa rota não existia (só /health, na raiz) — por isso o
+// widget do site mostrava "Offline" o tempo todo mesmo respondendo
+// normalmente, e ficava fazendo uma requisição perdida a cada 5s por
+// visitante. Mesmo CORS do resto do canal web.
+app.get("/webhook/web/health", widgetCors, (_req, res) => res.json({ ok: true }));
+
+// GET /webhook/web/poll?sessionId=...&after=N — como o widget recebe a
+// resposta de um atendente humano (relay de handoff, 05/10/2026). O canal
+// web é request/response: o servidor não tem como empurrar mensagem pro
+// navegador, então o widget pergunta periodicamente (enquanto a conversa
+// está em handoff — ver handoffActive na resposta).
+//
+// Polling e não SSE/WebSocket: numa VM de 892MB, uma conexão aberta por
+// visitante custa memória o tempo todo; um GET curto a cada poucos segundos,
+// que só lê o cache em memória do ConversationStore, custa quase nada e
+// atravessa o Nginx sem configuração extra.
+//
+// Segurança: o sessionId funciona como CHAVE de acesso — quem o conhece lê
+// as respostas do atendente daquela conversa. Por isso (a) a rota devolve
+// SÓ as falas "human-agent", nunca o histórico inteiro, e (b) o widget gera
+// o sessionId com crypto.randomUUID() (122 bits aleatórios), não com
+// Date.now()+Math.random() como fazia antes.
+app.get("/webhook/web/poll", widgetCors, (req, res) => {
+  // Aceita os dois nomes, igual ao POST do canal web (ver web.ts): o widget
+  // do DistributedOrderSystem usa sessionId; o whatsapp.html usa
+  // conversationId.
+  const conversationId = String(req.query.sessionId ?? req.query.conversationId ?? "");
+  // `after` inválido/negativo vira 0 (= "me manda tudo") — pior caso o
+  // widget recebe de novo algo que já mostrou, e ele deduplica pelo id.
+  const after = Math.max(0, Number.parseInt(String(req.query.after ?? "0"), 10) || 0);
+  // Teto no tamanho do id: nenhum id legítimo passa de ~64 caracteres, e
+  // isto evita existsSync com um nome de arquivo gigante vindo da internet.
+  if (!conversationId || conversationId.length > 128) {
+    res.status(400).json({ error: "sessionId/conversationId is required" });
+    return;
+  }
+  const { messages, cursor } = orchestrator.getHumanRepliesSince(conversationId, after);
+  // Só consulta o estado de handoff se a conversa existe — mesmo cuidado
+  // de não criar nada por causa de um id inventado.
+  const handoffActive = orchestrator.hasConversation(conversationId)
+    ? orchestrator.getHandoffState(conversationId).active
+    : false;
+  res.json({ messages, cursor, handoffActive });
+});
+
+// ---------------------------------------------------------------------
+// API do Mini App do atendente (public/handoff-app.html) — o caminho
+// "mais completo" do relay: histórico inteiro, caixa de resposta e botão de
+// devolver ao bot, aberto pelo botão "💬 Abrir conversa" do alerta no
+// Telegram. O caminho principal continua sendo o reply direto no Telegram
+// (src/handoff/telegramDesk.ts); estas rotas existem pro atendente que quer
+// ver a conversa inteira antes de responder.
+// ---------------------------------------------------------------------
+
+// Idade máxima aceita do initData (24h): cobre um atendente que deixa o Mini
+// App aberto o expediente todo, sem deixar um initData capturado valer pra
+// sempre. Ver validateTelegramInitData().
+const MINI_APP_INIT_DATA_MAX_AGE_SECONDS = 24 * 60 * 60;
+
+// Preâmbulo: requireAttendant() é o middleware de autenticação das rotas
+// /api/handoff/*. O Mini App manda o initData que recebeu do Telegram no
+// header X-Telegram-Init-Data (header, não querystring, pra não ir parar no
+// access log do Nginx); aqui validamos a assinatura com o token do bot e
+// conferimos se o user.id está na allowlist de atendentes. 503 se o relay
+// não está configurado (sem bot ou sem atendentes), 401 pra initData
+// inválido/vencido, 403 pra usuário válido do Telegram que não é atendente.
+function requireAttendant(req: express.Request, res: express.Response, next: express.NextFunction): void {
+  if (!env.TELEGRAM_BOT_TOKEN || attendantChatIds.size === 0) {
+    res.status(503).json({ error: "Relay de handoff não configurado neste servidor." });
+    return;
+  }
+  const initData = req.header("X-Telegram-Init-Data") ?? "";
+  const userId = validateTelegramInitData(initData, env.TELEGRAM_BOT_TOKEN, MINI_APP_INIT_DATA_MAX_AGE_SECONDS);
+  if (!userId) {
+    res.status(401).json({ error: "Abra esta página pelo botão do alerta no Telegram." });
+    return;
+  }
+  if (!attendantChatIds.has(userId)) {
+    res.status(403).json({ error: "Seu usuário do Telegram não está cadastrado como atendente." });
+    return;
+  }
+  next();
+}
+
+// GET /api/handoff/:conversationId — histórico completo + estado, pro Mini
+// App montar a tela. 404 pra conversa inexistente (não cria nada).
+app.get("/api/handoff/:conversationId", requireAttendant, (req, res) => {
+  const { conversationId } = req.params;
+  if (!orchestrator.hasConversation(conversationId)) {
+    res.status(404).json({ error: "Conversa não encontrada." });
+    return;
+  }
+  const state = orchestrator.getHandoffState(conversationId);
+  res.json({
+    conversationId,
+    channel: state.channel ?? null,
+    active: state.active,
+    since: state.since,
+    history: orchestrator.getHistory(conversationId),
+  });
+});
+
+// POST /api/handoff/:conversationId/reply {text} — mesma operação do reply
+// no Telegram, pelo mesmo HumanRelay (validação de tamanho, ordem
+// "envia -> grava", reativação do handoff).
+app.post("/api/handoff/:conversationId/reply", requireAttendant, async (req, res) => {
+  const text = typeof req.body?.text === "string" ? req.body.text : "";
+  // try/catch porque o Express 4 não captura rejeição de handler async —
+  // um erro inesperado (ex.: falha de escrita em disco no append) viraria
+  // uma unhandled rejection e a requisição do Mini App ficaria pendurada.
+  try {
+    const result = await relay.reply(req.params.conversationId, text);
+    res.status(result.ok ? 200 : 400).json(result);
+  } catch (err) {
+    console.error("Handoff relay reply failed:", err);
+    res.status(500).json({ ok: false, error: "Erro interno ao enviar — veja o log do servidor." });
+  }
+});
+
+// POST /api/handoff/:conversationId/release — botão "Devolver ao bot".
+app.post("/api/handoff/:conversationId/release", requireAttendant, (req, res) => {
+  const result = relay.release(req.params.conversationId);
+  res.status(result.ok ? 200 : 400).json(result);
+});
 
 // GET /api/config — devolve a configuração de negócio atual (agentConfig),
 // consumida pela tela de configuração (public/settings.html) pra preencher

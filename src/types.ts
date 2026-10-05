@@ -49,8 +49,16 @@ export interface ConversationTurn {
   // "system-note" = anotação interna do orquestrador (ex.: "handoff
   // acionado") que NÃO deve ser reenviada ao LLM como se fosse fala humana
   // (ver o filtro em orchestrator.ts que remove "system-note" do histórico
-  // antes de montar o prompt).
-  role: "user" | "assistant" | "system-note";
+  // antes de montar o prompt). "human-agent" = resposta escrita por um
+  // atendente humano durante um handoff (relay — ver src/handoff/relay.ts):
+  // é um papel próprio, e não "assistant", porque (a) o log de auditoria
+  // precisa distinguir o que o bot gerou do que uma pessoa escreveu, e (b) é
+  // por esse papel que o endpoint de polling do widget web
+  // (GET /webhook/web/poll) sabe quais turnos entregar ao navegador — ele
+  // NUNCA devolve o histórico inteiro, só as falas do atendente. Pro LLM,
+  // quando o bot volta a atender, esse turno vira "assistant" (é a mesma
+  // "voz" da empresa falando com o cliente).
+  role: "user" | "assistant" | "system-note" | "human-agent";
   text: string;
   timestamp: number;
   // Ids dos itens da base de conhecimento (KnowledgeItem.id) que foram

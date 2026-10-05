@@ -366,6 +366,13 @@
         <select id="handoffNotifier">
           <option value="console">Console (log local)</option>
           <option value="webhook">Webhook (Slack/Discord/custom)</option>
+          <!--
+            Telegram com relay (05/10/2026): além de avisar, o atendente
+            responde o cliente dali mesmo. Exige TELEGRAM_BOT_TOKEN,
+            HANDOFF_TELEGRAM_CHAT_IDS e TELEGRAM_WEBHOOK_SECRET no .env — se
+            faltar, o save é recusado com a mensagem do servidor.
+          -->
+          <option value="telegram">Telegram (avisar e responder pelo bot)</option>
         </select>
       </div>
       <div class="field">
