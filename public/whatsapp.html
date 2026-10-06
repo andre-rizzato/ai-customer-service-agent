@@ -613,7 +613,9 @@
       if (!res.ok || polledConversation !== conversationId) return;
       const data = await res.json();
       for (const m of data.messages) {
-        const agentMsg = { role: "agent", text: m.text, ts: m.timestamp };
+        // fromHuman=false = aviso automático (ex.: "atendimento encerrado"),
+        // mostrado como bolha normal do bot, sem o nome "Atendente".
+        const agentMsg = { role: m.fromHuman === false ? "bot" : "agent", text: m.text, ts: m.timestamp };
         const history = loadHistory();
         history.push(agentMsg);
         saveHistory(history);

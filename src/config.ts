@@ -116,6 +116,15 @@ export const AgentConfigSchema = z.object({
   // não deixar um cliente sem resposta nenhuma por dias.
   handoffTimeoutHours: z.number().positive().default(4),
 
+  // Minutos SEM NENHUMA mensagem (nem do cliente, nem do atendente) até o
+  // atendimento humano ser encerrado automaticamente, com aviso ao cliente e
+  // ao atendente (05/10/2026, ver HumanRelay.closeInactive()). Diferente de
+  // handoffTimeoutHours acima, que cobre "o atendente sumiu" e devolve ao bot
+  // em silêncio — este cobre "a conversa morreu". 0 desliga. Default de 30
+  // min: tempo de sobra pra um cliente ir buscar um número de pedido, curto o
+  // bastante pra não deixar atendimentos fantasmas abertos.
+  handoffInactivityMinutes: z.number().min(0).default(30),
+
   // Controles de geração do LLM, expostos na tela de configuração
   // (public/settings.html) — "o máximo configurável possível" pedido junto
   // com essa tela. Ficam aqui (config de negócio) e não no .env porque não

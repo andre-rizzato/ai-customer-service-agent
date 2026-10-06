@@ -82,20 +82,35 @@ Responder recebe um texto de ajuda e **não** vai pra ninguém.
 dentro do Telegram, com o histórico completo, uma caixa de resposta e o
 botão de devolver ao bot. Ele se atualiza a cada 4s.
 
-**Encerrar:** botão **🤖 Devolver ao bot**, ou `/liberar` como resposta a uma
-mensagem com 🆔. O bot volta a responder na próxima mensagem do cliente.
+**Encerrar o atendimento:** botão **✅ Encerrar atendimento** (no alerta e no
+Mini App), ou `/encerrar` como resposta a uma mensagem com 🆔. O cliente
+recebe *"Atendimento encerrado. Obrigado pelo contato! Se precisar de mais
+alguma coisa, é só mandar uma nova mensagem."* e o bot volta a responder.
+
+**Devolver ao bot sem encerrar:** botão **🤖 Devolver ao bot**, ou `/liberar`.
+Nenhum aviso vai pro cliente. Serve pra quando você resolveu a sua parte e o
+bot pode continuar a conversa.
 
 **Comandos:**
 
 | Comando | Quem pode usar | Efeito |
 |---|---|---|
 | `/meuid` | qualquer pessoa | o bot responde o seu chat id (é assim que se descobre o valor pra `HANDOFF_TELEGRAM_CHAT_IDS`) |
-| `/liberar` (como reply) | atendente | devolve aquela conversa ao bot |
+| `/encerrar` (como reply) | atendente | encerra o atendimento, avisa o cliente, devolve ao bot |
+| `/liberar` (como reply) | atendente | devolve aquela conversa ao bot sem avisar o cliente |
 
-**Regras de tempo:**
+**Regras de tempo** (dois timers diferentes):
 
-- O handoff expira sozinho depois de `handoffTimeoutHours` (padrão 4h) **sem
-  resposta do atendente**: cada resposta sua renova o prazo.
+| Timer | Mede | O que acontece | Config |
+|---|---|---|---|
+| Inatividade | nenhuma mensagem **de nenhum lado** | atendimento **encerrado**: o cliente recebe *"Encerramos este atendimento por falta de interação..."*, você recebe "🔚 Atendimento encerrado por inatividade" e o bot volta | `handoffInactivityMinutes`, padrão 30 (0 desliga) |
+| Atendente ausente | nenhuma resposta **do atendente** (o cliente pode estar falando) | o bot volta a responder em silêncio, sem aviso | `handoffTimeoutHours`, padrão 4h |
+
+- A inatividade é checada por uma varredura a cada minuto
+  (`setInterval` em `src/server.ts`), porque inatividade é justamente a
+  ausência de mensagens que disparariam uma checagem.
+- Cada resposta sua renova os dois prazos. Cada mensagem do cliente renova
+  só o de inatividade.
 - Se você responder uma conversa que já tinha sido devolvida ao bot ou
   expirado, ela **volta pra você** (o bot fica em silêncio de novo) e a
   confirmação avisa isso.
@@ -173,6 +188,14 @@ pelo bot)"** na tela de configuração. O save é recusado se faltar
 | `GET /api/handoff/:id` | `X-Telegram-Init-Data` | histórico + estado pro Mini App |
 | `POST /api/handoff/:id/reply` | idem | resposta pelo Mini App |
 | `POST /api/handoff/:id/release` | idem | devolver ao bot pelo Mini App |
+| `POST /api/handoff/:id/close` | idem | encerrar atendimento pelo Mini App |
+
+**Encerramento** (`HumanRelay.close()`): entrega o aviso ao cliente, devolve
+ao bot e avisa os atendentes (só por inatividade; quando é você quem encerra,
+a confirmação já vem do desk ou do Mini App). O atendimento é encerrado
+**mesmo se o aviso não chegar** (ex.: janela de 24h do WhatsApp). A
+confirmação diz quando isso acontece. No widget, o aviso chega pelo polling
+como um turno `assistant` com `relayed: true`, sem o rótulo "Atendente".
 
 **Papel novo no histórico:** `ConversationTurn.role = "human-agent"`. Separado
 de `"assistant"` pra auditoria saber o que foi escrito por uma pessoa e o
@@ -231,6 +254,12 @@ histórico, que é append-only, então nunca pula nem repete mensagem.
 - `npm test` → `tests/handoffRelay.test.ts`: marcador (incluindo o ataque de
   🆔 falso), validação do `initData` (válido, adulterado, outro token,
   vencido, vazio) e `HumanRelay` (web, envio antes de gravar, falha de
-  entrega, conversa desconhecida, reativação, limites de tamanho).
+  entrega, conversa desconhecida, reativação, limites de tamanho) e o
+  encerramento (aviso + liberação + notificação, encerrar mesmo com falha de
+  entrega, recusa de encerramento duplicado, varredura de inatividade com
+  limite, fallback de arquivo antigo e 0 = desligado).
+- Validado localmente com servidor real e inatividade de 1 min: `/encerrar`
+  entrega o aviso no widget e o bot volta; a varredura encerrou por
+  inatividade em ~105s, com aviso ao cliente.
 - Teste local ponta a ponta, sem Telegram real: ver
   [`DEBUG_LOCAL.md`](DEBUG_LOCAL.md), seção 8.1.

@@ -334,6 +334,42 @@ app.post("/api/handoff/:conversationId/release", requireAttendant, (req, res) =>
   res.status(result.ok ? 200 : 400).json(result);
 });
 
+// POST /api/handoff/:conversationId/close — botão "Encerrar atendimento" do
+// Mini App (05/10/2026): avisa o cliente e devolve ao bot (ver
+// HumanRelay.close). try/catch pelo mesmo motivo da rota /reply.
+app.post("/api/handoff/:conversationId/close", requireAttendant, async (req, res) => {
+  try {
+    const result = await relay.close(req.params.conversationId, "attendant");
+    res.status(result.ok ? 200 : 400).json(result);
+  } catch (err) {
+    console.error("Handoff relay close failed:", err);
+    res.status(500).json({ ok: false, error: "Erro interno ao encerrar — veja o log do servidor." });
+  }
+});
+
+// Varredura de inatividade (05/10/2026): a cada minuto, encerra os
+// atendimentos humanos sem nenhuma mensagem há handoffInactivityMinutes (lido
+// a cada rodada, então mudar pela tela de configuração vale sem reiniciar).
+// Custo: ler alguns arquivos de poucos bytes por minuto — desprezível na B1s.
+// `.unref()` pra este timer não impedir o processo de terminar num shutdown.
+// O `running` evita duas rodadas sobrepostas se uma entrega (API do
+// Telegram/WhatsApp lenta) passar de um minuto.
+const INACTIVITY_SWEEP_MS = 60_000;
+let inactivitySweepRunning = false;
+setInterval(() => {
+  if (inactivitySweepRunning) return;
+  inactivitySweepRunning = true;
+  relay
+    .closeInactive(agentConfig.handoffInactivityMinutes)
+    .then((closed) => {
+      if (closed.length) console.log(`Handoff: ${closed.length} atendimento(s) encerrado(s) por inatividade.`);
+    })
+    .catch((err) => console.error("Inactivity sweep failed:", err))
+    .finally(() => {
+      inactivitySweepRunning = false;
+    });
+}, INACTIVITY_SWEEP_MS).unref();
+
 // GET /api/config — devolve a configuração de negócio atual (agentConfig),
 // consumida pela tela de configuração (public/settings.html) pra preencher
 // o formulário. Nada em agentConfig é segredo (ver separação env/agentConfig

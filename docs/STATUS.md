@@ -79,7 +79,22 @@ Guia completo: [`HANDOFF_RELAY.md`](HANDOFF_RELAY.md).
 - [x] `GET /webhook/web/health` criado — o widget mostrava "Offline" sempre porque essa rota não existia
 - [x] Boot recusa `HANDOFF_TELEGRAM_CHAT_IDS` sem `TELEGRAM_WEBHOOK_SECRET` (senão dava pra forjar uma resposta de atendente pelo webhook)
 - [ ] Deploy: definir `HANDOFF_TELEGRAM_CHAT_IDS` e `PUBLIC_BASE_URL` no `.env` da VM (não estão no Key Vault, não são segredo), conferir que `TELEGRAM_WEBHOOK_SECRET` já existe lá e mudar o `handoffNotifier` para `telegram` pela tela de configuração
-- [ ] Deploy do widget atualizado no `rizzatotech-site` (cópia vendorizada; o original no `DistributedOrderSystem` não foi alterado)
+- [x] Deploy do widget atualizado no `rizzatotech-site` (cópia vendorizada; o original no `DistributedOrderSystem` não foi alterado)
+
+### Tela de configuração fechada para a internet (05/10/2026)
+
+Tutorial de uso (túnel, fluxo do save, desfazer): [`TUTORIAL_CONFIGURACAO.md`](TUTORIAL_CONFIGURACAO.md). `settings.html` e `/api/config` estavam abertos pra internet em produção, sem login.
+
+- [x] `/settings.html` e `/api/config` bloqueados no Nginx da VM (404, regex case-insensitive — o Express casa rotas sem diferenciar maiúsculas); acesso só por túnel SSH (`ssh -L 3000:localhost:3000 azureuser@20.127.12.103`)
+- [x] Auditoria do access log: nenhum acesso de terceiros com sucesso (só um scanner em 04/10, que recebeu 404 porque a tela ainda não existia)
+- [ ] Acesso pela internet com login de admin (Firebase, mesmo do site) — em desenvolvimento, fora deste commit; o projeto Firebase do site também ainda não está configurado
+
+### Encerramento de atendimento humano (05/10/2026)
+
+- [x] Botão **✅ Encerrar atendimento** no alerta do Telegram e no Mini App, mais o comando `/encerrar`: aviso ao cliente + devolve ao bot (diferente de "Devolver ao bot", que não avisa)
+- [x] Encerramento automático por inatividade (`handoffInactivityMinutes`, padrão 30, 0 desliga; campo na tela de configuração): varredura a cada minuto, aviso ao cliente e ao atendente
+- [x] Widget e simulador mostram o aviso automático sem o rótulo "Atendente" (`fromHuman` no polling)
+- [ ] Deploy (push) — commitado, ainda não enviado à VM
 
 ### CI/CD
 

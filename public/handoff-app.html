@@ -108,7 +108,15 @@
       <div><strong>Atendimento</strong> <span id="badge" class="badge">…</span></div>
       <div class="meta" id="meta">carregando…</div>
     </div>
-    <button id="release-btn" class="secondary" hidden>🤖 Devolver ao bot</button>
+    <!--
+      Encerrar (05/10/2026) avisa o cliente que o atendimento terminou;
+      Devolver só passa a conversa de volta pro bot, sem aviso. Os dois só
+      aparecem com o atendimento ativo.
+    -->
+    <div style="display:flex; gap:6px">
+      <button id="close-btn" class="secondary" hidden>✅ Encerrar</button>
+      <button id="release-btn" class="secondary" hidden>🤖 Devolver ao bot</button>
+    </div>
   </header>
   <div id="error" hidden></div>
   <div id="messages"></div>
@@ -138,6 +146,7 @@
   const inputEl = document.getElementById("input");
   const sendBtn = document.getElementById("send-btn");
   const releaseBtn = document.getElementById("release-btn");
+  const closeBtn = document.getElementById("close-btn");
   const badgeEl = document.getElementById("badge");
   const metaEl = document.getElementById("meta");
   const errorEl = document.getElementById("error");
@@ -199,6 +208,7 @@
       badgeEl.className = "badge" + (data.active ? " active" : "");
       metaEl.textContent = `Cliente no ${CHANNEL_LABEL[data.channel] || data.channel || "canal desconhecido"}`;
       releaseBtn.hidden = !data.active;
+      closeBtn.hidden = !data.active;
 
       // Só rola pro fim se o atendente já estava no fim — se ele subiu pra
       // reler algo, uma mensagem nova não deve arrancá-lo de lá.
@@ -251,6 +261,30 @@
 
   sendBtn.addEventListener("click", send);
   releaseBtn.addEventListener("click", release);
+
+  // Preâmbulo: closeConversation() encerra o atendimento
+  // (POST /api/handoff/:id/close): o cliente recebe a mensagem de
+  // encerramento e o bot volta a responder. Confirmação pelo popup nativo do
+  // Telegram, como em release().
+  function closeConversation() {
+    const doClose = async () => {
+      try {
+        const result = await request("/close", { method: "POST" });
+        // O encerramento acontece mesmo se o aviso não chegar ao cliente
+        // (ver HumanRelay.close) — mostra isso em vez de esconder.
+        showError(result.delivered === false ? "Encerrado, mas o aviso não chegou ao cliente." : "");
+        await refresh();
+      } catch (err) {
+        showError(err.message);
+      }
+    };
+    if (tg && tg.showConfirm) {
+      tg.showConfirm("Encerrar o atendimento? O cliente recebe uma mensagem de encerramento.", (ok) => ok && doClose());
+    } else {
+      doClose();
+    }
+  }
+  closeBtn.addEventListener("click", closeConversation);
   // Enter envia, Shift+Enter quebra linha — convenção de chat.
   inputEl.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {

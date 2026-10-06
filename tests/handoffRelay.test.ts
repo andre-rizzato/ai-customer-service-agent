@@ -111,11 +111,14 @@ describe("validateTelegramInitData (Mini App)", () => {
 // Preâmbulo: fakeOrchestrator() imita só os dois métodos do Orchestrator que
 // o HumanRelay usa, com o estado de handoff controlado pelo teste — evita
 // subir o Orchestrator de verdade (que carrega índice vetorial, LLM etc.).
-function fakeOrchestrator(state: HandoffState) {
+function fakeOrchestrator(state: HandoffState, active: HandoffState[] = []) {
   return {
     getHandoffState: vi.fn(() => state),
     recordHumanReply: vi.fn(),
     releaseHandoff: vi.fn(),
+    recordRelayedNotice: vi.fn(),
+    notifyHandoffClosed: vi.fn(async () => {}),
+    listActiveHandoffs: vi.fn(() => active),
   };
 }
 
@@ -175,5 +178,53 @@ describe("HumanRelay", () => {
     expect((await relay.reply("s1", "   ")).ok).toBe(false);
     expect((await relay.reply("s1", "a".repeat(MAX_REPLY_LENGTH + 1))).ok).toBe(false);
     expect(orch.recordHumanReply).not.toHaveBeenCalled();
+  });
+});
+
+describe("HumanRelay.close / closeInactive (encerramento)", () => {
+  // Preâmbulo: encerrar pelo atendente no canal web grava o aviso (o widget
+  // pega pelo polling), devolve ao bot com a nota certa e avisa o notifier.
+  it("encerra no canal web: grava aviso, libera e notifica", async () => {
+    const orch = fakeOrchestrator({ active: true, since: 1, channel: "web" });
+    const relay = new HumanRelay(orch as unknown as Orchestrator, {});
+    const result = await relay.close("s1", "attendant");
+    expect(result).toMatchObject({ ok: true, channel: "web", delivered: true });
+    expect(orch.recordRelayedNotice).toHaveBeenCalledWith("s1", expect.stringContaining("encerrado"));
+    expect(orch.releaseHandoff).toHaveBeenCalledWith("s1", "Atendimento encerrado pelo atendente");
+    expect(orch.notifyHandoffClosed).toHaveBeenCalledWith("s1", "web", "attendant");
+  });
+
+  // Preâmbulo: se o aviso não chega (WhatsApp fora da janela de 24h), o
+  // atendimento é encerrado MESMO assim — e o resultado conta isso.
+  it("encerra mesmo se a entrega do aviso falhar", async () => {
+    const orch = fakeOrchestrator({ active: true, since: 1, channel: "whatsapp" });
+    const relay = new HumanRelay(orch as unknown as Orchestrator, { whatsapp: async () => false });
+    const result = await relay.close("5511", "attendant");
+    expect(result).toMatchObject({ ok: true, delivered: false });
+    expect(orch.releaseHandoff).toHaveBeenCalled();
+  });
+
+  // Preâmbulo: encerrar algo que já não está ativo é recusado (evita mandar
+  // o aviso de encerramento duas vezes, ex.: dois atendentes clicando).
+  it("recusa encerrar atendimento já encerrado", async () => {
+    const orch = fakeOrchestrator({ active: false, since: 0, channel: "web" });
+    const relay = new HumanRelay(orch as unknown as Orchestrator, {});
+    expect((await relay.close("s1", "attendant")).ok).toBe(false);
+    expect(orch.recordRelayedNotice).not.toHaveBeenCalled();
+  });
+
+  // Preâmbulo: a varredura só encerra quem passou do limite, usando
+  // lastActivity (e `since` como fallback de arquivo antigo), e 0 desliga.
+  it("varredura encerra só quem passou do limite de inatividade", async () => {
+    const now = 10_000_000;
+    const min = 60_000;
+    const idle = { active: true, since: 0, channel: "web" as const, conversationId: "idle", lastActivity: now - 31 * min };
+    const fresh = { active: true, since: 0, channel: "web" as const, conversationId: "fresh", lastActivity: now - 5 * min };
+    const legacy = { active: true, since: now - 40 * min, channel: "web" as const, conversationId: "legacy" };
+    const orch = fakeOrchestrator({ active: true, since: 1, channel: "web" }, [idle, fresh, legacy]);
+    const relay = new HumanRelay(orch as unknown as Orchestrator, {});
+    expect(await relay.closeInactive(30, now)).toEqual(["idle", "legacy"]);
+    expect(orch.notifyHandoffClosed).toHaveBeenCalledWith("idle", "web", "inactivity");
+    expect(await relay.closeInactive(0, now)).toEqual([]);
   });
 });

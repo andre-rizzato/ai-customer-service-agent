@@ -40,9 +40,19 @@ const HELP_TEXT = [
   "Você está cadastrado como atendente.",
   "",
   "• Pra falar com um cliente: toque e segure (ou deslize) uma mensagem minha que termine com 🆔 e escolha \"Responder\".",
-  "• /liberar (como resposta a uma mensagem com 🆔): devolve a conversa ao bot.",
+  "• /encerrar (como resposta a uma mensagem com 🆔): encerra o atendimento, avisa o cliente e devolve ao bot.",
+  "• /liberar (como resposta a uma mensagem com 🆔): devolve a conversa ao bot sem avisar o cliente.",
   "• O botão \"💬 Abrir conversa\" no alerta mostra o histórico completo.",
 ].join("\n");
+
+// Preâmbulo: closeConfirmation() — texto de confirmação de encerramento pro
+// atendente; avisa quando a mensagem de encerramento não chegou ao cliente
+// (o atendimento foi encerrado mesmo assim — ver HumanRelay.close()).
+function closeConfirmation(delivered: boolean | undefined): string {
+  return delivered === false
+    ? "✅ Atendimento encerrado — mas o aviso NÃO chegou ao cliente (veja o log do servidor)."
+    : "✅ Atendimento encerrado — o cliente foi avisado e o bot volta a responder.";
+}
 
 // Preâmbulo: TelegramDesk é instanciado uma vez em src/server.ts quando há
 // token do Telegram e atendentes configurados, e entregue ao
@@ -90,6 +100,15 @@ export class TelegramDesk {
       return;
     }
 
+    // /encerrar: encerra com aviso ao cliente (ver HumanRelay.close). Sem
+    // marcador na confirmação — a conversa acabou, e um reply nela
+    // reabriria o atendimento sem querer.
+    if (text === "/encerrar") {
+      const result = await this.relay.close(conversationId, "attendant");
+      await this.say(chatId, result.ok ? closeConfirmation(result.delivered) : `⚠️ ${result.error}`);
+      return;
+    }
+
     if (text === "/liberar") {
       const result = this.relay.release(conversationId);
       await this.say(chatId, result.ok ? "🤖 Conversa devolvida ao bot." : `⚠️ ${result.error}`, conversationId);
@@ -117,8 +136,22 @@ export class TelegramDesk {
     const allowed = this.isAttendant(String(query.from.id));
     const data = query.data ?? "";
 
-    if (!allowed || !data.startsWith("rel:")) {
+    if (!allowed || !(data.startsWith("rel:") || data.startsWith("end:"))) {
       await callTelegram(this.botToken, "answerCallbackQuery", { callback_query_id: query.id, text: "Ação não permitida." });
+      return;
+    }
+
+    // "end:<id>" = ✅ Encerrar atendimento (05/10/2026): avisa o cliente e
+    // devolve ao bot. Confirmação sem marcador (ver /encerrar acima).
+    if (data.startsWith("end:")) {
+      const result = await this.relay.close(data.slice("end:".length), "attendant");
+      await callTelegram(this.botToken, "answerCallbackQuery", {
+        callback_query_id: query.id,
+        text: result.ok ? "Atendimento encerrado." : result.error,
+      });
+      if (result.ok && query.message) {
+        await this.say(String(query.message.chat.id), closeConfirmation(result.delivered));
+      }
       return;
     }
 

@@ -15,7 +15,7 @@
 // resposta do atendente vai pra API do Telegram, do WhatsApp, ou fica
 // esperando o polling do widget web — e ganhou getState() pra quem só
 // quer ler o estado sem disparar o efeito colateral do timeout.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { env } from "../config.js";
 import type { ChannelName } from "../types.js";
@@ -30,10 +30,25 @@ import type { ChannelName } from "../types.js";
 // `channel` é opcional porque arquivos gravados ANTES de 05/10/2026 não têm
 // esse campo — o relay trata a ausência como "não sei pra onde entregar" e
 // avisa o atendente, em vez de chutar um canal.
+//
+// `lastActivity` (05/10/2026, encerramento por inatividade): última mensagem
+// de QUALQUER lado — cliente ou atendente. É diferente de `since`, que só
+// anda com o atendente: os dois timers respondem perguntas diferentes.
+//  - `since` + handoffTimeoutHours: "o atendente sumiu?" — o cliente pode
+//    estar mandando mensagem sem ninguém responder; o bot volta a atender.
+//  - `lastActivity` + handoffInactivityMinutes: "a conversa morreu?" —
+//    ninguém fala nada há N minutos; o atendimento é encerrado com aviso.
+// `conversationId` vai dentro do arquivo porque o NOME do arquivo é
+// sanitizado ("+5511..." vira "_5511...") e não dá pra voltar ao id original
+// a partir dele — a varredura de inatividade (listActive) precisa do id real
+// pra entregar a mensagem de encerramento. Os dois são opcionais pelo mesmo
+// motivo de `channel`: arquivos antigos não têm.
 export interface HandoffState {
   active: boolean;
   since: number;
   channel?: ChannelName;
+  lastActivity?: number;
+  conversationId?: string;
 }
 
 // Valor usado quando o arquivo de estado ainda não existe (conversa nunca
@@ -151,7 +166,47 @@ export class HandoffStateStore {
   // que já estava gravado.
   activate(conversationId: string, channel?: ChannelName): void {
     const previous = this.load(conversationId);
-    this.save(conversationId, { active: true, since: Date.now(), channel: channel ?? previous.channel });
+    const now = Date.now();
+    this.save(conversationId, {
+      active: true,
+      since: now,
+      channel: channel ?? previous.channel,
+      lastActivity: now,
+      conversationId,
+    });
+  }
+
+  // Preâmbulo: touch() registra atividade do CLIENTE durante o handoff
+  // (chamado pelo Orchestrator no PASSO 0) — atualiza só `lastActivity`, sem
+  // mexer em `since`: o cliente falando não prova que o atendente está
+  // presente, então não pode adiar o timeout de "atendente sumiu".
+  touch(conversationId: string): void {
+    const state = this.load(conversationId);
+    if (!state.active) return;
+    this.save(conversationId, { ...state, lastActivity: Date.now(), conversationId });
+  }
+
+  // Preâmbulo: listActive() devolve todos os handoffs ativos com id
+  // conhecido — usado pela varredura de inatividade (HumanRelay
+  // .closeInactive(), a cada minuto). Lê a pasta inteira: com dezenas de
+  // arquivos de poucos bytes isso custa microssegundos; se um dia forem
+  // milhares, vale manter um índice em memória. Passa por isActive() pra o
+  // timeout de "atendente sumiu" também ser aplicado aqui (antes ele só
+  // rodava quando chegava uma mensagem nova).
+  listActive(): HandoffState[] {
+    return readdirSync(this.dir)
+      .filter((file) => file.endsWith(".json"))
+      .map((file) => {
+        try {
+          return JSON.parse(readFileSync(resolve(this.dir, file), "utf-8")) as HandoffState;
+        } catch {
+          // Arquivo corrompido/em escrita: ignora nesta rodada.
+          return null;
+        }
+      })
+      .filter((state): state is HandoffState & { conversationId: string } =>
+        !!state && state.active && typeof state.conversationId === "string" && this.isActive(state.conversationId)
+      );
   }
 
   // Preâmbulo: release() limpa o estado de handoff de uma conversa,
@@ -167,6 +222,6 @@ export class HandoffStateStore {
   // e reativa o handoff, em vez de falhar com "canal desconhecido".
   release(conversationId: string): void {
     const previous = this.load(conversationId);
-    this.save(conversationId, { ...INACTIVE, channel: previous.channel });
+    this.save(conversationId, { ...INACTIVE, channel: previous.channel, conversationId });
   }
 }

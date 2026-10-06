@@ -5,7 +5,7 @@
 // "console" por default em config/agent.config.example.json).
 import type { ChannelName, ConversationTurn } from "../types.js";
 import type { HandoffReason } from "../orchestrator/handoff.js";
-import type { HandoffNotifier } from "./types.js";
+import type { HandoffCloseReason, HandoffNotifier } from "./types.js";
 
 // Preâmbulo: ConsoleNotifier implementa HandoffNotifier escrevendo no
 // stdout do processo. Instanciada por src/handoffNotifier/index.ts quando
@@ -36,5 +36,12 @@ export class ConsoleNotifier implements HandoffNotifier {
   // disparado sem precisar de um bot do Telegram configurado.
   async onCustomerMessage(conversationId: string, text: string, channel: ChannelName): Promise<void> {
     console.log(`[HANDOFF] conversation=${conversationId} channel=${channel} cliente: ${text}`);
+  }
+
+  // Preâmbulo: onHandoffClosed() — uma linha no console quando um
+  // atendimento é encerrado, pra testar o encerramento (inclusive por
+  // inatividade) localmente sem bot do Telegram.
+  async onHandoffClosed(conversationId: string, channel: ChannelName, reason: HandoffCloseReason): Promise<void> {
+    console.log(`[HANDOFF] conversation=${conversationId} channel=${channel} encerrado (${reason})`);
   }
 }

@@ -6,6 +6,11 @@
 import type { ChannelName, ConversationTurn } from "../types.js";
 import type { HandoffReason } from "../orchestrator/handoff.js";
 
+// Por que um atendimento humano terminou (05/10/2026): "attendant" = o
+// atendente apertou "Encerrar atendimento"; "inactivity" = ninguém falou
+// nada por handoffInactivityMinutes (ver HumanRelay.closeInactive()).
+export type HandoffCloseReason = "attendant" | "inactivity";
+
 export interface HandoffNotifier {
   // Chamado uma vez toda vez que um handoff dispara. Recebe o histórico
   // completo da conversa até aqui — corresponde ao requisito da Fase 1 do
@@ -23,4 +28,11 @@ export interface HandoffNotifier {
   // cada mensagem repassada. Sem este hook, num relay o atendente só veria
   // a primeira mensagem do cliente e nunca as respostas dele.
   onCustomerMessage?(conversationId: string, text: string, channel: ChannelName): Promise<void>;
+
+  // Chamado quando um atendimento humano é ENCERRADO (não quando é só
+  // devolvido ao bot). Opcional pelo mesmo motivo de onCustomerMessage: só
+  // faz sentido pra quem sustenta a conversa com o atendente. Importa
+  // principalmente no encerramento por inatividade — o atendente não
+  // apertou nada e precisa saber que aquela conversa não está mais com ele.
+  onHandoffClosed?(conversationId: string, channel: ChannelName, reason: HandoffCloseReason): Promise<void>;
 }

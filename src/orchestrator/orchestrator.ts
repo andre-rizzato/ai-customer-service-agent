@@ -19,7 +19,8 @@ import { createHandoffNotifier, type HandoffNotifier } from "../handoffNotifier/
 import { HandoffStateStore, type HandoffState } from "./handoffState.js";
 import { KnowledgeBase } from "../knowledge/knowledgeBase.js";
 import { createLLMProvider, type LLMProvider } from "../llm/index.js";
-import type { ConversationTurn, InboundMessage } from "../types.js";
+import type { ChannelName, ConversationTurn, InboundMessage } from "../types.js";
+import type { HandoffCloseReason } from "../handoffNotifier/types.js";
 import { callAgentService } from "./agentServiceClient.js";
 import { detectCapability } from "./capabilityRouter.js";
 import { detectHandoffTrigger } from "./handoff.js";
@@ -123,6 +124,9 @@ export class Orchestrator {
     // completo quando for olhar), só não gera nenhuma resposta automática.
     if (this.handoffState.isActive(conversationId)) {
       this.conversations.append(conversationId, { role: "user", text, timestamp });
+      // Cliente falou: adia o encerramento por inatividade (lastActivity),
+      // sem adiar o timeout de "atendente sumiu" — ver HandoffStateStore.touch().
+      this.handoffState.touch(conversationId);
       // Repassa a mensagem ao atendente (relay — ver
       // handoffNotifier/types.ts onCustomerMessage). Sem `await` de
       // propósito: no canal web o cliente está com a requisição HTTP aberta
@@ -378,33 +382,70 @@ export class Orchestrator {
   // do Telegram/Mini App. Grava uma system-note pra auditoria saber QUANDO
   // o atendente encerrou (a liberação por timeout não grava, porque não é
   // uma decisão de ninguém).
-  releaseHandoff(conversationId: string): void {
+  // `note` (05/10/2026): o motivo vai pra auditoria — "devolvido ao bot",
+  // "encerrado pelo atendente" ou "encerrado por inatividade" são decisões
+  // diferentes e o log precisa distinguir.
+  releaseHandoff(conversationId: string, note = "Handoff devolvido ao bot pelo atendente"): void {
     this.handoffState.release(conversationId);
     this.conversations.append(conversationId, {
       role: "system-note",
-      text: "Handoff encerrado pelo atendente — bot volta a responder",
+      text: note,
       timestamp: Date.now(),
     });
   }
 
+  // Preâmbulo: recordRelayedNotice() grava um texto AUTOMÁTICO entregue ao
+  // cliente fora do fluxo de resposta (hoje: a mensagem de encerramento do
+  // atendimento). Papel "assistant" (não foi uma pessoa que escreveu) com
+  // `relayed: true`, pra o polling do widget web também entregá-lo.
+  recordRelayedNotice(conversationId: string, text: string): void {
+    this.conversations.append(conversationId, { role: "assistant", text, timestamp: Date.now(), relayed: true });
+  }
+
+  // Preâmbulo: listActiveHandoffs() — repassa HandoffStateStore.listActive()
+  // pra varredura de inatividade do HumanRelay.
+  listActiveHandoffs(): HandoffState[] {
+    return this.handoffState.listActive();
+  }
+
+  // Preâmbulo: notifyHandoffClosed() avisa o(s) atendente(s) que um
+  // atendimento foi encerrado — via o hook opcional do notifier ativo (ver
+  // handoffNotifier/types.ts). Fica aqui porque o notifier é do Orchestrator
+  // (recriado em reloadConfig) e o relay não deve guardar uma referência
+  // velha a ele. Nunca lança: aviso que falha vira log.
+  async notifyHandoffClosed(conversationId: string, channel: ChannelName, reason: HandoffCloseReason): Promise<void> {
+    try {
+      await this.handoffNotifier.onHandoffClosed?.(conversationId, channel, reason);
+    } catch (err) {
+      console.error("Handoff onHandoffClosed failed:", err);
+    }
+  }
+
   // Preâmbulo: getHumanRepliesSince() alimenta o polling do widget web
-  // (GET /webhook/web/poll): devolve só os turnos "human-agent" a partir
-  // do índice `after`, mais o novo cursor (tamanho atual do histórico).
-  // O cursor é o ÍNDICE no array do histórico — estável porque o
-  // histórico é append-only (nada é removido ou reordenado), então "tudo
-  // depois do índice N" nunca pula nem repete mensagem entre dois polls.
-  // Um id desconhecido devolve vazio sem tocar no cache (hasConversation).
+  // (GET /webhook/web/poll): devolve só os turnos entregues de forma
+  // assíncrona — "human-agent" (atendente) e os `relayed` (aviso automático
+  // de encerramento) — a partir do índice `after`, mais o novo cursor
+  // (tamanho atual do histórico). `fromHuman` diz ao widget se mostra o
+  // rótulo "Atendente". O cursor é o ÍNDICE no array do histórico — estável
+  // porque o histórico é append-only (nada é removido ou reordenado), então
+  // "tudo depois do índice N" nunca pula nem repete mensagem entre dois
+  // polls. Um id desconhecido devolve vazio sem tocar no cache.
   getHumanRepliesSince(
     conversationId: string,
     after: number
-  ): { messages: { id: number; text: string; timestamp: number }[]; cursor: number } {
+  ): { messages: { id: number; text: string; timestamp: number; fromHuman: boolean }[]; cursor: number } {
     if (!this.conversations.exists(conversationId)) return { messages: [], cursor: 0 };
     const history = this.conversations.getHistory(conversationId);
     const messages = history
       .map((turn, index) => ({ turn, index }))
       .slice(after)
-      .filter(({ turn }) => turn.role === "human-agent")
-      .map(({ turn, index }) => ({ id: index, text: turn.text, timestamp: turn.timestamp }));
+      .filter(({ turn }) => turn.role === "human-agent" || turn.relayed === true)
+      .map(({ turn, index }) => ({
+        id: index,
+        text: turn.text,
+        timestamp: turn.timestamp,
+        fromHuman: turn.role === "human-agent",
+      }));
     return { messages, cursor: history.length };
   }
 }

@@ -69,6 +69,14 @@ export interface ConversationTurn {
   // Marca true quando este turno representa um gatilho de handoff que
   // disparou, para facilitar filtrar/contar handoffs ao ler o log depois.
   handoff?: boolean;
+  // true quando este turno foi entregue ao cliente FORA de uma resposta
+  // direta ao webhook — hoje, a mensagem automática de encerramento de um
+  // atendimento humano (ver HumanRelay.close()). Turnos "human-agent" já são
+  // sempre entregues assim; este campo existe pra um turno "assistant"
+  // (texto automático, não escrito por pessoa) também chegar ao widget web
+  // pelo polling (GET /webhook/web/poll), que só devolve turnos relayed ou
+  // human-agent.
+  relayed?: boolean;
 }
 
 // Uma linha da base de conhecimento (Fase 3 do runbook: "uma linha por

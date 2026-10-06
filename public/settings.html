@@ -377,8 +377,21 @@
       </div>
       <div class="field">
         <label for="handoffTimeoutHours">Liberar sozinho após (horas)</label>
-        <p class="hint">Se ninguém liberar manualmente, o bot volta a responder sozinho.</p>
+        <p class="hint">Sem resposta do atendente por esse tempo, o bot volta a responder sozinho.</p>
         <input type="number" id="handoffTimeoutHours" min="0.1" step="0.1" />
+      </div>
+    </div>
+    <!--
+      Encerramento por inatividade (05/10/2026): timer diferente do de cima —
+      aquele mede "o atendente sumiu", este mede "ninguém fala nada", e
+      encerra COM aviso ao cliente. Ver handoffInactivityMinutes em
+      src/config.ts.
+    -->
+    <div class="two-col">
+      <div class="field">
+        <label for="handoffInactivityMinutes">Encerrar por inatividade após (minutos)</label>
+        <p class="hint">Sem nenhuma mensagem de nenhum dos lados, o atendimento é encerrado e o cliente avisado. 0 desliga.</p>
+        <input type="number" id="handoffInactivityMinutes" min="0" step="1" />
       </div>
     </div>
 
@@ -537,6 +550,7 @@
 
     document.getElementById("handoffNotifier").value = config.handoffNotifier;
     document.getElementById("handoffTimeoutHours").value = config.handoffTimeoutHours;
+    document.getElementById("handoffInactivityMinutes").value = config.handoffInactivityMinutes;
     setupTagInput("handoffKeywords", config.handoffKeywords);
     setupTagInput("frustrationKeywords", config.frustrationKeywords);
 
@@ -576,6 +590,7 @@
       },
       handoffNotifier: document.getElementById("handoffNotifier").value,
       handoffTimeoutHours: Number(document.getElementById("handoffTimeoutHours").value),
+      handoffInactivityMinutes: Number(document.getElementById("handoffInactivityMinutes").value),
       handoffKeywords: tagInputs.handoffKeywords.getTags(),
       frustrationKeywords: tagInputs.frustrationKeywords.getTags(),
       enabledCapabilities,

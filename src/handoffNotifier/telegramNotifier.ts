@@ -15,7 +15,7 @@
 // Telegram tem Mini App com autenticação assinada (initData).
 import type { ChannelName, ConversationTurn } from "../types.js";
 import type { HandoffReason } from "../orchestrator/handoff.js";
-import type { HandoffNotifier } from "./types.js";
+import type { HandoffCloseReason, HandoffNotifier } from "./types.js";
 import { callTelegram } from "../channels/telegramApi.js";
 import { formatConversationMarker, sanitizeQuoted } from "../handoff/attendants.js";
 
@@ -80,10 +80,15 @@ export class TelegramNotifier implements HandoffNotifier {
   //    chat PRIVADO com o bot e com URL https — chat id negativo é grupo,
   //    então o botão é omitido ali (senão o sendMessage inteiro falharia
   //    com BUTTON_TYPE_INVALID e o atendente não receberia nem o alerta).
-  //  - "🤖 Devolver ao bot" (callback_data "rel:<id>"): tratado pelo
-  //    TelegramDesk. callback_data tem limite de 64 BYTES — um id maior que
-  //    isso (não acontece com uuid, chat id ou telefone) simplesmente não
-  //    ganha o botão; o atendente ainda pode usar /liberar.
+  //  - "✅ Encerrar atendimento" (callback_data "end:<id>", 05/10/2026):
+  //    manda a mensagem de encerramento ao cliente e devolve ao bot.
+  //  - "🤖 Devolver ao bot" (callback_data "rel:<id>"): devolve SEM avisar o
+  //    cliente — pra quando o atendente resolveu a parte dele e o bot pode
+  //    continuar a conversa normalmente.
+  //  Os dois são tratados pelo TelegramDesk. callback_data tem limite de 64
+  //  BYTES — um id maior que isso (não acontece com uuid, chat id ou
+  //  telefone) simplesmente não ganha os botões; o atendente ainda pode usar
+  //  /encerrar e /liberar.
   private buildKeyboard(chatId: string, conversationId: string): Record<string, unknown> | undefined {
     const rows: Record<string, unknown>[][] = [];
     const isPrivateChat = !chatId.startsWith("-");
@@ -95,9 +100,12 @@ export class TelegramNotifier implements HandoffNotifier {
       const url = `${this.publicBaseUrl.replace(/\/$/, "")}/handoff-app.html?c=${encodeURIComponent(conversationId)}`;
       rows.push([{ text: "💬 Abrir conversa", web_app: { url } }]);
     }
-    const callbackData = `rel:${conversationId}`;
-    if (Buffer.byteLength(callbackData, "utf-8") <= 64) {
-      rows.push([{ text: "🤖 Devolver ao bot", callback_data: callbackData }]);
+    // "end:" e "rel:" têm o mesmo tamanho, então uma checagem cobre os dois.
+    if (Buffer.byteLength(`rel:${conversationId}`, "utf-8") <= 64) {
+      rows.push([
+        { text: "✅ Encerrar atendimento", callback_data: `end:${conversationId}` },
+        { text: "🤖 Devolver ao bot", callback_data: `rel:${conversationId}` },
+      ]);
     }
     return rows.length ? { inline_keyboard: rows } : undefined;
   }
@@ -160,5 +168,20 @@ export class TelegramNotifier implements HandoffNotifier {
       formatConversationMarker(conversationId),
     ].join("\n");
     await this.sendToAttendants(body, conversationId, false);
+  }
+
+  // Preâmbulo: onHandoffClosed() avisa os atendentes só no encerramento por
+  // INATIVIDADE — quando foi o próprio atendente que encerrou, o TelegramDesk
+  // (ou o Mini App) já confirma pra ele, e repetir aqui geraria duas
+  // mensagens iguais no mesmo chat. Sem marcador 🆔 de propósito: a conversa
+  // acabou, um reply aqui reabriria o atendimento sem querer (o relay
+  // reativa conversas encerradas quando o atendente responde).
+  async onHandoffClosed(conversationId: string, channel: ChannelName, reason: HandoffCloseReason): Promise<void> {
+    if (reason !== "inactivity") return;
+    await this.sendToAttendants(
+      `🔚 Atendimento encerrado por inatividade (cliente no ${CHANNEL_LABEL[channel]}).\nConversa: ${conversationId}`,
+      conversationId,
+      false
+    );
   }
 }
