@@ -6,7 +6,7 @@
 // dependem do LLM responder e são testados manualmente via
 // `npm run simulate`, não aqui).
 import { describe, expect, it } from "vitest";
-import { detectHandoffTrigger } from "../src/orchestrator/handoff.js";
+import { HANDOFF_SIGNAL, detectAssistantHandoff, detectHandoffTrigger } from "../src/orchestrator/handoff.js";
 
 // describe() agrupa os testes relacionados sob um rótulo comum, exibido no
 // relatório do vitest — não afeta a execução, só a organização/leitura do
@@ -46,5 +46,33 @@ describe("detectHandoffTrigger (Fase 5 matrix)", () => {
   // seja "gatilho fácil demais" e comece a interromper conversas normais.
   it("returns null for an ambiguous message", () => {
     expect(detectHandoffTrigger("oi bom dia gostaria de saber sobre o produto blz")).toBeNull();
+  });
+});
+
+// Testes de detectAssistantHandoff() (06/10/2026): o LLM decidindo
+// transferir. As frases "claim" são as respostas REAIS do bug reportado — o
+// cliente aceitou a oferta e o modelo prometeu transferir sem que nada
+// acontecesse.
+describe("detectAssistantHandoff (LLM decidindo transferir)", () => {
+  // Preâmbulo: o caminho certo — o modelo usa o sinal combinado no prompt.
+  it("reconhece o sinal combinado", () => {
+    expect(detectAssistantHandoff(HANDOFF_SIGNAL)).toBe("signal");
+    expect(detectAssistantHandoff(`Claro! ${HANDOFF_SIGNAL}`)).toBe("signal");
+  });
+
+  // Preâmbulo: rede de segurança com as frases exatas que o bot de
+  // produção respondeu em 06/10 sem transferir nada.
+  it("pega a promessa de transferência sem o sinal (frases reais do bug)", () => {
+    expect(detectAssistantHandoff("Perfeito! Vou transferi-lo para um atendente humano agora.")).toBe("claim");
+    expect(detectAssistantHandoff("Perfeito! 🤝\n\nEstou transferindo você para um atendente humano agora.")).toBe("claim");
+    expect(detectAssistantHandoff("Vou te conectar com alguém da equipe.")).toBe("claim");
+  });
+
+  // Preâmbulo: OFERECER não é transferir — essas não podem disparar, senão
+  // o bot ficaria mudo sem o cliente ter aceitado.
+  it("não confunde oferta com transferência", () => {
+    expect(detectAssistantHandoff("Posso transferir você para um atendente humano. Deseja?")).toBeNull();
+    expect(detectAssistantHandoff("Quer que eu te transfira para um atendente?")).toBeNull();
+    expect(detectAssistantHandoff("Nosso horário de atendimento é das 9h às 18h.")).toBeNull();
   });
 });

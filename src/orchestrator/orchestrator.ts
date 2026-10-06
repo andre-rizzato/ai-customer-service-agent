@@ -23,7 +23,7 @@ import type { ChannelName, ConversationTurn, InboundMessage } from "../types.js"
 import type { HandoffCloseReason } from "../handoffNotifier/types.js";
 import { callAgentService } from "./agentServiceClient.js";
 import { detectCapability } from "./capabilityRouter.js";
-import { detectHandoffTrigger } from "./handoff.js";
+import { detectAssistantHandoff, detectHandoffTrigger } from "./handoff.js";
 import { buildSystemPrompt } from "./promptBuilder.js";
 import { RateLimiter } from "./rateLimiter.js";
 
@@ -301,6 +301,36 @@ export class Orchestrator {
       temperature: agentConfig.temperature,
       maxTokens: agentConfig.maxTokens,
     });
+
+    // PASSO 5.5 — O LLM decidiu transferir? (06/10/2026) Até aqui o modelo
+    // era instruído a transferir mas não tinha como: escrevia "vou te
+    // transferir" e o handoff nunca acontecia (bug real: cliente aceitou a
+    // oferta, recebeu a promessa e nenhum alerta chegou ao atendente). Agora
+    // ele responde HANDOFF_SIGNAL e o handoff é executado aqui, igual ao do
+    // PASSO 2. "claim" = rede de segurança: o modelo AFIRMOU que está
+    // transferindo sem usar o sinal — executa o handoff mesmo assim (uma
+    // transferência a mais é melhor que uma promessa falsa) e loga, pra dar
+    // pra ajustar o prompt se isso ficar frequente.
+    const assistantHandoff = detectAssistantHandoff(reply);
+    if (assistantHandoff) {
+      if (assistantHandoff === "claim") {
+        console.warn(`Handoff por rede de segurança (LLM afirmou transferir sem o sinal) em ${conversationId}: ${reply.slice(0, 120)}`);
+      }
+      const history = this.conversations.getHistory(conversationId);
+      await this.handoffNotifier.notify(conversationId, "assistant_decision", history, channel);
+      this.conversations.append(conversationId, {
+        role: "system-note",
+        text: `Handoff acionado: assistant_decision (${assistantHandoff === "signal" ? "sinal do LLM" : "rede de segurança — LLM afirmou transferir sem o sinal"})`,
+        timestamp: Date.now(),
+        handoff: true,
+      });
+      this.handoffState.activate(conversationId, channel);
+      // A resposta do LLM (o sinal, ou a frase de "vou transferir") NÃO vai
+      // pro cliente nem pro histórico como fala do assistente — o cliente
+      // recebe a mesma mensagem padrão de qualquer outro handoff, e o
+      // atendente vê o motivo no alerta.
+      return HANDOFF_REPLY;
+    }
 
     // PASSO 6 — Log: grava a resposta do assistente no histórico/auditoria,
     // incluindo QUAIS itens da base foram usados para gerar essa resposta

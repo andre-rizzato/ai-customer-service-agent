@@ -55,6 +55,22 @@ sequenceDiagram
 
 ---
 
+### O que dispara um handoff
+
+| Gatilho | Motivo no alerta | Onde |
+|---|---|---|
+| Palavra-chave do cliente (`handoffKeywords`, `frustrationKeywords`) | pedido de atendimento humano / frustração | `detectHandoffTrigger()`, antes do LLM |
+| Pergunta de pedido sem `AgentService`, cancelamento, capacidade sem conector | pedido de atendimento humano | `orchestrator.ts` |
+| **O LLM decide** (ex.: o cliente **aceitou** a transferência oferecida: "sim, pode") | o assistente transferiu | o LLM responde `[[TRANSFERIR]]`; `detectAssistantHandoff()` |
+
+O terceiro gatilho existe desde 06/10/2026. Antes, o prompt mandava o LLM
+transferir, mas ele não tinha como: escrevia "vou te transferir" e **nada
+acontecia** (bug real em produção, o cliente esperando um atendente que nunca
+foi avisado). Há também uma rede de segurança: se o LLM **afirmar** que está
+transferindo sem o sinal ("vou te transferir", "estou conectando você"), o
+handoff é executado mesmo assim e o servidor loga um aviso. Ofertas
+("posso transferir?") não disparam.
+
 ## 3. Guia do atendente
 
 **Receber:** quando um handoff dispara, chega no seu chat com o bot:

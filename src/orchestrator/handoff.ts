@@ -10,7 +10,45 @@ import { agentConfig } from "../config.js";
 // Motivo do handoff detectado, ou null se nenhum gatilho disparou. Usado
 // tanto pelo Orchestrator (para decidir se interrompe o pipeline) quanto
 // pelo HandoffNotifier (para incluir o motivo na notificação ao humano).
-export type HandoffReason = "explicit_request" | "frustration" | null;
+// "assistant_decision" (06/10/2026): quem decidiu foi o LLM — tipicamente o
+// cliente ACEITOU uma transferência oferecida ("sim, pode transferir"), coisa
+// que nenhuma palavra-chave fixa consegue capturar (ver
+// detectAssistantHandoff abaixo).
+export type HandoffReason = "explicit_request" | "frustration" | "assistant_decision" | null;
+
+// Sinal que o LLM devolve quando decide transferir (instrução na regra 3 de
+// promptBuilder.ts). Entre colchetes duplos e em maiúsculas pra ser
+// impossível de aparecer por acaso numa resposta normal. Nunca chega ao
+// cliente: o Orchestrator troca pela mensagem padrão de handoff.
+export const HANDOFF_SIGNAL = "[[TRANSFERIR]]";
+
+// Frases em que o LLM AFIRMA estar transferindo agora — a rede de segurança
+// pro caso de ele esquecer o sinal. Bug real de 06/10/2026: o cliente aceitou
+// a oferta ("sim pode fazer"), o modelo respondeu "Vou transferi-lo para um
+// atendente humano agora" e nada aconteceu — nenhuma palavra-chave casou e o
+// modelo não tinha como transferir de fato. Só formas de AFIRMAÇÃO (vou
+// transferir / estou transferindo / vou te conectar), não de OFERTA ("posso
+// transferir?", "quer que eu transfira?") — oferecer não é transferir, e
+// tratar oferta como handoff silenciaria o bot sem o cliente ter aceitado.
+// Comparado contra o texto já normalizado (sem acento, minúsculo).
+const TRANSFER_CLAIM_PATTERNS = [
+  /\b(vou|irei|estou|ja estou)\s+(te\s+|lhe\s+)?(transferi|transferindo|encaminha|encaminhando|conecta|conectando|passa|passando)/,
+  /\b(transferindo|encaminhando|conectando)\s+(voce|o senhor|a senhora|sua conversa|seu atendimento)/,
+  /\b(vou|irei)\s+(transferir|encaminhar|conectar|passar)\s+(voce|sua conversa|seu atendimento)/,
+];
+
+// Preâmbulo: detectAssistantHandoff() olha a RESPOSTA do LLM (não a mensagem
+// do cliente) e diz se ela é um pedido de handoff: "signal" = o modelo usou
+// o sinal combinado (caminho certo); "claim" = o modelo afirmou que está
+// transferindo sem usar o sinal (rede de segurança — o Orchestrator loga
+// isso pra dar pra ajustar o prompt se acontecer muito); null = resposta
+// normal. Chamada pelo Orchestrator logo depois do llm.generate(), ANTES de
+// a resposta ir pro cliente.
+export function detectAssistantHandoff(reply: string): "signal" | "claim" | null {
+  if (reply.includes(HANDOFF_SIGNAL)) return "signal";
+  const normalized = normalize(reply);
+  return TRANSFER_CLAIM_PATTERNS.some((pattern) => pattern.test(normalized)) ? "claim" : null;
+}
 
 // Regex que casa qualquer caractere na faixa Unicode dos "diacríticos
 // combinantes" (acentos, til, cedilha etc. quando representados como

@@ -7,6 +7,7 @@
 // ChannelAdapter.
 import { agentConfig } from "../config.js";
 import type { RetrievedChunk } from "../types.js";
+import { HANDOFF_SIGNAL } from "./handoff.js";
 
 // Preâmbulo: buildSystemPrompt() recebe os trechos já recuperados e
 // filtrados pela KnowledgeBase (ver knowledgeBase.ts — já passaram pelo
@@ -47,8 +48,16 @@ REGRAS FIXAS (nunca quebrar):
 2. Se perguntarem se você é humano ou IA, responda com transparência
    total: "Sou um assistente virtual de ${agentConfig.businessName}."
 3. Transfira para humano imediatamente se: (a) o cliente pedir
-   explicitamente, (b) a pergunta sair do escopo de produto/venda,
-   (c) houver sinal de reclamação ou frustração.
+   explicitamente, (b) o cliente ACEITAR uma transferência que você
+   ofereceu (ex.: "sim", "pode", "pode transferir"), (c) a pergunta sair
+   do escopo de produto/venda, (d) houver sinal de reclamação ou
+   frustração.
+   COMO TRANSFERIR: responda APENAS com ${HANDOFF_SIGNAL} — sem nenhum
+   outro texto. O sistema faz a transferência e avisa o cliente. NUNCA
+   escreva que está transferindo ("vou te transferir", "estou
+   conectando você") sem usar ${HANDOFF_SIGNAL}: sem ele, a transferência
+   NÃO acontece e o cliente fica esperando alguém que não vem.
+   Para OFERECER a transferência (sem fazer), pergunte se o cliente quer.
 
 TOM: ${agentConfig.toneAdjectives.join(", ")}
 
@@ -60,5 +69,13 @@ Responda à última mensagem do cliente.`;
   // handoff em handoff.ts, que roda ANTES desta função ser chamada — a
   // regra escrita no prompt é uma segunda camada de segurança para os casos
   // que o detector por palavra-chave não pegar (ex.: frustração implícita
-  // sem usar nenhuma das palavras da lista configurada).
+  // sem usar nenhuma das palavras da lista configurada, ou o cliente
+  // aceitando uma oferta de transferência).
+  //
+  // Até 06/10/2026 essa "segunda camada" não existia de fato: o modelo era
+  // instruído a transferir mas não tinha COMO — só escrevia "vou te
+  // transferir" e nada acontecia (bug reportado pelo usuário). Agora o
+  // modelo responde HANDOFF_SIGNAL e o Orchestrator executa o handoff
+  // (detectAssistantHandoff em handoff.ts, com rede de segurança pra quando
+  // ele afirma transferir sem o sinal).
 }

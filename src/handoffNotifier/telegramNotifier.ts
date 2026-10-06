@@ -42,6 +42,10 @@ function describeReason(reason: HandoffReason): string {
       return "pedido de atendimento humano (ou assunto que exige um)";
     case "frustration":
       return "sinais de frustração do cliente";
+    case "assistant_decision":
+      // O LLM decidiu (06/10/2026) — normalmente o cliente aceitou a
+      // transferência que o bot ofereceu por não saber responder.
+      return "o assistente transferiu (ex.: cliente aceitou a oferta de falar com um humano)";
     default:
       return "não informado";
   }
