@@ -190,7 +190,9 @@ describe("HumanRelay.close / closeInactive (encerramento)", () => {
     const result = await relay.close("s1", "attendant");
     expect(result).toMatchObject({ ok: true, channel: "web", delivered: true });
     expect(orch.recordRelayedNotice).toHaveBeenCalledWith("s1", expect.stringContaining("encerrado"));
-    expect(orch.releaseHandoff).toHaveBeenCalledWith("s1", "Atendimento encerrado pelo atendente");
+    // `true` = ponto de corte do contexto (o LLM e o alerta não veem o
+    // atendimento encerrado — bug de 06/10/2026, ver currentSession.ts).
+    expect(orch.releaseHandoff).toHaveBeenCalledWith("s1", "Atendimento encerrado pelo atendente", true);
     expect(orch.notifyHandoffClosed).toHaveBeenCalledWith("s1", "web", "attendant");
   });
 

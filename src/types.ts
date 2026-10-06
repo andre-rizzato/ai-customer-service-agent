@@ -77,6 +77,15 @@ export interface ConversationTurn {
   // pelo polling (GET /webhook/web/poll), que só devolve turnos relayed ou
   // human-agent.
   relayed?: boolean;
+  // true no turno que marca o FIM de um atendimento humano encerrado (ver
+  // HumanRelay.close()): o LLM não recebe nada ANTES deste turno — depois de
+  // um encerramento, a próxima mensagem é uma conversa nova. Bug de
+  // 06/10/2026: sem esse corte, o modelo via no histórico o "sim, pode
+  // transferir" de um atendimento JÁ encerrado e transferia de novo na
+  // primeira mensagem seguinte ("Nossos serviços"), sem perguntar nada.
+  // O histórico completo continua gravado (auditoria e Mini App); o corte
+  // vale só pro prompt.
+  contextBoundary?: boolean;
 }
 
 // Uma linha da base de conhecimento (Fase 3 do runbook: "uma linha por

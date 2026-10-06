@@ -15,6 +15,7 @@
 // passa pra um humano").
 import { agentConfig } from "../config.js";
 import { ConversationStore } from "../conversation/store.js";
+import { currentSession } from "../conversation/currentSession.js";
 import { createHandoffNotifier, type HandoffNotifier } from "../handoffNotifier/index.js";
 import { HandoffStateStore, type HandoffState } from "./handoffState.js";
 import { KnowledgeBase } from "../knowledge/knowledgeBase.js";
@@ -272,8 +273,11 @@ export class Orchestrator {
     const systemPrompt = buildSystemPrompt(retrieved);
     // Monta o histórico no formato que o LLMProvider espera (ChatMessage[]:
     // só role "user"/"assistant" + content).
-    const history = this.conversations
-      .getHistory(conversationId)
+    // currentSession(): só o que veio depois do último atendimento humano
+    // ENCERRADO — ver src/conversation/currentSession.ts (bug de 06/10: o
+    // modelo reaproveitava um "sim, pode transferir" de um atendimento já
+    // encerrado e transferia de novo sem perguntar).
+    const history = currentSession(this.conversations.getHistory(conversationId))
       // Remove qualquer turno "system-note" (ex.: o registro de handoff
       // gravado acima em uma chamada anterior desta mesma conversa) — o
       // modelo nunca deve ver essas anotações internas como se fossem parte
@@ -415,12 +419,18 @@ export class Orchestrator {
   // `note` (05/10/2026): o motivo vai pra auditoria — "devolvido ao bot",
   // "encerrado pelo atendente" ou "encerrado por inatividade" são decisões
   // diferentes e o log precisa distinguir.
-  releaseHandoff(conversationId: string, note = "Handoff devolvido ao bot pelo atendente"): void {
+  //
+  // `contextBoundary` (06/10/2026): true quando o atendimento foi ENCERRADO
+  // (não só devolvido) — a nota vira um ponto de corte do contexto do LLM
+  // (ver llmHistory()). "Devolver ao bot" NÃO corta: ali o bot continua a
+  // mesma conversa e precisa saber o que o atendente já disse.
+  releaseHandoff(conversationId: string, note = "Handoff devolvido ao bot pelo atendente", contextBoundary = false): void {
     this.handoffState.release(conversationId);
     this.conversations.append(conversationId, {
       role: "system-note",
       text: note,
       timestamp: Date.now(),
+      ...(contextBoundary ? { contextBoundary: true } : {}),
     });
   }
 

@@ -18,6 +18,7 @@ import type { HandoffReason } from "../orchestrator/handoff.js";
 import type { HandoffCloseReason, HandoffNotifier } from "./types.js";
 import { callTelegram } from "../channels/telegramApi.js";
 import { formatConversationMarker, sanitizeQuoted } from "../handoff/attendants.js";
+import { currentSession } from "../conversation/currentSession.js";
 
 // Quantos turnos do histórico entram no alerta, e o tamanho máximo de cada
 // um. O Telegram corta mensagens acima de 4096 caracteres (recusa o envio,
@@ -142,7 +143,11 @@ export class TelegramNotifier implements HandoffNotifier {
   // de instrução, e termina SEMPRE com o marcador "🆔 <id>" — é ele que
   // permite o reply (ver extractConversationId).
   async notify(conversationId: string, reason: HandoffReason, history: ConversationTurn[], channel: ChannelName): Promise<void> {
-    const recent = history
+    // currentSession(): só o que veio depois do último atendimento encerrado
+    // (06/10/2026) — antes o alerta mostrava mensagens de um atendimento
+    // anterior que o cliente nem via mais no widget, e o atendente lia uma
+    // conversa diferente da que estava acontecendo.
+    const recent = currentSession(history)
       .filter((turn) => turn.role !== "system-note")
       .slice(-ALERT_MAX_TURNS)
       .map((turn) => `${ROLE_LABEL[turn.role]}: ${truncate(sanitizeQuoted(turn.text), ALERT_MAX_TURN_CHARS)}`);

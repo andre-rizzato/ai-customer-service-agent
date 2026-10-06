@@ -122,9 +122,13 @@ export class HumanRelay {
     // marcado `relayed`). Nos outros canais grava pra auditoria e pro bot
     // saber, quando voltar, que o atendimento anterior foi encerrado.
     this.orchestrator.recordRelayedNotice(conversationId, text);
+    // `true` = ponto de corte do contexto (06/10/2026): depois de encerrar, a
+    // próxima mensagem do cliente é uma conversa NOVA pro LLM e pro alerta —
+    // ver src/conversation/currentSession.ts.
     this.orchestrator.releaseHandoff(
       conversationId,
-      reason === "inactivity" ? "Atendimento encerrado por inatividade" : "Atendimento encerrado pelo atendente"
+      reason === "inactivity" ? "Atendimento encerrado por inatividade" : "Atendimento encerrado pelo atendente",
+      true
     );
     await this.orchestrator.notifyHandoffClosed(conversationId, state.channel, reason);
     return { ok: true, channel: state.channel, reactivated: false, delivered };
