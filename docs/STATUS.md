@@ -89,12 +89,38 @@ Tutorial de uso (túnel, fluxo do save, desfazer): [`TUTORIAL_CONFIGURACAO.md`](
 - [x] Auditoria do access log: nenhum acesso de terceiros com sucesso (só um scanner em 04/10, que recebeu 404 porque a tela ainda não existia)
 - [ ] Acesso pela internet com login de admin (Firebase, mesmo do site) — em desenvolvimento, fora deste commit; o projeto Firebase do site também ainda não está configurado
 
+### Idioma do cliente + bot separado para o atendente (06/10/2026)
+
+Guia: [`HANDOFF_RELAY.md`](HANDOFF_RELAY.md), seções 4.1 (dois bots + migração) e 4.2 (idioma).
+
+- [x] **Idioma** (commit `59e02b6` + site `35646c4`, em produção): widget manda o idioma da página, Telegram manda `language_code`; LLM responde no idioma do cliente; mensagens fixas em pt/en/it (`src/orchestrator/messages.ts`); alerta avisa o atendente quando o cliente não fala português (o relay não traduz). Bug que motivou: as versões em/it do site recebiam resposta em português
+- [x] **Dois bots** (commit `59e02b6`, em produção e **ativo desde 06/10 ~03:15 UTC**): `HANDOFF_TELEGRAM_BOT_TOKEN` dá ao atendente um bot próprio em `/webhook/telegram-desk`; `TELEGRAM_BOT_TOKEN` fica só pra clientes (simula o futuro WhatsApp). Motivo: com um bot só, o atendente nunca conseguia usar o bot como cliente
+- **Migração em produção (seção 4.1 do `HANDOFF_RELAY.md`):**
+  - [x] Passo 1: código publicado (06/10, ~02:50 UTC)
+  - [x] Passo 2: bot de clientes criado no BotFather pelo usuário
+  - [x] Passo 3a: token atual copiado para `handoff-telegram-bot-token` no Key Vault (06/10, ~02:55 UTC). Conferido: idêntico ao original e pertence ao `@rizzatotech_atendimento_bot` (que vira o bot do atendente)
+  - [x] Passo 3b: usuário gravou o token do `@rizzatotech_bot` em `telegram-bot-token` (06/10, 03:00 UTC, no terminal dele). Entre o 3b e o 4, o `@rizzatotech_bot` ficou sem webhook e o `/start` não chegava a lugar nenhum: era o sintoma reportado
+  - [x] Passo 4: `getMe` conferido (atendente = `@rizzatotech_atendimento_bot`, clientes = `@rizzatotech_bot`) + `setWebhook` dos dois; `getWebhookInfo` sem erro
+  - [x] Passo 5: restart feito; log mostra `Handoff relay: 1 atendente(s) no Telegram (bot próprio, /webhook/telegram-desk)`
+  - [ ] Passo 6: teste real pelo celular (bot novo como cliente → alerta no bot do atendente → Responder)
+
+### Auditoria de segurança da VM (06/10/2026)
+
+Relatório: [`SECURITY_AUDIT_2026-10-06.md`](SECURITY_AUDIT_2026-10-06.md). Como repetir: [`TUTORIAL_SEGURANCA_LOGS.md`](TUTORIAL_SEGURANCA_LOGS.md) + `scripts/security-check.sh`.
+
+- [x] Varredura somente leitura: nenhuma invasão (todos os logins = sua chave ou deploy); ~5.600 tentativas SSH falhas e scanners web, todos sem sucesso
+- [ ] 🔴 Restringir a chave de deploy do GitHub (hoje = shell completo + sudo sem senha)
+- [ ] 🟠 Reboot pendente (kernel + libc6); PM2 sobe sozinho
+- [ ] 🟠 `npm ci --omit=optional` no deploy (5 vulnerabilidades em `@xenova/transformers`, instalado mas não usado)
+- [ ] 🟡 SSH (`PermitRootLogin no`, `X11Forwarding no`, `MaxAuthTries 3`), `server_tokens off`, `x-powered-by`, headers de segurança, Node em 127.0.0.1
+- [ ] Alerta diário automático (cron + bot do Telegram) com as seções "alguém entrou" e "estranhos com sucesso"
+
 ### Encerramento de atendimento humano (05/10/2026)
 
 - [x] Botão **✅ Encerrar atendimento** no alerta do Telegram e no Mini App, mais o comando `/encerrar`: aviso ao cliente + devolve ao bot (diferente de "Devolver ao bot", que não avisa)
 - [x] Encerramento automático por inatividade (`handoffInactivityMinutes`, padrão 30, 0 desliga; campo na tela de configuração): varredura a cada minuto, aviso ao cliente e ao atendente
 - [x] Widget e simulador mostram o aviso automático sem o rótulo "Atendente" (`fromHuman` no polling)
-- [ ] Deploy (push) — commitado, ainda não enviado à VM
+- [ ] Deploy (commit/push) — código e widget ainda não enviados
 
 ### CI/CD
 

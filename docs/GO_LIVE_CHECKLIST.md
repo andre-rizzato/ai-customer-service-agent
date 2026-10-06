@@ -138,6 +138,26 @@ tenants isolados de verdade (o modelo multi-tenant com container +
 identidade por cliente, do Mapa de Capacidades, não foi provisionado ainda
 — ver `docs/STATUS.md`).
 
+## 6.2 Bot de clientes separado do bot do atendente — ✅ migrado em 06/10/2026 (falta o teste pelo celular)
+
+Hoje um bot só (`@rizzatotech_atendimento_bot`) faz as duas coisas. A meta:
+um **bot novo** atende clientes (simulando o futuro WhatsApp) e transfere pro
+bot atual, que vira **só do atendente**. Comandos prontos, que leem os tokens
+do Key Vault sem exibi-los: [`HANDOFF_RELAY.md`](HANDOFF_RELAY.md), seção 4.1.
+O andamento passo a passo está no `STATUS.md`.
+
+O que só você faz:
+
+1. ✅ Criar o bot novo no [@BotFather](https://t.me/BotFather).
+2. ✅ Gravar o token dele no Key Vault, no **seu** terminal (feito; webhooks e restart também):
+   ```bash
+   az keyvault secret set --vault-name kv-agente-atendimento -n telegram-bot-token --value "<TOKEN DO BOT NOVO>" --query name -o tsv
+   ```
+   Não cole o token em chat nenhum. Depois disso, faça os webhooks e o
+   restart **na sequência** (passos 4 e 5 da seção 4.1).
+3. ⏳ Testar pelo celular: "quero falar com atendente" no bot **novo**; o
+   alerta chega no bot **atual**; dê Responder; a resposta chega no bot novo.
+
 ## 6.1 Relay de handoff pelo Telegram — ⏳ código pronto, configuração pendente
 
 O atendente recebe o alerta no Telegram e responde ao cliente dali (widget,
@@ -178,3 +198,5 @@ WhatsApp ou Telegram). Guia completo, incluindo o passo a passo de deploy:
 - [ ] Chip `+55` registrado na API do WhatsApp (planejado semana de 11/10/2026)
 - [ ] Subdomínio + teste via canal real pro tenant DistributedOrderSystem
 - [ ] Relay de handoff: `HANDOFF_TELEGRAM_CHAT_IDS` + `PUBLIC_BASE_URL` na VM, notifier = Telegram, teste real widget → atendente → widget
+- [x] Bot de clientes separado: token novo em `telegram-bot-token`, webhooks dos dois bots, restart (seção 6.2)
+- [ ] Teste pelo celular: `@rizzatotech_bot` (cliente) → alerta no `@rizzatotech_atendimento_bot` → Responder

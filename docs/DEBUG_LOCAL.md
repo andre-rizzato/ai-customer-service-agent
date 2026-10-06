@@ -238,6 +238,141 @@ AUDIT_LOG_PATH=/tmp/relay/audit.jsonl npx tsx src/server.ts
    `tests/handoffRelay.test.ts` com o token falso e `user.id = 555`, e mande
    no header `X-Telegram-Init-Data`.
 
+### 8.2 Relay de handoff com Telegram de verdade, local (bot de dev)
+
+Use quando quiser ver o fluxo **inteiro** na sua máquina: alerta chegando no
+seu Telegram, reply, botões, Mini App. Para só testar o fluxo de ponta a
+ponta, é mais simples usar a página de produção
+`https://rizzato-tech.rizzatotech.com/whatsapp.html`, que já fala com o bot
+real.
+
+**Por que um segundo bot:** o Telegram entrega as mensagens de um bot (inclusive
+as suas respostas como atendente) para **um único endereço**, o webhook. O bot
+de produção (`@rizzatotech_atendimento_bot`) aponta pra VM. Se você apontar o
+webhook dele pro seu computador, **o bot de produção para de funcionar** pra
+todo mundo enquanto durar o teste. Um bot de dev tem token e webhook próprios,
+e os dois nunca se misturam.
+
+> ⚠️ **Nunca rode `setWebhook` com o token de produção.** Antes de qualquer
+> `setWebhook`, confira de qual bot é o token (passo 4). O token de produção
+> fica no Key Vault (`telegram-bot-token`); o do `.env` local deve ser
+> **sempre** o de dev.
+
+**1. Criar o bot de dev (uma vez só).** No Telegram, abra o
+[@BotFather](https://t.me/BotFather) e mande `/newbot`:
+
+- nome: `Rizzato Tech DEV` (qualquer um);
+- username: algo como `rizzatotech_dev_bot` (precisa terminar em `bot`).
+
+O BotFather responde com o **token**. Guarde como guardaria uma senha.
+
+**2. `.env` local.** O `.env` está no `.gitignore` e nunca é commitado:
+
+```bash
+TELEGRAM_BOT_TOKEN=<token do bot de DEV>
+# qualquer string aleatória; gere com:
+#   node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"
+TELEGRAM_WEBHOOK_SECRET=<string aleatória>
+HANDOFF_TELEGRAM_CHAT_IDS=<seu chat id, ver passo 5>
+PUBLIC_BASE_URL=<URL https do ngrok, ver passo 3>   # só pro botão do Mini App
+```
+
+Na tela de configuração local (`http://localhost:3000/settings.html`), mude
+**Notificação de handoff** para **Telegram** (é a config **local**; a de
+produção não muda).
+
+**3. Expor o servidor local.** Em outro terminal:
+
+```bash
+npm run dev          # terminal 1
+ngrok http 3000      # terminal 2 -> copie a URL "https://xxxx.ngrok-free.app"
+```
+
+No plano gratuito do ngrok **a URL muda a cada vez** que ele reinicia. Quando
+mudar, atualize `PUBLIC_BASE_URL` (e reinicie o `npm run dev`) e refaça o
+passo 6.
+
+**4. Conferir de qual bot é o token** (sempre, antes do passo 6):
+
+```bash
+curl -s "https://api.telegram.org/bot<TOKEN>/getMe"
+# tem que mostrar "username":"rizzatotech_dev_bot" (o seu de DEV).
+# Se mostrar rizzatotech_atendimento_bot, PARE: é o de produção.
+```
+
+**5. Descobrir o seu chat id.** Com o `npm run dev` e o ngrok rodando e o
+webhook registrado (passo 6), mande `/meuid` pro **bot de dev**. Ou use o mesmo
+número que está em `HANDOFF_TELEGRAM_CHAT_IDS` na VM: em chat privado, o chat
+id é o seu id de usuário, igual em qualquer bot. Coloque no `.env` e reinicie
+o `npm run dev`.
+
+**6. Apontar o webhook do bot de DEV pro ngrok:**
+
+```bash
+curl -s "https://api.telegram.org/bot<TOKEN_DEV>/setWebhook" \
+  -d "url=https://xxxx.ngrok-free.app/webhook/telegram" \
+  -d "secret_token=<TELEGRAM_WEBHOOK_SECRET do .env>"
+
+# conferir:
+curl -s "https://api.telegram.org/bot<TOKEN_DEV>/getWebhookInfo"
+```
+
+Não passe `allowed_updates`: o padrão já inclui os cliques de botão
+(`callback_query`), que o "✅ Encerrar" e o "🤖 Devolver ao bot" precisam.
+
+**7. Testar.**
+
+1. Abra `http://localhost:3000/whatsapp.html` e mande "quero falar com
+   atendente" (ou "Nossos serviços" e depois aceite a oferta).
+2. O alerta chega no seu Telegram, **vindo do bot de dev**. O terminal mostra
+   `Handoff relay: 1 atendente(s) no Telegram.` no boot.
+3. Dê **Responder** no alerta. Em até 4s a resposta aparece no `whatsapp.html`
+   com o rótulo "Atendente".
+4. Teste **✅ Encerrar**, **🤖 Devolver ao bot**, `/encerrar` e `/liberar`.
+5. **Mini App:** o botão "💬 Abrir conversa" só aparece com `PUBLIC_BASE_URL`
+   em https (a URL do ngrok). Na primeira abertura, o ngrok gratuito mostra
+   uma página de aviso ("You are about to visit..."); clique em **Visit Site**.
+
+**8. Ao terminar.** Pode só fechar o ngrok: o Telegram vai tentar entregar e
+falhar, o que é inofensivo (é o bot de dev). Para deixar limpo:
+
+```bash
+curl -s "https://api.telegram.org/bot<TOKEN_DEV>/deleteWebhook"
+```
+
+E volte a notificação local para **Console**, se preferir ver os alertas no
+terminal no dia a dia.
+
+**Com dois bots de dev** (igual à produção depois da migração, ver
+`HANDOFF_RELAY.md` seção 4.1): crie mais um bot no BotFather e use os dois no
+`.env` local, um de clientes e outro do atendente:
+
+```bash
+TELEGRAM_BOT_TOKEN=<bot de dev de CLIENTES>
+HANDOFF_TELEGRAM_BOT_TOKEN=<bot de dev do ATENDENTE>
+```
+
+Faça o `setWebhook` de cada um pro ngrok: o de clientes em
+`/webhook/telegram`, o do atendente em `/webhook/telegram-desk` (o mesmo
+`secret_token` serve pros dois). O boot deve mostrar
+`Handoff relay: 1 atendente(s) no Telegram (bot próprio, /webhook/telegram-desk)`.
+Com isso você pode conversar com o bot de clientes **pelo seu próprio
+Telegram**, como cliente, e receber o alerta no bot do atendente.
+
+**Testar outro idioma:** no `whatsapp.html`, acrescente `?lang=en` ou `?lang=it`
+na URL (`http://localhost:3000/whatsapp.html?lang=it`). Sem isso ele usa o
+idioma do navegador. No Telegram, vale o idioma do app de quem escreve.
+
+**Problemas comuns deste modo:**
+
+| Sintoma | Causa | Solução |
+|---|---|---|
+| Alerta não chega | `handoffNotifier` local ainda em `console`, ou chat id errado | tela de configuração local → Telegram; conferir `/meuid` |
+| Reply no Telegram não chega no `whatsapp.html` | webhook do bot de dev não aponta pro ngrok atual (URL mudou) | refazer o passo 6 e conferir com `getWebhookInfo` |
+| `getWebhookInfo` mostra `last_error_message: "Unauthorized"` ou 401 | `secret_token` do `setWebhook` diferente do `TELEGRAM_WEBHOOK_SECRET` do `.env` | refazer o passo 6 com o mesmo valor |
+| Servidor não sobe: `HANDOFF_TELEGRAM_CHAT_IDS está definido mas TELEGRAM_WEBHOOK_SECRET não` | faltou o segredo no `.env` | adicionar (passo 2) |
+| Você não consegue conversar com o bot de dev **como cliente** | seu chat id está na lista de atendentes; tudo o que você manda vai pro balcão | use o `whatsapp.html` como cliente, ou outra conta do Telegram |
+
 ## 9. Problemas comuns
 
 - **`npm run ingest` falha com erro de autenticação** — confira se
