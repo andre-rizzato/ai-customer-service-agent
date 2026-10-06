@@ -18,6 +18,9 @@ import type { HumanRelay } from "./relay.js";
 // campos extras de um update do Telegram que o TelegramAdapter repassa.
 export interface DeskMessage {
   chat: { id: number };
+  // Quem mandou — `language_code` é o idioma do app do Telegram, usado pelo
+  // TelegramAdapter quando a mensagem é de cliente (06/10/2026).
+  from?: { id: number; language_code?: string };
   text?: string;
   // Mensagem à qual o atendente respondeu (quando usa "Responder"). `from`
   // vem junto pra conferir que a mensagem original é do BOT — o marcador

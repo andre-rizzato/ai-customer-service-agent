@@ -3,7 +3,7 @@
 // (vindo de agent.config.json, não do .env — é uma escolha do NEGÓCIO, não
 // um segredo de ambiente), qual implementação instanciar.
 import { agentConfig, env } from "../config.js";
-import { attendantChatIds } from "../handoff/attendants.js";
+import { attendantChatIds, deskBotToken } from "../handoff/attendants.js";
 import { ConsoleNotifier } from "./consoleNotifier.js";
 import { TelegramNotifier } from "./telegramNotifier.js";
 import { WebhookNotifier } from "./webhookNotifier.js";
@@ -25,7 +25,10 @@ export function createHandoffNotifier(): HandoffNotifier {
       // Mesma garantia: validateCrossConfig() (src/config.ts) recusa
       // "telegram" sem TELEGRAM_BOT_TOKEN e sem HANDOFF_TELEGRAM_CHAT_IDS —
       // tanto no boot quanto num save pela tela de configuração.
-      return new TelegramNotifier(env.TELEGRAM_BOT_TOKEN!, attendantChatIds, env.PUBLIC_BASE_URL);
+      // deskBotToken (06/10/2026): o alerta sai pelo bot do ATENDENTE — que é
+      // o bot de HANDOFF_TELEGRAM_BOT_TOKEN quando existe um separado, ou o
+      // mesmo bot de clientes quando não (ver src/handoff/attendants.ts).
+      return new TelegramNotifier(deskBotToken!, attendantChatIds, env.PUBLIC_BASE_URL);
     case "console":
       return new ConsoleNotifier();
   }

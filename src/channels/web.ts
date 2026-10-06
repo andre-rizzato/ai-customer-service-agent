@@ -6,6 +6,7 @@
 // referência para quem for implementar um canal novo.
 import type { Request, Response } from "express";
 import type { InboundMessage } from "../types.js";
+import { normalizeLanguage } from "../orchestrator/messages.js";
 import type { ChannelAdapter } from "./types.js";
 
 // Preâmbulo: WebAdapter implementa ChannelAdapter respondendo de forma
@@ -36,7 +37,18 @@ export class WebAdapter implements ChannelAdapter {
     // sem precisar editar o JS dele (ver docs/artifacts/widget-embarcavel.html,
     // Fase 3). Os dois pares são conceitualmente a mesma coisa: id da
     // conversa + texto da mensagem.
-    const body = req.body as { conversationId?: string; text?: string; sessionId?: string; message?: string };
+    // `language`/`locale` (06/10/2026): idioma da página de onde o widget
+    // fala (pt/en/it) — o widget do site manda `language`, o whatsapp.html
+    // manda o idioma do navegador. Opcional: sem ele, o LLM responde no
+    // idioma em que o cliente escreveu (ver promptBuilder.ts).
+    const body = req.body as {
+      conversationId?: string;
+      text?: string;
+      sessionId?: string;
+      message?: string;
+      language?: string;
+      locale?: string;
+    };
     const conversationId = body.conversationId ?? body.sessionId;
     const text = body.text ?? body.message;
 
@@ -59,6 +71,7 @@ export class WebAdapter implements ChannelAdapter {
       conversationId,
       text,
       timestamp: Date.now(),
+      language: normalizeLanguage(body.language ?? body.locale),
     };
 
     // Delega ao Orchestrator e devolve a resposta diretamente como JSON na

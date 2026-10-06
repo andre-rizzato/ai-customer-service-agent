@@ -139,9 +139,11 @@ bot pode continuar a conversa.
 
 | Variável | Obrigatória | Para quê |
 |---|---|---|
-| `TELEGRAM_BOT_TOKEN` | sim | o mesmo bot do canal Telegram envia os alertas |
+| `TELEGRAM_BOT_TOKEN` | sim | bot de **clientes** (canal Telegram). Também é o do atendente se não houver `HANDOFF_TELEGRAM_BOT_TOKEN` |
+| `HANDOFF_TELEGRAM_BOT_TOKEN` | não | bot **do atendente**, separado (seção 4.1). Recebe os alertas e as respostas, em `/webhook/telegram-desk` |
 | `HANDOFF_TELEGRAM_CHAT_IDS` | sim | chat ids dos atendentes, separados por vírgula: quem recebe alerta e quem pode responder |
 | `TELEGRAM_WEBHOOK_SECRET` | sim | **o boot falha sem ele** quando há atendentes configurados (ver seção 6) |
+| `HANDOFF_TELEGRAM_WEBHOOK_SECRET` | não | segredo do webhook do bot do atendente; sem ele, vale o `TELEGRAM_WEBHOOK_SECRET` |
 | `PUBLIC_BASE_URL` | não | URL https pública (ex.: `https://rizzato-tech.rizzatotech.com`). Sem ela o alerta sai sem o botão "Abrir conversa" |
 
 `HANDOFF_TELEGRAM_CHAT_IDS` e `PUBLIC_BASE_URL` **não** estão na lista de
@@ -177,6 +179,85 @@ pelo bot)"** na tela de configuração. O save é recusado se faltar
 6. Deploy do widget atualizado no `rizzatotech-site`.
 7. Teste: no site, "quero falar com atendente" → alerta chega → Responder →
    a resposta aparece no widget com o rótulo "Atendente".
+
+### 4.1 Dois bots: um pra clientes, outro pro atendente (06/10/2026)
+
+**Problema:** com um bot só, quem está em `HANDOFF_TELEGRAM_CHAT_IDS` cai
+sempre no balcão do atendente. Você nunca conseguia usar o bot como cliente,
+e o bot deixou de servir pra simular o atendimento automático.
+
+**Solução:** dois bots no mesmo servidor, sem processo nem custo a mais.
+
+| Bot | Variável | Webhook | Papel |
+|---|---|---|---|
+| **Bot de clientes** (novo; simula o atendimento que será pelo WhatsApp) | `TELEGRAM_BOT_TOKEN` | `/webhook/telegram` | atende com o LLM e transfere pro humano quando precisa. **Todo mundo é cliente aqui, inclusive você** |
+| **Bot do atendente** (o atual, `@rizzatotech_atendimento_bot`) | `HANDOFF_TELEGRAM_BOT_TOKEN` | `/webhook/telegram-desk` | recebe os alertas, Responder, botões, Mini App. Quem não é atendente recebe "uso interno" |
+
+Sem `HANDOFF_TELEGRAM_BOT_TOKEN` tudo funciona como antes (um bot só). Por
+isso o código pode ir pro ar antes da migração.
+
+#### Migração em produção (passo a passo)
+
+O token **atual** passa a ser o do atendente, e o bot **novo** fica com o canal
+de clientes. Faça os passos na ordem, de uma vez: entre os passos 3 e 4 o bot
+antigo ainda aponta pro webhook de clientes.
+
+1. **Publicar o código** (push), sem mudar nada na VM. O comportamento
+   continua igual.
+2. **Criar o bot de clientes** no [@BotFather](https://t.me/BotFather):
+   `/newbot`, nome ex. `Rizzato Tech`, username ex. `rizzatotech_bot`. Guarde
+   o token.
+3. **Key Vault** (no seu terminal, com `az login`). A VM já consegue ler os
+   nomes novos: a identidade dela tem "Key Vault Secrets User" no cofre
+   inteiro (conferido em 06/10). `HANDOFF_TELEGRAM_BOT_TOKEN` e
+   `HANDOFF_TELEGRAM_WEBHOOK_SECRET` estão em `SECRET_ENV_VARS`. **Primeiro**
+   copie o token atual para o nome novo, **depois** troque o de clientes:
+   ```bash
+   KV=kv-agente-atendimento
+   az keyvault secret set --vault-name $KV -n handoff-telegram-bot-token \
+     --value "$(az keyvault secret show --vault-name $KV -n telegram-bot-token --query value -o tsv)"
+   az keyvault secret set --vault-name $KV -n telegram-bot-token --value "<TOKEN DO BOT NOVO>"
+   ```
+4. **Webhooks dos dois bots**, puxando os valores do Key Vault (nenhum token
+   precisa ser colado no chat nem aparece na tela):
+   ```bash
+   DESK=$(az keyvault secret show --vault-name $KV -n handoff-telegram-bot-token --query value -o tsv)
+   CUST=$(az keyvault secret show --vault-name $KV -n telegram-bot-token --query value -o tsv)
+   SEC=$(az keyvault secret show --vault-name $KV -n telegram-webhook-secret --query value -o tsv)
+   URL=https://rizzato-tech.rizzatotech.com
+
+   # confira os donos ANTES (atendente = rizzatotech_atendimento_bot; clientes = o novo)
+   curl -s "https://api.telegram.org/bot$DESK/getMe"; echo
+   curl -s "https://api.telegram.org/bot$CUST/getMe"; echo
+
+   curl -s "https://api.telegram.org/bot$DESK/setWebhook" -d "url=$URL/webhook/telegram-desk" -d "secret_token=$SEC"; echo
+   curl -s "https://api.telegram.org/bot$CUST/setWebhook" -d "url=$URL/webhook/telegram" -d "secret_token=$SEC"; echo
+   ```
+5. **Reiniciar o agente** pra ele ler os segredos novos do Key Vault:
+   ```bash
+   ssh azureuser@20.127.12.103 'pm2 restart agente-atendimento --update-env && sleep 3 && tail -5 ~/.pm2/logs/agente-atendimento-out.log'
+   ```
+   O log deve mostrar `Handoff relay: 1 atendente(s) no Telegram (bot próprio, /webhook/telegram-desk).`
+6. **Testar:** do seu Telegram, abra o **bot novo**, mande "quero falar com
+   atendente". O alerta chega no **bot antigo** (o do atendente). Dê Responder:
+   a resposta aparece no bot novo, como se fosse o atendimento ao cliente.
+
+**Se algo der errado:** volte o segredo `telegram-bot-token` pro token antigo
+(está guardado em `handoff-telegram-bot-token`), apague
+`handoff-telegram-bot-token`, refaça o `setWebhook` do bot antigo apontando pra
+`/webhook/telegram` e reinicie. Volta a ser um bot só.
+
+### 4.2 Idioma do cliente (06/10/2026)
+
+O bot responde no idioma do cliente: o widget manda o idioma da página do site
+(pt/en/it), o Telegram manda o idioma do app (`language_code`). Sem idioma
+informado (WhatsApp), o LLM responde no idioma em que o cliente escreveu. As
+mensagens fixas ("Vou te conectar...", "Atendimento encerrado...") estão em
+pt/en/it em `src/orchestrator/messages.ts`.
+
+**O relay não traduz:** quando o cliente não fala português, o alerta mostra
+`🌐 Idioma do cliente: inglês — responda em inglês`. O que você escrever chega
+ao cliente exatamente como escreveu.
 
 ---
 

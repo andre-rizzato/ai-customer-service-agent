@@ -36,6 +36,28 @@ export function parseAttendantChatIds(raw: string | undefined): Set<string> {
 // autenticação, ver POST /api/config em server.ts).
 export const attendantChatIds = parseAttendantChatIds(env.HANDOFF_TELEGRAM_CHAT_IDS);
 
+// Bot do ATENDENTE (06/10/2026). Até aqui um único bot fazia as duas coisas:
+// atendia clientes e era o balcão do atendente (quem estava na allowlist
+// caía no balcão, os outros no bot de atendimento). O efeito colateral era
+// que o atendente nunca conseguia usar o bot como cliente. Agora o balcão
+// pode ter um bot PRÓPRIO (HANDOFF_TELEGRAM_BOT_TOKEN), e o bot de
+// TELEGRAM_BOT_TOKEN fica só pra clientes — simulando o que será o
+// atendimento pelo WhatsApp, que transfere pro bot do atendente.
+// Sem HANDOFF_TELEGRAM_BOT_TOKEN, cai no TELEGRAM_BOT_TOKEN (comportamento
+// anterior, um bot só) — por isso dá pra publicar o código antes de criar o
+// bot novo.
+export const deskBotToken: string | undefined = env.HANDOFF_TELEGRAM_BOT_TOKEN ?? env.TELEGRAM_BOT_TOKEN;
+// Segredo do webhook do bot do atendente: o próprio, ou o mesmo do bot de
+// clientes (dois bots podem usar o mesmo segredo sem problema — ele só
+// prova que a requisição veio do Telegram).
+export const deskWebhookSecret: string | undefined = env.HANDOFF_TELEGRAM_WEBHOOK_SECRET ?? env.TELEGRAM_WEBHOOK_SECRET;
+// true quando o balcão é um bot separado do bot de clientes. Comparar os
+// tokens (e não só "a variável existe") cobre alguém pondo o MESMO token nas
+// duas variáveis: aí continua sendo um bot só, e montar duas rotas pro mesmo
+// bot só confundiria.
+export const hasSeparateDeskBot =
+  !!env.HANDOFF_TELEGRAM_BOT_TOKEN && env.HANDOFF_TELEGRAM_BOT_TOKEN !== env.TELEGRAM_BOT_TOKEN;
+
 // Preâmbulo: formatConversationMarker() monta a linha final de toda mensagem
 // do bot pro atendente. SEMPRE a última linha — extractConversationId()
 // depende disso.

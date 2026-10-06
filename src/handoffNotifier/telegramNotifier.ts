@@ -13,7 +13,8 @@
 // integrado (zero processo novo na VM), mensagem do bot pro atendente é
 // gratuita (no WhatsApp seria template pago fora da janela de 24h), e o
 // Telegram tem Mini App com autenticação assinada (initData).
-import type { ChannelName, ConversationTurn } from "../types.js";
+import type { ChannelName, ConversationTurn, Language } from "../types.js";
+import { LANGUAGE_NAME } from "../orchestrator/messages.js";
 import type { HandoffReason } from "../orchestrator/handoff.js";
 import type { HandoffCloseReason, HandoffNotifier } from "./types.js";
 import { callTelegram } from "../channels/telegramApi.js";
@@ -142,7 +143,7 @@ export class TelegramNotifier implements HandoffNotifier {
   // dispara. Monta o alerta com cabeçalho, as últimas mensagens e a linha
   // de instrução, e termina SEMPRE com o marcador "🆔 <id>" — é ele que
   // permite o reply (ver extractConversationId).
-  async notify(conversationId: string, reason: HandoffReason, history: ConversationTurn[], channel: ChannelName): Promise<void> {
+  async notify(conversationId: string, reason: HandoffReason, history: ConversationTurn[], channel: ChannelName, language?: Language): Promise<void> {
     // currentSession(): só o que veio depois do último atendimento encerrado
     // (06/10/2026) — antes o alerta mostrava mensagens de um atendimento
     // anterior que o cliente nem via mais no widget, e o atendente lia uma
@@ -155,6 +156,10 @@ export class TelegramNotifier implements HandoffNotifier {
     const text = [
       `🔔 Handoff — cliente no ${CHANNEL_LABEL[channel]}`,
       `Motivo: ${describeReason(reason)}`,
+      // Idioma do cliente (06/10/2026): só aparece quando NÃO é português —
+      // é o aviso pro atendente responder em inglês/italiano (o relay entrega
+      // o texto como foi escrito, não traduz).
+      ...(language && language !== "pt" ? [`🌐 Idioma do cliente: ${LANGUAGE_NAME[language]} — responda em ${LANGUAGE_NAME[language]}`] : []),
       "",
       "Últimas mensagens:",
       ...recent,

@@ -11,6 +11,8 @@ import type { InboundMessage } from "../types.js";
 import type { ChannelAdapter } from "./types.js";
 import { DedupeCache } from "../orchestrator/dedupeCache.js";
 import { callTelegram } from "./telegramApi.js";
+import { normalizeLanguage } from "../orchestrator/messages.js";
+import { deskBotToken, deskWebhookSecret, hasSeparateDeskBot } from "../handoff/attendants.js";
 import type { DeskCallbackQuery, DeskMessage, TelegramDesk } from "../handoff/telegramDesk.js";
 
 // Mesmo valor e mesmo raciocínio do WhatsAppAdapter (ver
@@ -68,7 +70,16 @@ export class TelegramAdapter implements ChannelAdapter {
   // tratado como cliente (comportamento anterior).
   desk?: TelegramDesk;
 
-  constructor(private readonly botToken: string, private readonly webhookSecret?: string) {}
+  // `deskOnly` (06/10/2026): true no adapter do BOT DO ATENDENTE quando ele é
+  // separado do bot de clientes (ver hasSeparateDeskBot em
+  // src/handoff/attendants.ts). Nesse modo, mensagem de quem não é atendente
+  // NÃO vai pro Orchestrator: recebe um aviso de que o bot é interno — o bot
+  // do atendente não deve virar um segundo canal de atendimento.
+  constructor(
+    private readonly botToken: string,
+    private readonly webhookSecret?: string,
+    private readonly deskOnly = false
+  ) {}
 
   // Preâmbulo: handleWebhook() é chamado por src/server.ts para toda
   // requisição HTTP recebida em /webhook/telegram. Faz quatro coisas em
@@ -152,6 +163,16 @@ export class TelegramAdapter implements ChannelAdapter {
       await this.desk.handleMessage(message);
       return;
     }
+
+    // Bot do atendente separado (deskOnly): quem não é atendente não é
+    // atendido aqui — o canal de clientes é o outro bot.
+    if (this.deskOnly) {
+      await this.sendMessage(
+        chatId,
+        "Este bot é de uso interno da equipe de atendimento. Para falar com a gente, use nossos canais de atendimento."
+      );
+      return;
+    }
     const inbound: InboundMessage = {
       channel: this.name,
       userId: chatId,
@@ -163,6 +184,10 @@ export class TelegramAdapter implements ChannelAdapter {
       // Converte segundos (Telegram) para milissegundos (padrão interno do
       // projeto, igual ao que Date.now() produz).
       timestamp: message.date * 1000,
+      // Idioma do app do Telegram do usuário (ex.: "it", "en-US") — o mais
+      // perto de "em que língua essa pessoa quer ser atendida" que o canal
+      // oferece (06/10/2026).
+      language: normalizeLanguage(message.from?.language_code),
     };
 
     // Delega ao Orchestrator todo o processamento (RAG, prompt, LLM,
@@ -201,4 +226,13 @@ export class TelegramAdapter implements ChannelAdapter {
 export function createTelegramAdapter(): TelegramAdapter | null {
   if (!env.TELEGRAM_BOT_TOKEN) return null;
   return new TelegramAdapter(env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_WEBHOOK_SECRET);
+}
+
+// Preâmbulo: createTelegramDeskAdapter() cria o adapter do BOT DO ATENDENTE
+// quando ele é separado do bot de clientes (06/10/2026) — montado por
+// src/server.ts em /webhook/telegram-desk. null quando não há bot separado
+// (aí o balcão continua dentro do adapter de clientes, como antes).
+export function createTelegramDeskAdapter(): TelegramAdapter | null {
+  if (!hasSeparateDeskBot || !deskBotToken) return null;
+  return new TelegramAdapter(deskBotToken, deskWebhookSecret, true);
 }

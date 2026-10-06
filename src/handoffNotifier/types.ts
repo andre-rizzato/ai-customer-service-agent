@@ -3,7 +3,7 @@
 // entre avisar no console (dev), via webhook do Slack/Discord/etc. e via
 // Telegram com relay de resposta (produção) apenas mudando
 // agent.config.json, sem tocar no pipeline.
-import type { ChannelName, ConversationTurn } from "../types.js";
+import type { ChannelName, ConversationTurn, Language } from "../types.js";
 import type { HandoffReason } from "../orchestrator/handoff.js";
 
 // Por que um atendimento humano terminou (05/10/2026): "attendant" = o
@@ -18,7 +18,9 @@ export interface HandoffNotifier {
   // chamaram aqui'". `channel` entrou em 05/10/2026 junto com o relay
   // (src/handoff/relay.ts): o atendente precisa saber se está falando com
   // alguém no widget do site, no WhatsApp ou no Telegram.
-  notify(conversationId: string, reason: HandoffReason, history: ConversationTurn[], channel: ChannelName): Promise<void>;
+  // `language` (06/10/2026, opcional): idioma do cliente, pra o atendente
+  // saber em que língua responder (o relay não traduz nada).
+  notify(conversationId: string, reason: HandoffReason, history: ConversationTurn[], channel: ChannelName, language?: Language): Promise<void>;
 
   // Chamado pra CADA mensagem nova que o cliente manda enquanto a conversa
   // está em handoff (PASSO 0 do Orchestrator — bot silenciado). Opcional

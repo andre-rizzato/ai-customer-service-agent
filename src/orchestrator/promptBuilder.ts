@@ -6,7 +6,8 @@
 // assim o mesmo prompt funciona sem alteração por trás de qualquer
 // ChannelAdapter.
 import { agentConfig } from "../config.js";
-import type { RetrievedChunk } from "../types.js";
+import type { Language, RetrievedChunk } from "../types.js";
+import { LANGUAGE_NAME } from "./messages.js";
 import { HANDOFF_SIGNAL } from "./handoff.js";
 
 // Preâmbulo: buildSystemPrompt() recebe os trechos já recuperados e
@@ -14,7 +15,20 @@ import { HANDOFF_SIGNAL } from "./handoff.js";
 // corte de relevância mínima) e devolve a string completa de system prompt.
 // Chamada pelo Orchestrator uma vez por mensagem, depois de confirmar que
 // não houve gatilho de handoff.
-export function buildSystemPrompt(retrieved: RetrievedChunk[]): string {
+//
+// `language` (06/10/2026): idioma do cliente informado pelo canal. Sem ele,
+// o modelo respondia sempre em português — o prompt e a base de
+// conhecimento são em português, e ele seguia o idioma do contexto em vez
+// do idioma do cliente (bug: as versões em inglês e italiano do site
+// recebiam resposta em português).
+export function buildSystemPrompt(retrieved: RetrievedChunk[], language?: Language): string {
+  // Instrução de idioma: explícita quando o canal informou; quando não
+  // informou (ex.: WhatsApp), manda seguir o idioma da mensagem do cliente.
+  // Nos dois casos, avisa que o contexto pode estar em outro idioma — senão
+  // o modelo tende a copiar o idioma dos trechos recuperados.
+  const languageRule = language
+    ? `Responda SEMPRE em ${LANGUAGE_NAME[language]}, mesmo que o contexto abaixo esteja em outro idioma (traduza as informações do contexto).`
+    : "Responda no mesmo idioma em que o cliente escreveu a última mensagem, mesmo que o contexto abaixo esteja em outro idioma (traduza as informações do contexto).";
   // Monta o bloco de "contexto recuperado da base": se houver trechos
   // relevantes, lista cada um como "- Título: conteúdo"; se a busca não
   // encontrou nada acima do corte de relevância (regra de vazio da Fase 3),
@@ -63,6 +77,8 @@ REGRAS FIXAS (nunca quebrar):
    conectando você") sem usar ${HANDOFF_SIGNAL}: sem ele, a transferência
    NÃO acontece e o cliente fica esperando alguém que não vem.
    Para OFERECER a transferência (sem fazer), pergunte se o cliente quer.
+
+IDIOMA: ${languageRule}
 
 TOM: ${agentConfig.toneAdjectives.join(", ")}
 

@@ -204,6 +204,16 @@ const EnvSchema = z.object({
   TELEGRAM_BOT_TOKEN: z.string().optional(),
   TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
 
+  // Bot do ATENDENTE separado do bot de clientes (06/10/2026, ver
+  // src/handoff/attendants.ts): TELEGRAM_BOT_TOKEN fica só pra clientes
+  // (simula o atendimento que será pelo WhatsApp) e este bot recebe os
+  // alertas de handoff e as respostas do atendente, no webhook
+  // /webhook/telegram-desk. Opcional: sem ele, um bot só faz as duas coisas
+  // (comportamento anterior). O segredo do webhook dele cai no
+  // TELEGRAM_WEBHOOK_SECRET se não for definido.
+  HANDOFF_TELEGRAM_BOT_TOKEN: z.string().optional(),
+  HANDOFF_TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
+
   // Credenciais do canal WhatsApp (Meta Cloud API) — usadas por
   // src/channels/whatsapp.ts, mesma lógica de habilitação dinâmica.
   WHATSAPP_ACCESS_TOKEN: z.string().optional(),
@@ -307,6 +317,8 @@ const SECRET_ENV_VARS = [
   "VOYAGE_API_KEY",
   "TELEGRAM_BOT_TOKEN",
   "TELEGRAM_WEBHOOK_SECRET",
+  "HANDOFF_TELEGRAM_BOT_TOKEN",
+  "HANDOFF_TELEGRAM_WEBHOOK_SECRET",
   "WHATSAPP_ACCESS_TOKEN",
   "WHATSAPP_PHONE_NUMBER_ID",
   "WHATSAPP_VERIFY_TOKEN",
@@ -396,9 +408,14 @@ export function validateCrossConfig(config: AgentConfig): void {
   // Notificação pelo Telegram precisa do bot (token) e de pelo menos um
   // atendente pra avisar — sem isso o handoff dispararia, o cliente
   // ouviria "vou te conectar com um atendente" e ninguém seria avisado.
-  if (config.handoffNotifier === "telegram" && (!env.TELEGRAM_BOT_TOKEN || !env.HANDOFF_TELEGRAM_CHAT_IDS)) {
+  // O token que importa é o do bot do ATENDENTE (o próprio, ou o de
+  // clientes quando é um bot só — 06/10/2026).
+  if (
+    config.handoffNotifier === "telegram" &&
+    (!(env.HANDOFF_TELEGRAM_BOT_TOKEN ?? env.TELEGRAM_BOT_TOKEN) || !env.HANDOFF_TELEGRAM_CHAT_IDS)
+  ) {
     throw new Error(
-      "handoffNotifier=telegram mas TELEGRAM_BOT_TOKEN e/ou HANDOFF_TELEGRAM_CHAT_IDS não estão definidos no ambiente (.env)."
+      "handoffNotifier=telegram mas nenhum token de bot (HANDOFF_TELEGRAM_BOT_TOKEN ou TELEGRAM_BOT_TOKEN) e/ou HANDOFF_TELEGRAM_CHAT_IDS está definido no ambiente (.env)."
     );
   }
 
@@ -435,9 +452,11 @@ if (env.WHATSAPP_ACCESS_TOKEN && !env.WHATSAPP_APP_SECRET) {
 // webhook poderia forjar um update "do atendente" e mandar mensagens pros
 // clientes em nome da empresa — mesmo raciocínio do WHATSAPP_APP_SECRET
 // acima: recusar o boot é melhor do que rodar sem essa proteção.
-if (env.HANDOFF_TELEGRAM_CHAT_IDS && !env.TELEGRAM_WEBHOOK_SECRET) {
+// Com bot do atendente separado (06/10/2026), o webhook que importa é o
+// dele — vale o segredo próprio ou, na falta, o do bot de clientes.
+if (env.HANDOFF_TELEGRAM_CHAT_IDS && !(env.HANDOFF_TELEGRAM_WEBHOOK_SECRET ?? env.TELEGRAM_WEBHOOK_SECRET)) {
   throw new Error(
-    "HANDOFF_TELEGRAM_CHAT_IDS está definido mas TELEGRAM_WEBHOOK_SECRET não — obrigatório pra que ninguém consiga forjar uma resposta de atendente pelo webhook do Telegram."
+    "HANDOFF_TELEGRAM_CHAT_IDS está definido mas nenhum segredo de webhook (HANDOFF_TELEGRAM_WEBHOOK_SECRET ou TELEGRAM_WEBHOOK_SECRET) — obrigatório pra que ninguém consiga forjar uma resposta de atendente pelo webhook do Telegram."
   );
 }
 

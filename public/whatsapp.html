@@ -523,7 +523,15 @@
       const res = await fetch(WEBHOOK_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationId, text }),
+        // `language` (06/10/2026): idioma do navegador ("pt-BR", "en-US"...),
+        // pro bot responder no idioma de quem está testando. Pra testar outro
+        // idioma, troque o idioma do navegador ou acrescente ?lang=en / ?lang=it
+        // na URL desta página.
+        body: JSON.stringify({
+          conversationId,
+          text,
+          language: new URLSearchParams(location.search).get("lang") || navigator.language,
+        }),
       });
 
       hideTyping();

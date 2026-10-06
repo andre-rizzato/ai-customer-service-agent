@@ -9,13 +9,13 @@ import { copyFileSync, existsSync, writeFileSync } from "node:fs";
 import { ZodError } from "zod";
 import { AgentConfigSchema, agentConfig, agentConfigPath, env, validateCrossConfig } from "./config.js";
 import { Orchestrator } from "./orchestrator/orchestrator.js";
-import { createTelegramAdapter } from "./channels/telegram.js";
+import { createTelegramAdapter, createTelegramDeskAdapter } from "./channels/telegram.js";
 import { createWhatsAppAdapter } from "./channels/whatsapp.js";
 import { WebAdapter } from "./channels/web.js";
 import type { ChannelAdapter } from "./channels/types.js";
 import { HumanRelay, type ChannelSender } from "./handoff/relay.js";
 import { TelegramDesk } from "./handoff/telegramDesk.js";
-import { attendantChatIds } from "./handoff/attendants.js";
+import { attendantChatIds, deskBotToken } from "./handoff/attendants.js";
 import { validateTelegramInitData } from "./handoff/telegramInitData.js";
 import type { ChannelName } from "./types.js";
 
@@ -109,8 +109,30 @@ const relay = new HumanRelay(orchestrator, senders);
 // Balcão do atendente no Telegram: só existe se o bot está configurado E há
 // atendentes na allowlist. Atribuído ao adapter depois da construção (ver
 // comentário em TelegramAdapter.desk sobre a dependência circular).
-if (telegram && attendantChatIds.size > 0) {
-  telegram.desk = new TelegramDesk(env.TELEGRAM_BOT_TOKEN!, relay, attendantChatIds);
+//
+// Dois modos (06/10/2026):
+//  - bot do atendente SEPARADO (HANDOFF_TELEGRAM_BOT_TOKEN): ele ganha um
+//    adapter próprio em /webhook/telegram-desk, só com o balcão; o bot de
+//    clientes fica sem balcão — inclusive quem é atendente é tratado como
+//    CLIENTE lá, o que permite testar o atendimento pelo próprio celular.
+//  - um bot só (sem HANDOFF_TELEGRAM_BOT_TOKEN): comportamento anterior, o
+//    balcão vive dentro do adapter de clientes.
+const telegramDesk = createTelegramDeskAdapter();
+if (telegramDesk && attendantChatIds.size > 0) {
+  telegramDesk.desk = new TelegramDesk(deskBotToken!, relay, attendantChatIds);
+  // Rota própria, fora do loop de adapters: o nome "telegram" já é do bot de
+  // clientes (/webhook/telegram) e ChannelName não deve ganhar um canal
+  // falso — o bot do atendente não é um canal de clientes. O callback de
+  // mensagem nunca é usado em modo deskOnly; devolve "" por segurança.
+  app.post("/webhook/telegram-desk", (req, res) => {
+    telegramDesk.handleWebhook(req, res, async () => "").catch((err) => {
+      console.error("Error handling telegram-desk webhook:", err);
+      if (!res.headersSent) res.sendStatus(500);
+    });
+  });
+  console.log(`Handoff relay: ${attendantChatIds.size} atendente(s) no Telegram (bot próprio, /webhook/telegram-desk).`);
+} else if (telegram && attendantChatIds.size > 0) {
+  telegram.desk = new TelegramDesk(deskBotToken!, relay, attendantChatIds);
   console.log(`Handoff relay: ${attendantChatIds.size} atendente(s) no Telegram.`);
 }
 
@@ -276,12 +298,15 @@ const MINI_APP_INIT_DATA_MAX_AGE_SECONDS = 24 * 60 * 60;
 // não está configurado (sem bot ou sem atendentes), 401 pra initData
 // inválido/vencido, 403 pra usuário válido do Telegram que não é atendente.
 function requireAttendant(req: express.Request, res: express.Response, next: express.NextFunction): void {
-  if (!env.TELEGRAM_BOT_TOKEN || attendantChatIds.size === 0) {
+  // deskBotToken (06/10/2026): o Mini App é aberto a partir de uma mensagem
+  // do bot do ATENDENTE, e o Telegram assina o initData com o token desse
+  // bot — validar com o token do bot de clientes recusaria todo mundo.
+  if (!deskBotToken || attendantChatIds.size === 0) {
     res.status(503).json({ error: "Relay de handoff não configurado neste servidor." });
     return;
   }
   const initData = req.header("X-Telegram-Init-Data") ?? "";
-  const userId = validateTelegramInitData(initData, env.TELEGRAM_BOT_TOKEN, MINI_APP_INIT_DATA_MAX_AGE_SECONDS);
+  const userId = validateTelegramInitData(initData, deskBotToken, MINI_APP_INIT_DATA_MAX_AGE_SECONDS);
   if (!userId) {
     res.status(401).json({ error: "Abra esta página pelo botão do alerta no Telegram." });
     return;

@@ -26,34 +26,18 @@ import { callAgentService } from "./agentServiceClient.js";
 import { detectCapability } from "./capabilityRouter.js";
 import { detectAssistantHandoff, detectHandoffTrigger } from "./handoff.js";
 import { buildSystemPrompt } from "./promptBuilder.js";
+// Importado como fixedMessage porque o parâmetro de handleMessage() já se
+// chama `message` (o InboundMessage) e esconderia esta função.
+import { message as fixedMessage } from "./messages.js";
 import { RateLimiter } from "./rateLimiter.js";
 
-// Mensagem fixa enviada ao usuário sempre que um handoff dispara — fica
-// como constante de módulo (em vez de string solta dentro do método) para
-// ser fácil de encontrar e editar, e para não ser recriada a cada chamada.
-const HANDOFF_REPLY =
-  "Vou te conectar com um atendente humano para continuar essa conversa. Só um instante.";
-// Mensagem fixa enviada quando o rate limiter bloqueia uma mensagem — mesmo
-// raciocínio da constante acima.
-const RATE_LIMIT_REPLY =
-  "Recebi várias mensagens muito rápido e preciso desacelerar um pouco — me manda de novo em um minuto, por favor.";
-// Mensagem fixa pra quando capabilityRouter detecta "scheduling"/"sales" —
-// capacidades que já existem na tela de configuração do cliente (Mapa de
-// Capacidades) mas ainda não têm conector plugado do lado do AgentService
-// nesta versão. Cair em handoff aqui é deliberado: é a mesma regra
-// anti-alucinação do resto do produto (promptBuilder.ts) aplicada à
-// orquestração — "sem integração real, não finge que resolveu".
-const CAPABILITY_NOT_WIRED_REPLY =
-  "Vou te conectar com um atendente humano para resolver isso com você. Só um instante.";
-// Mensagem fixa pra quando a intenção é cancelar um pedido — item #4 da
-// revisão de segurança: o agente NUNCA executa o cancelamento sozinho,
-// mesmo que a intenção tenha sido classificada com confiança alta e o
-// AgentService tecnicamente consiga chamar o backend. Cancelamento é
-// sempre uma ação humana, porque (a) é destrutivo e irreversível do lado
-// do cliente, e (b) hoje não existe verificação forte o bastante de que
-// quem está pedindo é o dono do pedido (ver docs/SECURITY_REVIEW.md #4).
-const CANCEL_ORDER_HANDOFF_REPLY =
-  "Entendi que você quer cancelar um pedido — para confirmar isso com segurança, vou te conectar com um atendente humano. Só um instante.";
+// Mensagens fixas ao cliente (handoff, rate limit, capacidade sem conector,
+// cancelamento de pedido): desde 06/10/2026 vivem em ./messages.ts, em
+// português, inglês e italiano — antes eram constantes só em português aqui,
+// e um cliente na versão em inglês do site recebia "Vou te conectar com um
+// atendente humano". Os motivos de cada uma continuam valendo: cancelamento
+// SEMPRE passa por humano (item #4 da revisão de segurança) e capacidade sem
+// conector cai em handoff em vez de fingir que resolveu.
 
 // Preâmbulo: a classe Orchestrator é instanciada UMA VEZ por processo
 // (ver src/server.ts e scripts/simulate.ts) e reaproveitada para todas as
@@ -105,6 +89,12 @@ export class Orchestrator {
     // montar requesterPhone logo abaixo — fora isso, o pipeline continua
     // agnóstico de canal.
     const { channel, userId, conversationId, text, timestamp } = message;
+    // Idioma do cliente (06/10/2026), quando o canal informa (widget: idioma
+    // da página; Telegram: idioma do app). Usado no prompt do LLM, nas
+    // mensagens fixas e gravado no estado do handoff pro aviso de
+    // encerramento. undefined = canal não informa (WhatsApp hoje): o LLM
+    // responde no idioma em que o cliente escreveu e as fixas saem em pt.
+    const language = message.language;
     // Groundwork de verificação de identidade (item #4): no WhatsApp, o
     // próprio userId JÁ É o número de telefone verificado de quem mandou a
     // mensagem (ver whatsapp.ts — conversationId/userId = message.from).
@@ -146,7 +136,7 @@ export class Orchestrator {
     // bloqueada não gaste nem uma escrita em disco além do necessário para
     // a própria checagem de limite.
     if (!this.rateLimiter.isAllowed(conversationId)) {
-      return RATE_LIMIT_REPLY;
+      return fixedMessage("rateLimit", language);
     }
 
     // Grava a mensagem do usuário no histórico/log ANTES de decidir o que
@@ -168,7 +158,7 @@ export class Orchestrator {
       // notificação falhar, ela mesma trata o erro internamente sem lançar
       // (ver WebhookNotifier), então esta linha nunca impede a resposta
       // abaixo de ser enviada.
-      await this.handoffNotifier.notify(conversationId, handoffReason, history, channel);
+      await this.handoffNotifier.notify(conversationId, handoffReason, history, channel, language);
       // Registra no histórico que um handoff ocorreu, como um turno de tipo
       // "system-note" — isso é só para fins de auditoria (aparece no log
       // JSONL com handoff:true), e é FILTRADO explicitamente mais abaixo
@@ -184,12 +174,12 @@ export class Orchestrator {
       // Marca a conversa como "em atendimento humano" — a partir daqui, o
       // PASSO 0 silencia o bot nas próximas mensagens desta conversa, até
       // alguém liberar (scripts/releaseHandoff.ts) ou o timeout expirar.
-      this.handoffState.activate(conversationId, channel);
+      this.handoffState.activate(conversationId, channel, language);
       // Encerra o pipeline aqui — não faz busca no RAG nem chama o LLM para
       // esta mensagem, exatamente como o diagrama da Fase 1 descreve
       // ("Sim -> transfere para humano" é um ramo que pula direto para o
       // fim, sem passar pela caixa de "busca na base").
-      return HANDOFF_REPLY;
+      return fixedMessage("handoff", language);
     }
 
     // PASSO 2.5 — Roteamento de capacidade: só chega aqui se não houve
@@ -215,15 +205,15 @@ export class Orchestrator {
         // nenhuma lógica nova pra detectar isso aqui, só checar o valor.
         if (agentResponse.intent === "cancel_order") {
           const history = this.conversations.getHistory(conversationId);
-          await this.handoffNotifier.notify(conversationId, "explicit_request", history, channel);
+          await this.handoffNotifier.notify(conversationId, "explicit_request", history, channel, language);
           this.conversations.append(conversationId, {
             role: "system-note",
             text: `Handoff acionado: cancel_order (cancelamento sempre passa por humano, order_id=${agentResponse.order_id ?? "não informado"})`,
             timestamp: Date.now(),
             handoff: true,
           });
-          this.handoffState.activate(conversationId, channel);
-          return CANCEL_ORDER_HANDOFF_REPLY;
+          this.handoffState.activate(conversationId, channel, language);
+          return fixedMessage("cancelOrderHandoff", language);
         }
 
         this.conversations.append(conversationId, {
@@ -235,15 +225,15 @@ export class Orchestrator {
         return agentResponse.reply;
       } catch (err) {
         console.error("AgentService call failed, falling back to handoff:", err);
-        await this.handoffNotifier.notify(conversationId, "explicit_request", this.conversations.getHistory(conversationId), channel);
+        await this.handoffNotifier.notify(conversationId, "explicit_request", this.conversations.getHistory(conversationId), channel, language);
         this.conversations.append(conversationId, {
           role: "system-note",
           text: "Handoff acionado: order (AgentService indisponível)",
           timestamp: Date.now(),
           handoff: true,
         });
-        this.handoffState.activate(conversationId, channel);
-        return HANDOFF_REPLY;
+        this.handoffState.activate(conversationId, channel, language);
+        return fixedMessage("handoff", language);
       }
     }
     if (capability === "scheduling" || capability === "sales") {
@@ -252,15 +242,15 @@ export class Orchestrator {
       // inventada, registrado do mesmo jeito que um handoff por palavra-
       // chave normal (ver PASSO 2 acima) pra aparecer igual na auditoria.
       const history = this.conversations.getHistory(conversationId);
-      await this.handoffNotifier.notify(conversationId, "explicit_request", history, channel);
+      await this.handoffNotifier.notify(conversationId, "explicit_request", history, channel, language);
       this.conversations.append(conversationId, {
         role: "system-note",
         text: `Handoff acionado: ${capability} (capacidade sem conector ainda)`,
         timestamp: Date.now(),
         handoff: true,
       });
-      this.handoffState.activate(conversationId, channel);
-      return CAPABILITY_NOT_WIRED_REPLY;
+      this.handoffState.activate(conversationId, channel, language);
+      return fixedMessage("capabilityNotWired", language);
     }
 
     // PASSO 3 — Busca RAG: só chega aqui se não houve gatilho de handoff.
@@ -270,7 +260,7 @@ export class Orchestrator {
     const retrieved = await this.knowledgeBase.search(text);
     // PASSO 4 — Monta o system prompt com as 3 regras fixas + o contexto
     // recuperado (ou a frase de "nada encontrado").
-    const systemPrompt = buildSystemPrompt(retrieved);
+    const systemPrompt = buildSystemPrompt(retrieved, language);
     // Monta o histórico no formato que o LLMProvider espera (ChatMessage[]:
     // só role "user"/"assistant" + content).
     // currentSession(): só o que veio depois do último atendimento humano
@@ -321,19 +311,19 @@ export class Orchestrator {
         console.warn(`Handoff por rede de segurança (LLM afirmou transferir sem o sinal) em ${conversationId}: ${reply.slice(0, 120)}`);
       }
       const history = this.conversations.getHistory(conversationId);
-      await this.handoffNotifier.notify(conversationId, "assistant_decision", history, channel);
+      await this.handoffNotifier.notify(conversationId, "assistant_decision", history, channel, language);
       this.conversations.append(conversationId, {
         role: "system-note",
         text: `Handoff acionado: assistant_decision (${assistantHandoff === "signal" ? "sinal do LLM" : "rede de segurança — LLM afirmou transferir sem o sinal"})`,
         timestamp: Date.now(),
         handoff: true,
       });
-      this.handoffState.activate(conversationId, channel);
+      this.handoffState.activate(conversationId, channel, language);
       // A resposta do LLM (o sinal, ou a frase de "vou transferir") NÃO vai
       // pro cliente nem pro histórico como fala do assistente — o cliente
       // recebe a mesma mensagem padrão de qualquer outro handoff, e o
       // atendente vê o motivo no alerta.
-      return HANDOFF_REPLY;
+      return fixedMessage("handoff", language);
     }
 
     // PASSO 6 — Log: grava a resposta do assistente no histórico/auditoria,

@@ -10,7 +10,8 @@
 // src/handoff/telegramDesk.ts e as rotas /api/handoff/* em server.ts).
 // Ela só sabe "entregar texto do atendente na conversa X" e "devolver a
 // conversa X ao bot".
-import type { ChannelName } from "../types.js";
+import type { ChannelName, Language } from "../types.js";
+import { message as fixedMessage } from "../orchestrator/messages.js";
 import type { Orchestrator } from "../orchestrator/orchestrator.js";
 import type { HandoffCloseReason } from "../handoffNotifier/types.js";
 
@@ -112,7 +113,7 @@ export class HumanRelay {
     if (!state.channel) return { ok: false, error: "Conversa desconhecida." };
     if (!state.active) return { ok: false, error: "Este atendimento já estava encerrado." };
 
-    const text = CLOSING_MESSAGES[reason];
+    const text = closingMessage(reason, state.language);
     let delivered = true;
     if (state.channel !== "web") {
       const send = this.senders[state.channel];
@@ -156,13 +157,12 @@ export class HumanRelay {
   }
 }
 
-// Mensagens automáticas de encerramento enviadas ao cliente. Constantes
-// (e não config) por enquanto: ainda não houve pedido de personalizar por
-// negócio — se houver, viram campos de agent.config.json como
-// handoffKeywords. Terminam convidando o cliente a escrever de novo porque,
-// depois do encerramento, o BOT volta a responder.
-const CLOSING_MESSAGES: Record<HandoffCloseReason, string> = {
-  attendant: "Atendimento encerrado. Obrigado pelo contato! Se precisar de mais alguma coisa, é só mandar uma nova mensagem.",
-  inactivity:
-    "Encerramos este atendimento por falta de interação. Se ainda precisar de ajuda, é só mandar uma nova mensagem.",
-};
+// Preâmbulo: closingMessage() devolve o aviso de encerramento no idioma do
+// cliente (gravado no estado do handoff quando ele começou). Os textos vivem
+// em src/orchestrator/messages.ts junto com as outras mensagens fixas, em
+// pt/en/it (06/10/2026 — antes eram só em português aqui). Terminam
+// convidando o cliente a escrever de novo porque, depois do encerramento, o
+// BOT volta a responder.
+function closingMessage(reason: HandoffCloseReason, language: Language | undefined): string {
+  return fixedMessage(reason === "inactivity" ? "closedByInactivity" : "closedByAttendant", language);
+}

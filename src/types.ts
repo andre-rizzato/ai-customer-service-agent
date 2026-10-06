@@ -8,6 +8,10 @@
 // "telegran" errado em algum lugar do código.
 export type ChannelName = "telegram" | "whatsapp" | "web";
 
+// Reexportado daqui pra os adapters importarem tudo de "../types.js".
+import type { Language } from "./orchestrator/messages.js";
+export type { Language };
+
 // Formato normalizado de UMA mensagem recebida, depois que o adapter do
 // canal (ex.: src/channels/telegram.ts) já traduziu o payload específico
 // daquela plataforma para este formato comum. É o que o Orchestrator
@@ -31,6 +35,11 @@ export interface InboundMessage {
   // Vem do próprio payload da plataforma quando disponível (Telegram/WhatsApp
   // mandam segundos, por isso os adapters multiplicam por 1000).
   timestamp: number;
+  // Idioma do cliente, quando o canal sabe (06/10/2026): o widget manda o
+  // idioma da página do site (pt/en/it); o Telegram manda o idioma do app do
+  // usuário (`language_code`). Ausente = o Orchestrator usa o último idioma
+  // conhecido da conversa ou o padrão (pt). Ver src/orchestrator/messages.ts.
+  language?: Language;
 }
 
 // Formato de UMA mensagem de saída. Hoje só carrega o texto porque nenhum

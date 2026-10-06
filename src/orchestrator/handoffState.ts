@@ -18,7 +18,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { env } from "../config.js";
-import type { ChannelName } from "../types.js";
+import type { ChannelName, Language } from "../types.js";
 
 // Preâmbulo: HandoffState é o formato salvo em disco, um arquivo por
 // conversa. `since` é o timestamp (epoch ms) de quando o handoff foi
@@ -43,12 +43,18 @@ import type { ChannelName } from "../types.js";
 // a partir dele — a varredura de inatividade (listActive) precisa do id real
 // pra entregar a mensagem de encerramento. Os dois são opcionais pelo mesmo
 // motivo de `channel`: arquivos antigos não têm.
+//
+// `language` (06/10/2026): idioma do cliente no momento do handoff — a
+// mensagem de encerramento (HumanRelay.close, inclusive por inatividade, que
+// roda sem nenhuma mensagem do cliente chegando) precisa sair no idioma
+// certo, e este é o único lugar que guarda isso entre uma mensagem e outra.
 export interface HandoffState {
   active: boolean;
   since: number;
   channel?: ChannelName;
   lastActivity?: number;
   conversationId?: string;
+  language?: Language;
 }
 
 // Valor usado quando o arquivo de estado ainda não existe (conversa nunca
@@ -164,7 +170,7 @@ export class HandoffStateStore {
   // atendente. `channel` é opcional no parâmetro: quando não vem (renovação
   // pelo atendente, que não sabe nem precisa saber o canal), reaproveita o
   // que já estava gravado.
-  activate(conversationId: string, channel?: ChannelName): void {
+  activate(conversationId: string, channel?: ChannelName, language?: Language): void {
     const previous = this.load(conversationId);
     const now = Date.now();
     this.save(conversationId, {
@@ -173,6 +179,9 @@ export class HandoffStateStore {
       channel: channel ?? previous.channel,
       lastActivity: now,
       conversationId,
+      // Mesmo raciocínio de `channel`: a renovação pelo atendente não sabe o
+      // idioma, então mantém o que já estava gravado.
+      language: language ?? previous.language,
     });
   }
 
