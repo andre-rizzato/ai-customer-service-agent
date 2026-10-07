@@ -1,0 +1,18 @@
+# Dependências do harness RAGAS deste repo. Deliberadamente SEPARADO do
+# package.json (este projeto é Node/TS; o harness é Python, só porque RAGAS
+# é uma biblioteca Python-only, sem porte em TypeScript) e do
+# requirements.txt do AgentService irmão (DistributedOrderSystem) — os dois
+# têm o mesmo propósito mas avaliam processos diferentes, não há código
+# compartilhado entre eles que justifique um pacote comum agora.
+#
+# Mesmos pins (mesmas versões resolvidas) usados no harness do AgentService,
+# pelos mesmos motivos documentados lá:
+# - ragas==0.4.3 importa incondicionalmente langchain_community.chat_models.
+#   vertexai, módulo removido em langchain-community>=0.4.0 -> precisa do
+#   pin abaixo ou a importação quebra antes de qualquer teste rodar.
+ragas==0.4.3
+langchain-community<0.4.0
+anthropic==1.12.0
+python-dotenv==1.1.1
+requests==2.32.5
+pytest==8.4.2

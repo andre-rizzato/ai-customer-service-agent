@@ -52,14 +52,14 @@ export class LocalEmbeddings implements EmbeddingProvider {
       // pooling: "mean" combina os embeddings de cada token do texto em um
       // único vetor de sentença (em vez de devolver um vetor por token);
       // normalize: true escala o vetor para norma 1, necessário para que a
-      // similaridade de cosseno usada em FileVectorStore funcione de forma
-      // comparável com os vetores vindos de Voyage/OpenAI (que já vêm
-      // normalizados).
+      // distância de cosseno usada no Qdrant (ver qdrantStore.ts) funcione
+      // de forma comparável com os vetores vindos de Voyage/OpenAI (que já
+      // vêm normalizados).
       const output = await extractor(text, { pooling: "mean", normalize: true });
       // A saída do transformers.js é um tensor com um Float32Array de dados
       // — convertemos para number[] comum para bater com o tipo esperado
-      // por EmbeddingProvider e para poder ser serializado em JSON pelo
-      // FileVectorStore.
+      // por EmbeddingProvider e para poder ser serializado em JSON na
+      // chamada REST pro Qdrant.
       vectors.push(Array.from(output.data as Float32Array));
     }
     return vectors;

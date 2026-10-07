@@ -17,7 +17,27 @@ on:
     branches: [master]
 
 jobs:
+  # Gate adicionado junto com a migração do RAG para Qdrant (10/2026) - até
+  # então este workflow não rodava NENHUM teste antes de deployar (gap
+  # conhecido, registrado no plano de upgrade do RAG). typecheck+test rodam
+  # ANTES do job de deploy (via `needs` abaixo), num runner limpo do
+  # GitHub, não na VM - não deploya nada se qualquer um dos dois falhar.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

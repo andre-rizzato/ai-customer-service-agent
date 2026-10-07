@@ -4,18 +4,22 @@
 // "Indexar". Rodado manualmente via `npm run ingest`, e deve ser rodado de
 // novo toda vez que o catálogo mudar (Fase 7: "atraso aqui é a causa nº 1
 // de informação errada meses depois do lançamento").
+//
+// Troca de armazenamento (antes: FileVectorStore em disco; agora: Qdrant) —
+// mesma técnica do AgentService irmão (rag/ingest.py). O formato do
+// catálogo e o resto do pipeline de ingest não mudaram.
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { agentConfig } from "../config.js";
 import { createEmbeddingProvider } from "../embeddings/index.js";
-import { FileVectorStore } from "./vectorStore.js";
+import { ensureCollection, replaceAll } from "./qdrantStore.js";
 import type { KnowledgeItem } from "../types.js";
 
 // Preâmbulo: main() é o ponto de entrada do script. Lê o catálogo do
-// caminho configurado, embeda cada item e grava o resultado no vector
-// store. É uma função `async` separada (em vez de código solto no topo do
-// módulo) só para poder usar `await` livremente e ter um único lugar para
-// tratar erro (ver o `.catch` no final do arquivo).
+// caminho configurado, embeda cada item e grava o resultado no Qdrant. É
+// uma função `async` separada (em vez de código solto no topo do módulo)
+// só para poder usar `await` livremente e ter um único lugar para tratar
+// erro (ver o `.catch` no final do arquivo).
 async function main() {
   // Resolve o caminho do catálogo configurado em agent.config.json
   // (knowledgeBasePath) para um caminho absoluto, independente de onde o
@@ -30,7 +34,7 @@ async function main() {
 
   // Guarda contra catálogo vazio: evita chamar a API de embeddings com uma
   // lista vazia e sobrescrever o índice com "nada" por engano — melhor
-  // avisar e sair sem tocar no vector store existente.
+  // avisar e sair sem tocar no Qdrant.
   if (items.length === 0) {
     console.warn("Catalog is empty — nothing to ingest.");
     return;
@@ -51,15 +55,17 @@ async function main() {
   // que uma chamada de API por item.
   const vectors = await embedder.embed(items.map((i) => `${i.title}\n${i.content}`));
 
-  // Abre (ou cria) o arquivo de índice vetorial no caminho configurado.
-  const store = new FileVectorStore(resolve(agentConfig.vectorStorePath));
+  // Garante que a coleção existe (com a dimensão certa, descoberta a partir
+  // do próprio vetor gerado acima — nunca um número cravado no código) antes
+  // de gravar qualquer ponto.
+  await ensureCollection(vectors[0].length);
   // Substitui o índice inteiro pelos novos pares (item, vetor) — `vectors[i]`
   // corresponde a `items[i]` porque embed() preserva a ordem de entrada
   // (contrato garantido pela interface EmbeddingProvider).
-  store.replaceAll(items.map((item, i) => ({ item, vector: vectors[i] })));
+  await replaceAll(items.map((item, i) => ({ item, vector: vectors[i] })));
 
   // Confirmação final para o operador.
-  console.log(`Ingested ${items.length} items into ${agentConfig.vectorStorePath}`);
+  console.log(`Ingested ${items.length} items into Qdrant.`);
 }
 
 // Executa main() e, se qualquer passo acima lançar uma exceção (arquivo não

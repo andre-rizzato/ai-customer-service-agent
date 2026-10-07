@@ -53,17 +53,23 @@ export const AgentConfigSchema = z.object({
   // Caminho do arquivo JSON com o catálogo (Fase 3 "Catalogar") — lido pelo
   // script de ingest (src/knowledge/ingest.ts), nunca em tempo de resposta.
   knowledgeBasePath: z.string().min(1),
-  // Caminho onde o índice vetorial fica persistido em disco — usado tanto
-  // pelo ingest (grava) quanto pelo KnowledgeBase (lê) em
-  // src/knowledge/vectorStore.ts.
-  vectorStorePath: z.string().min(1),
+  // Vestigial pós-migração pro Qdrant (ver src/knowledge/qdrantStore.ts) —
+  // nada lê mais este campo (o índice agora vive no Qdrant, não num arquivo
+  // local). Deixado opcional (não removido) só pra não quebrar a validação
+  // de agent.config.json de tenants que já têm esse campo salvo.
+  vectorStorePath: z.string().optional(),
   // Quantos trechos da base recuperar por pergunta (top-K da busca por
   // similaridade). .default(3) é aplicado pelo zod se o campo faltar no JSON.
   topK: z.number().int().positive().default(3),
-  // Nota de corte de similaridade (0 a 1): trechos abaixo disso são
+  // Nota de corte de relevância (0 a 1): trechos abaixo disso são
   // descartados antes de irem para o prompt — é a "regra de vazio" da Fase 3
-  // aplicada em src/knowledge/knowledgeBase.ts.
-  minRelevanceScore: z.number().min(0).max(1).default(0.7),
+  // aplicada em src/knowledge/knowledgeBase.ts. Esse score vem do RERANKER
+  // (Voyage rerank-2) desde a migração pro Qdrant, não mais de cosseno puro
+  // — a escala é mais baixa (ver comentário em knowledgeBase.ts com os
+  // números medidos), por isso o default caiu de 0.7 pra 0.4. Tenant com
+  // agent.config.json salvo antes dessa migração continua com o valor
+  // antigo (0.72) até alguém editar manualmente — não há auto-migração.
+  minRelevanceScore: z.number().min(0).max(1).default(0.4),
   // Palavras/frases que, se aparecerem na mensagem do usuário, disparam
   // handoff imediato por pedido explícito — checado em
   // src/orchestrator/handoff.ts ANTES de chamar o LLM.
@@ -197,6 +203,16 @@ const EnvSchema = z.object({
   VOYAGE_MODEL: z.string().default("voyage-3.5-lite"),
   OPENAI_EMBEDDING_MODEL: z.string().default("text-embedding-3-small"),
 
+  // Qdrant (src/knowledge/qdrantStore.ts) - substituiu o FileVectorStore em
+  // disco. QDRANT_URL aponta pro Docker local em dev
+  // (docker-compose.yml na raiz do AgentService irmão, mesma imagem); em
+  // produção, pro Qdrant hospedado no Azure Container Apps
+  // (ca-qdrant, rg-agente-atendimento - MESMO Key Vault que este projeto já
+  // usa, ver SECRET_ENV_VARS abaixo). QDRANT_API_KEY vazio = container local
+  // sem autenticação (dev); produção sempre tem uma.
+  QDRANT_URL: z.string().default("http://localhost:6333"),
+  QDRANT_API_KEY: z.string().optional(),
+
   // Credenciais do canal Telegram — usadas por src/channels/telegram.ts.
   // Ambas opcionais porque o canal é habilitado dinamicamente: se
   // TELEGRAM_BOT_TOKEN não estiver setado, src/server.ts simplesmente não
@@ -250,6 +266,26 @@ const EnvSchema = z.object({
   // botão, e o atendente responde só por reply (caminho principal). O
   // Telegram exige https pra Mini App — http é ignorado.
   PUBLIC_BASE_URL: z.string().optional(),
+
+  // Autenticação de admin da tela de configuração (05/10/2026, ver
+  // src/admin/firebaseAuth.ts): usa o MESMO projeto Firebase do site
+  // institucional. Os três valores são a config web pública do Firebase —
+  // os mesmos NEXT_PUBLIC_FIREBASE_* do .env.local do rizzatotech-site; não
+  // são segredo (o Firebase restringe pelos "domínios autorizados", não por
+  // sigilo), por isso não vão pro Key Vault. FIREBASE_PROJECT_ID também é
+  // usado no servidor pra validar o `aud`/`iss` do ID token.
+  FIREBASE_PROJECT_ID: z.string().optional(),
+  FIREBASE_API_KEY: z.string().optional(),
+  FIREBASE_AUTH_DOMAIN: z.string().optional(),
+  // E-mails (separados por vírgula) com acesso de admin à tela de
+  // configuração. Só valem com e-mail verificado (ver isAdmin()).
+  ADMIN_EMAILS: z.string().optional(),
+  // "true" desliga a exigência de login na tela de configuração — SÓ pra
+  // desenvolvimento local, onde não há Firebase configurado. String (e não
+  // z.coerce.boolean) de propósito: coerce.boolean transforma a string
+  // "false" em true (Boolean("false") === true), e um flag de segurança não
+  // pode ter essa armadilha. Comparado com === "true" em src/server.ts.
+  CONFIG_AUTH_DISABLED: z.string().optional(),
 
   // Diretório onde o histórico de cada conversa é persistido em disco
   // (um arquivo .json por conversationId) — usado por
@@ -315,6 +351,8 @@ const SECRET_ENV_VARS = [
   "ANTHROPIC_API_KEY",
   "OPENAI_API_KEY",
   "VOYAGE_API_KEY",
+  "QDRANT_URL",
+  "QDRANT_API_KEY",
   "TELEGRAM_BOT_TOKEN",
   "TELEGRAM_WEBHOOK_SECRET",
   "HANDOFF_TELEGRAM_BOT_TOKEN",

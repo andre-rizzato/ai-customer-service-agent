@@ -4,7 +4,7 @@
   "knowledgeBasePath": "./knowledge/catalog.example.json",
   "vectorStorePath": "./data/vector-store.json",
   "topK": 3,
-  "minRelevanceScore": 0.72,
+  "minRelevanceScore": 0.4,
   "handoffKeywords": [
     "falar com atendente",
     "falar com humano",

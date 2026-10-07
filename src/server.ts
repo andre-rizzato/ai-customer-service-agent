@@ -9,6 +9,7 @@ import { copyFileSync, existsSync, writeFileSync } from "node:fs";
 import { ZodError } from "zod";
 import { AgentConfigSchema, agentConfig, agentConfigPath, env, validateCrossConfig } from "./config.js";
 import { Orchestrator } from "./orchestrator/orchestrator.js";
+import { KnowledgeBase } from "./knowledge/knowledgeBase.js";
 import { createTelegramAdapter, createTelegramDeskAdapter } from "./channels/telegram.js";
 import { createWhatsAppAdapter } from "./channels/whatsapp.js";
 import { WebAdapter } from "./channels/web.js";
@@ -461,6 +462,47 @@ app.post("/api/config", (req, res) => {
 // monitoramento/orquestração de containers para saber se o processo está
 // vivo e respondendo, sem depender de nenhuma credencial externa.
 app.get("/health", (_req, res) => res.json({ ok: true }));
+
+// GET /debug/rag-search?q=... — devolve os trechos recuperados PELO
+// RETRIEVAL CRU (score do reranker, item completo), sem passar pelo LLM de
+// geração. Existe só pra alimentar o harness RAGAS em Python (eval/, ver
+// README desse harness) e pra depuração manual — RAGAS precisa do contexto
+// recuperado separado da resposta final pra calcular Faithfulness/Context
+// Precision, e o contrato público /webhook/web/message nunca expõe isso
+// (só devolve {reply, message}, ver webContract.test.ts).
+//
+// Gate por NODE_ENV, não por feature flag: diferente de
+// ORDER_HISTORY_RAG_ENABLED no AgentService irmão (que liga/desliga uma
+// CAPACIDADE do produto), esta rota não tem nenhuma utilidade em produção
+// pro cliente final — só serve pra quem está rodando eval/CI localmente —
+// então nem é montada no processo quando NODE_ENV=production, em vez de
+// montada-mas-recusando-responder. Uma rota que não existe não pode ser
+// descoberta por scan de superfície de ataque.
+if (process.env.NODE_ENV !== "production") {
+  // Instância própria, independente da que o Orchestrator usa internamente
+  // (orchestrator.ts linha ~54) — KnowledgeBase não guarda estado por
+  // sessão/conversa (só o provider de embedding, carregado uma vez), então
+  // ter uma segunda instância aqui não duplica nenhum dado, só mantém esta
+  // rota de debug desacoplada do Orchestrator.
+  const debugKnowledgeBase = new KnowledgeBase();
+  app.get("/debug/rag-search", async (req, res) => {
+    const query = String(req.query.q ?? "");
+    if (!query) {
+      res.status(400).json({ error: "q (query string) is required" });
+      return;
+    }
+    try {
+      const results = await debugKnowledgeBase.search(query);
+      res.json({
+        query,
+        results: results.map((r) => ({ title: r.item.title, content: r.item.content, score: r.score })),
+      });
+    } catch (err) {
+      res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+  console.log("Mounted debug route: /debug/rag-search (NODE_ENV != production)");
+}
 
 // Sobe o servidor HTTP na porta configurada (env.PORT, default 3000) e
 // confirma no console quando está pronto para receber requisições.

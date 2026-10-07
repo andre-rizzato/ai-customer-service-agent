@@ -1,0 +1,8 @@
+{"question": "quanto custa o filtro mais barato?", "ground_truth": "O filtro de água FX100 é o mais barato, R$ 189,90."}
+{"question": "qual o preço do filtro FX200?", "ground_truth": "O filtro de água FX200 custa R$ 349,90."}
+{"question": "posso devolver se eu me arrepender da compra?", "ground_truth": "Sim, em até 7 dias corridos após o recebimento, produto sem uso e na embalagem original; o frete de devolução por arrependimento é por conta do cliente."}
+{"question": "vocês entregam em quanto tempo?", "ground_truth": "3 a 7 dias úteis para capitais, 5 a 12 dias úteis para demais localidades, após confirmação do pagamento."}
+{"question": "tem frete grátis?", "ground_truth": "Sim, para compras acima de R$ 300,00."}
+{"question": "quais as formas de pagamento?", "ground_truth": "Pix (5% de desconto à vista), cartão de crédito em até 6x sem juros, e boleto bancário."}
+{"question": "o filtro FX100 precisa de instalação elétrica?", "ground_truth": "Não, o FX100 funciona por gravidade, sem uso de energia elétrica, é só de bancada."}
+{"question": "qual a garantia do FX200?", "ground_truth": "12 meses contra defeito de fabricação."}

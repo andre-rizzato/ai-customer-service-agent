@@ -257,6 +257,58 @@
     color: var(--text-dim);
     font-size: 14px;
   }
+
+  /*
+    Login de admin (05/10/2026) — mesmo Firebase do site institucional. Um
+    card centralizado no lugar do formulário enquanto não há admin logado;
+    reaproveita as cores do resto da tela pra não parecer uma página à parte.
+  */
+  .auth-card {
+    max-width: 380px;
+    margin: 48px auto;
+    padding: 24px;
+    background: var(--card-bg);
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .auth-card h2 { margin: 0 0 6px; font-size: 17px; }
+  .auth-card p { margin: 0 0 16px; font-size: 13.5px; color: var(--text-dim); }
+  .auth-card input {
+    width: 100%;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font: inherit;
+  }
+  .auth-card button {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: 10px;
+  }
+  /* Google em destaque: é o caminho recomendado (e-mail já vem verificado,
+     condição pra ser admin — ver isAdmin() em src/admin/firebaseAuth.ts). */
+  .auth-card .google-btn { background: var(--accent); color: #fff; }
+  .auth-card .google-btn:hover { background: var(--accent-dark); }
+  .auth-card .secondary-btn { background: var(--page-bg); color: var(--text); }
+  .auth-card .divider { text-align: center; font-size: 12px; color: var(--text-dim); margin: 6px 0 12px; }
+  .auth-error { color: var(--danger); font-size: 13px; min-height: 1em; }
+  /* Chip do usuário logado no cabeçalho, ao lado do link do simulador. */
+  .user-chip { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .user-chip button {
+    background: rgba(255,255,255,0.15);
+    color: #fff;
+    border: none;
+    border-radius: 16px;
+    padding: 6px 12px;
+    font: inherit;
+    cursor: pointer;
+  }
 </style>
 </head>
 <body>
@@ -266,10 +318,33 @@
     <h1>⚙️ Configurações do Agente</h1>
     <p>Mudanças salvas aqui valem na próxima mensagem — não precisa reiniciar o servidor.</p>
   </div>
-  <a class="sim-link" href="whatsapp.html">💬 Abrir simulador de mensagens →</a>
+  <div class="user-chip">
+    <!-- Preenchido pelo script quando há um usuário logado (Firebase). -->
+    <span id="user-email" hidden></span>
+    <button id="signout-btn" hidden>Sair</button>
+    <a class="sim-link" href="whatsapp.html">💬 Abrir simulador de mensagens →</a>
+  </div>
 </header>
 
 <div id="loading" class="loading-banner">Carregando configuração atual...</div>
+
+<!--
+  Login de admin: mostrado no lugar do formulário quando o servidor exige
+  autenticação (GET /api/auth/config -> enabled) e não há admin logado. As
+  contas são as do site (mesmo projeto Firebase); só e-mails verificados em
+  ADMIN_EMAILS (.env do servidor) passam — quem decide é o servidor, esta
+  tela só faz o login e manda o token.
+-->
+<div id="auth-gate" class="auth-card" hidden>
+  <h2>🔒 Acesso de administrador</h2>
+  <p>Entre com a mesma conta do site Rizzato Tech.</p>
+  <button id="google-btn" class="google-btn">Entrar com Google</button>
+  <div class="divider">ou com e-mail e senha</div>
+  <input type="email" id="auth-email" placeholder="e-mail" autocomplete="username" />
+  <input type="password" id="auth-password" placeholder="senha" autocomplete="current-password" />
+  <button id="email-btn" class="secondary-btn">Entrar</button>
+  <div id="auth-error" class="auth-error"></div>
+</div>
 
 <main id="form-root" style="display:none">
 
@@ -325,7 +400,7 @@
         <p class="hint">Trechos abaixo desta nota são descartados.</p>
         <div class="range-row">
           <input type="range" id="minRelevanceScore" min="0" max="1" step="0.01" />
-          <output id="minRelevanceScore-out">0.72</output>
+          <output id="minRelevanceScore-out">0.4</output>
         </div>
       </div>
     </div>
@@ -606,10 +681,137 @@
     el.className = type || "";
   }
 
+  // ---------------------------------------------------------------------
+  // Login de admin (05/10/2026) — mesmo Firebase Authentication do site
+  // institucional. O SDK do Firebase é carregado sob demanda (import()
+  // dinâmico do CDN oficial gstatic) só quando o servidor diz que a
+  // autenticação está ligada — em dev local (CONFIG_AUTH_DISABLED=true) a
+  // tela funciona como antes, sem baixar nada. Versão fixa, a mesma do site
+  // (rizzatotech-site/package.json), pra o comportamento ser idêntico.
+  // ---------------------------------------------------------------------
+  const FIREBASE_CDN = "https://www.gstatic.com/firebasejs/12.19.0";
+
+  // Devolve o ID token atual do usuário logado (ou null sem login/auth
+  // desligada). Trocada por initAuth() quando há usuário — user.getIdToken()
+  // renova o token sozinho perto de expirar (ele vale 1h).
+  let getIdToken = async () => null;
+  // Função de logout do Firebase, preenchida por initAuth().
+  let signOutFn = async () => {};
+
+  const gateEl = document.getElementById("auth-gate");
+  const authErrorEl = document.getElementById("auth-error");
+  const loadingEl = document.getElementById("loading");
+  const userEmailEl = document.getElementById("user-email");
+  const signoutBtn = document.getElementById("signout-btn");
+
+  // Preâmbulo: showGate() troca a tela pro card de login, com uma mensagem
+  // opcional (ex.: "sua conta não é admin"). `loggedIn` mostra o botão Sair
+  // no cabeçalho — quem está logado com a conta errada precisa conseguir
+  // trocar de conta.
+  function showGate(message, loggedIn) {
+    loadingEl.hidden = true;
+    document.getElementById("form-root").style.display = "none";
+    document.getElementById("savebar").style.display = "none";
+    gateEl.hidden = false;
+    authErrorEl.textContent = message || "";
+    signoutBtn.hidden = !loggedIn;
+  }
+
+  // Preâmbulo: authFetch() é fetch() com o ID token no header Authorization
+  // — o servidor (requireAdmin em src/server.ts) valida o token e a lista de
+  // admins. Toda chamada a /api/config passa por aqui.
+  async function authFetch(url, options = {}) {
+    const token = await getIdToken();
+    const headers = { ...(options.headers || {}) };
+    if (token) headers.Authorization = "Bearer " + token;
+    return fetch(url, { ...options, headers });
+  }
+
+  // Preâmbulo: initAuth() é o ponto de partida da tela: pergunta ao servidor
+  // se precisa de login. Sem login exigido, carrega a config direto. Com
+  // login, inicializa o Firebase e reage a cada mudança de sessão
+  // (onAuthStateChanged dispara na abertura, já com a sessão salva do
+  // navegador, e a cada login/logout).
+  async function initAuth() {
+    let authConfig;
+    try {
+      const res = await fetch("/api/auth/config");
+      authConfig = await res.json();
+    } catch (err) {
+      loadingEl.textContent = "⚠️ Não foi possível falar com o servidor. (" + err.message + ")";
+      return;
+    }
+
+    if (!authConfig.enabled) {
+      loadConfig();
+      return;
+    }
+    if (!authConfig.firebase) {
+      showGate("Login de admin não configurado no servidor (faltam FIREBASE_* no .env).", false);
+      document.getElementById("google-btn").disabled = true;
+      document.getElementById("email-btn").disabled = true;
+      return;
+    }
+
+    const { initializeApp } = await import(FIREBASE_CDN + "/firebase-app.js");
+    const fb = await import(FIREBASE_CDN + "/firebase-auth.js");
+    const auth = fb.getAuth(initializeApp(authConfig.firebase));
+    signOutFn = () => fb.signOut(auth);
+
+    // Botões de login. Erros do Firebase (senha errada, popup fechado)
+    // aparecem no próprio card, com o código pra facilitar diagnóstico.
+    document.getElementById("google-btn").addEventListener("click", async () => {
+      try {
+        await fb.signInWithPopup(auth, new fb.GoogleAuthProvider());
+      } catch (err) {
+        authErrorEl.textContent = "Não foi possível entrar com Google (" + (err.code || err.message) + ").";
+      }
+    });
+    document.getElementById("email-btn").addEventListener("click", async () => {
+      try {
+        await fb.signInWithEmailAndPassword(
+          auth,
+          document.getElementById("auth-email").value.trim(),
+          document.getElementById("auth-password").value
+        );
+      } catch (err) {
+        authErrorEl.textContent = "E-mail ou senha inválidos (" + (err.code || err.message) + ").";
+      }
+    });
+
+    fb.onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        getIdToken = async () => null;
+        userEmailEl.hidden = true;
+        showGate("", false);
+        return;
+      }
+      getIdToken = () => user.getIdToken();
+      userEmailEl.textContent = user.email || user.uid;
+      userEmailEl.hidden = false;
+      signoutBtn.hidden = false;
+      gateEl.hidden = true;
+      loadingEl.hidden = false;
+      loadConfig();
+    });
+  }
+
+  signoutBtn.addEventListener("click", () => signOutFn());
+
   async function loadConfig() {
     try {
-      const res = await fetch(CONFIG_URL);
-      if (!res.ok) throw new Error("HTTP " + res.status);
+      const res = await authFetch(CONFIG_URL);
+      // 401/403: sem sessão válida ou conta sem permissão — volta pro card
+      // de login com a mensagem do servidor (que diz QUAL conta foi recusada).
+      if (res.status === 401 || res.status === 403) {
+        const body = await res.json().catch(() => ({}));
+        showGate(body.error, res.status === 403);
+        return;
+      }
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "HTTP " + res.status);
+      }
       const config = await res.json();
       populateForm(config);
     } catch (err) {
@@ -625,7 +827,7 @@
     showStatus("Salvando...", "");
 
     try {
-      const res = await fetch(CONFIG_URL, {
+      const res = await authFetch(CONFIG_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildPayload()),
@@ -647,7 +849,8 @@
 
   document.getElementById("save-btn").addEventListener("click", saveConfig);
 
-  loadConfig();
+  // Começa pela autenticação — ela decide se e quando chamar loadConfig().
+  initAuth();
 })();
 </script>
 
