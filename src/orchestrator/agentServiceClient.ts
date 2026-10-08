@@ -6,6 +6,7 @@
 // trocar de LangGraph pra qualquer outra coisa sem este arquivo mudar uma
 // linha.
 import { env } from "../config.js";
+import type { Language } from "./messages.js";
 
 // Espelha AgentResponse em main.py — só os campos que o Orchestrator
 // realmente usa (reply) têm tipo obrigatório; os outros (intent,
@@ -38,10 +39,19 @@ export interface AgentServiceResponse {
 // OrderBackend.get_status) — um conector REST genérico não tem como saber
 // o nome do campo de telefone na resposta de cada cliente, então essa
 // comparação só faz sentido num CustomBackend específico de cliente.
+// language (07/10/2026): mesmo idioma já resolvido pelo canal (ver
+// orchestrator.ts, `message.language`) que buildSystemPrompt() usa pro
+// RAG do Node — sem isso, o AgentService (Python) não tinha NENHUM sinal
+// de idioma e respondia sempre em inglês (hardcoded em
+// AgentService/graph.py), mesmo pra cliente que escreveu em português.
+// `undefined` (ex.: WhatsApp, que hoje não informa idioma nenhum) é
+// repassado como `undefined` no JSON e o lado Python cai no mesmo
+// fallback do Node: seguir o idioma da própria mensagem do cliente.
 export async function callAgentService(
   message: string,
   sessionId: string,
-  requesterPhone?: string
+  requesterPhone?: string,
+  language?: Language
 ): Promise<AgentServiceResponse> {
   // env.AGENT_SERVICE_URL é string | undefined no tipo (Zod .optional()),
   // mas a checagem cruzada em config.ts já garante que ele existe sempre
@@ -50,7 +60,12 @@ export async function callAgentService(
   const res = await fetch(`${env.AGENT_SERVICE_URL!}/agent/message`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message, session_id: sessionId, requester_phone: requesterPhone }),
+    body: JSON.stringify({
+      message,
+      session_id: sessionId,
+      requester_phone: requesterPhone,
+      language,
+    }),
   });
 
   // Mesmo padrão de tratamento de erro HTTP que voyageEmbeddings.ts já usa:

@@ -228,6 +228,7 @@ Detalhes em `docs/HANDOFF_RELAY.md`. O que é fácil quebrar sem perceber:
 
 - `docs/STATUS.md` — checklist consolidado do que está feito/pendente, nos três repositórios do projeto.
 - `docs/GO_LIVE_CHECKLIST.md` — passos manuais de domínio/email/canais.
+- `docs/WEBHOOKS_E_URLS.md` — todas as rotas públicas, para onde aponta cada webhook (Telegram, WhatsApp, widget) e os comandos exatos de `setWebhook`.
 - `docs/TUTORIAL_CONFIGURACAO.md` — tutorial: abrir a tela de configuração em produção (túnel SSH), o que acontece ao salvar, desfazer, e por que o site não mexe na config.
 - `docs/SECURITY_AUDIT_2026-10-06.md` + `docs/TUTORIAL_SEGURANCA_LOGS.md` — auditoria da VM e como verificar tentativas de ataque (`scripts/security-check.sh`).
 - `docs/HANDOFF_RELAY.md` — relay de handoff: atendente responde ao cliente pelo Telegram (reply ou Mini App), configuração, segurança e limitações.

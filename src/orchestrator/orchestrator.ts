@@ -194,7 +194,7 @@ export class Orchestrator {
       // pro ChannelAdapter, mesma filosofia de "nunca deixar o usuário sem
       // resposta" do resto do pipeline.
       try {
-        const agentResponse = await callAgentService(text, conversationId, requesterPhone);
+        const agentResponse = await callAgentService(text, conversationId, requesterPhone, language);
 
         // Item #4 da revisão de segurança: cancelamento é SEMPRE handoff,
         // nunca uma ação que o bot executa sozinho — mesmo que o

@@ -108,7 +108,11 @@ npm start      # produção
 
 1. Crie um bot com o [@BotFather](https://t.me/BotFather) e pegue o token.
 2. `TELEGRAM_BOT_TOKEN=...` no `.env`.
-3. Exponha o servidor publicamente (ex.: `ngrok http 3000` em dev) e registre o webhook:
+   Opcional: `HANDOFF_TELEGRAM_BOT_TOKEN=...` com um **segundo** bot, só para o
+   atendente humano (alertas de handoff e respostas), com webhook em
+   `/webhook/telegram-desk`. Ver `docs/HANDOFF_RELAY.md`, seção 4.1.
+3. Exponha o servidor publicamente (ex.: `ngrok http 3000` em dev) e registre o webhook
+   (endereços e comandos usados em produção: `docs/WEBHOOKS_E_URLS.md`):
    ```
    https://api.telegram.org/bot<TOKEN>/setWebhook?url=<sua-url-publica>/webhook/telegram&secret_token=<TELEGRAM_WEBHOOK_SECRET>
    ```

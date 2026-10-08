@@ -6,7 +6,7 @@ repositórios envolvidos: `ai-customer-service-agent` (este),
 institucional). Para os passos manuais de domínio/email/WhatsApp, ver
 [`GO_LIVE_CHECKLIST.md`](GO_LIVE_CHECKLIST.md).
 
-Última atualização: 04/10/2026.
+Última atualização: 07/10/2026.
 
 ---
 
@@ -81,13 +81,15 @@ Guia completo: [`HANDOFF_RELAY.md`](HANDOFF_RELAY.md).
 - [ ] Deploy: definir `HANDOFF_TELEGRAM_CHAT_IDS` e `PUBLIC_BASE_URL` no `.env` da VM (não estão no Key Vault, não são segredo), conferir que `TELEGRAM_WEBHOOK_SECRET` já existe lá e mudar o `handoffNotifier` para `telegram` pela tela de configuração
 - [x] Deploy do widget atualizado no `rizzatotech-site` (cópia vendorizada; o original no `DistributedOrderSystem` não foi alterado)
 
-### Tela de configuração fechada para a internet (05/10/2026)
+### Login de admin da tela de configuração (05/10/2026)
 
-Tutorial de uso (túnel, fluxo do save, desfazer): [`TUTORIAL_CONFIGURACAO.md`](TUTORIAL_CONFIGURACAO.md). `settings.html` e `/api/config` estavam abertos pra internet em produção, sem login.
+Guia: [`ADMIN_AUTH.md`](ADMIN_AUTH.md). Tutorial de uso (túnel, fluxo do save, desfazer): [`TUTORIAL_CONFIGURACAO.md`](TUTORIAL_CONFIGURACAO.md). `settings.html` e `/api/config` estavam abertos pra internet em produção.
 
-- [x] `/settings.html` e `/api/config` bloqueados no Nginx da VM (404, regex case-insensitive — o Express casa rotas sem diferenciar maiúsculas); acesso só por túnel SSH (`ssh -L 3000:localhost:3000 azureuser@20.127.12.103`)
-- [x] Auditoria do access log: nenhum acesso de terceiros com sucesso (só um scanner em 04/10, que recebeu 404 porque a tela ainda não existia)
-- [ ] Acesso pela internet com login de admin (Firebase, mesmo do site) — em desenvolvimento, fora deste commit; o projeto Firebase do site também ainda não está configurado
+- [x] `/api/config` exige ID token do Firebase (mesmo projeto do site) de um e-mail verificado em `ADMIN_EMAILS`, verificado sem `firebase-admin`; falha fechada (503) sem config
+- [x] `settings.html` com login (Google ou e-mail/senha) e botão Sair; `CONFIG_AUTH_DISABLED=true` só pra dev local
+- [ ] **Projeto Firebase não configurado em lugar nenhum**: secrets `NEXT_PUBLIC_FIREBASE_*` ausentes no GitHub do site (o login do site também não funciona em produção). Criar o projeto, cadastrar os secrets e preencher `FIREBASE_*` + `ADMIN_EMAILS` na VM (ver `ADMIN_AUTH.md` seção 5)
+- [ ] Teste real de login pelo navegador (depende do item acima)
+- [x] **Medida imediata em produção:** `/settings.html` e `/api/config` bloqueados no Nginx da VM (404, regex case-insensitive); acesso só por túnel SSH (`ssh -L 3000:localhost:3000 ...`). Ver `ADMIN_AUTH.md`
 
 ### Idioma do cliente + bot separado para o atendente (06/10/2026)
 
@@ -121,6 +123,45 @@ Relatório: [`SECURITY_AUDIT_2026-10-06.md`](SECURITY_AUDIT_2026-10-06.md). Como
 - [x] Encerramento automático por inatividade (`handoffInactivityMinutes`, padrão 30, 0 desliga; campo na tela de configuração): varredura a cada minuto, aviso ao cliente e ao atendente
 - [x] Widget e simulador mostram o aviso automático sem o rótulo "Atendente" (`fromHuman` no polling)
 - [ ] Deploy (commit/push) — código e widget ainda não enviados
+
+### RAG avançado: hybrid search + HyDE + reranking + Qdrant (07/10/2026)
+
+Antes: cosseno puro sobre `FileVectorStore` (Node) e zero retrieval (AgentService —
+`general_question` ia direto pro LLM sem contexto nenhum). Guia completo do lado
+AgentService: `AGENT_SERVICE_RAG_DOCUMENTATION.md` (`DistributedOrderSystem/docs/`).
+
+- [x] **Node** (commit `f2788e8`): `KnowledgeBase.search()` migrado pro pipeline
+  HyDE → embed → Qdrant → BM25 → RRF → rerank (Voyage `rerank-2`). Assinatura
+  pública inalterada (`orchestrator.ts`/`promptBuilder.ts` não mudaram nenhuma
+  linha). `minRelevanceScore` recalibrado de 0.72 pra 0.4 — a escala do rerank é
+  mais baixa que a do cosseno puro da versão anterior
+- [x] **AgentService** (`DistributedOrderSystem`, commit `33b27dd`): novo nó
+  `retrieve_knowledge_node` (`rag_node.py`) com o mesmo pipeline, sobre duas
+  coleções Qdrant — `faq_policy` (pública) e `order_support_notes` (exige
+  `requester_phone` verificado; sem ele, o nó se recusa a consultar, nunca
+  busca sem filtro — verificado empiricamente que vazaria nota de outro
+  cliente). Atrás de `ORDER_HISTORY_RAG_ENABLED` (default `false`)
+- [x] Qdrant hospedado em Azure Container Apps (`ca-qdrant`,
+  `rg-agente-atendimento`), scale-to-zero, coleção compartilhada pelos dois
+  catálogos
+- [x] RAGAS (harness de qualidade de retrieval) nos dois lados —
+  `eval/` (Node) e `tests/rag_eval/` (AgentService) — fora do deploy
+  automático (custo de API paga + variância do LLM-judge), roda só sob
+  demanda/workflow separado
+- [x] **Bug encontrado e corrigido (07/10/2026)**: `generate_reply_node`
+  (AgentService) respondia sempre em inglês (prompt fixo), mesmo pra cliente
+  que escreveu em português — pouco visível antes, mas a nova intenção
+  `order_history_query` passou a capturar muito mais mensagens nessa rota
+  (ex.: "status do pedido" sem número, que cai no guard de privacidade acima).
+  Corrigido: `agentServiceClient.ts` agora manda `language` (o mesmo valor que
+  o Node já resolve pro seu próprio RAG, `promptBuilder.ts`) pro AgentService;
+  `generate_reply_node` e os nós de resposta fixa (`cancel_order_agent`,
+  `create/update/product_info_stub`, `clarify`) ficaram idioma-aware
+  (`messages.py`, espelha `src/orchestrator/messages.ts`)
+- ⚠️ Custo de latência, não corrigido (decisão em aberto): HyDE (chamada de
+  LLM) + rerank (chamada à Voyage) somam 2 round-trips de rede por mensagem
+  ANTES da resposta final, nos dois lados — vale decidir se compensa pro
+  tamanho atual do catálogo/base de notas, ou se é desproporcional
 
 ### CI/CD
 
@@ -186,5 +227,5 @@ Relatório: [`SECURITY_AUDIT_2026-10-06.md`](SECURITY_AUDIT_2026-10-06.md). Como
 
 ### Fora de escopo por enquanto (decisão já tomada)
 
-- RAG avançado (hybrid search, reranking, Qdrant, RAGAS, DSPy) e fine-tuning (LoRA/QLoRA, DPO, vLLM) — fica pro `DistributedOrderSystem`/curso, só migra pro produto quando o volume real justificar
+- ~~RAG avançado (hybrid search, reranking, Qdrant, RAGAS)~~ — decisão revertida em 07/10/2026: migrado pros dois repositórios, ver seção "RAG avançado" acima. DSPy e fine-tuning (LoRA/QLoRA, DPO, vLLM) continuam fora de escopo, sem sinal de que o volume real justifique
 - `npm audit` acusa vulnerabilidades em `@xenova/transformers` (dependência opcional, embeddings locais não usados) — pré-existente, não introduzido nesta sessão

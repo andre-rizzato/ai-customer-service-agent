@@ -76,12 +76,23 @@ de descasamento de país. Cuidados a lembrar nessa hora:
 
 ### Telegram — ✅ feito e testado de ponta a ponta
 
-Bot `@rizzatotech_atendimento_bot` criado via BotFather, token e
-`TELEGRAM_WEBHOOK_SECRET` no Key Vault, webhook registrado via
-`setWebhook` apontando pra `https://rizzato-tech.rizzatotech.com/webhook/telegram`.
-**Mensagem real enviada e respondida** (confirmado em 04/10/2026) — pipeline
-completo (webhook → orchestrator → RAG/LLM via Key Vault → resposta) validado
-em produção, não só em teste local.
+Referência completa (todos os webhooks, comandos exatos de `setWebhook`,
+como conferir e desfazer): [`WEBHOOKS_E_URLS.md`](WEBHOOKS_E_URLS.md).
+
+**Desde 06/10/2026 são dois bots:**
+
+| Bot | Papel | Webhook |
+|---|---|---|
+| `@rizzatotech_bot` | clientes | `https://rizzato-tech.rizzatotech.com/webhook/telegram` |
+| `@rizzatotech_atendimento_bot` | atendente | `https://rizzato-tech.rizzatotech.com/webhook/telegram-desk` |
+
+Tokens no Key Vault (`telegram-bot-token` e `handoff-telegram-bot-token`), o
+mesmo `telegram-webhook-secret` nos dois.
+
+Histórico: em 04/10/2026 era um bot só, `@rizzatotech_atendimento_bot`, em
+`/webhook/telegram`, com **mensagem real enviada e respondida**. O pipeline
+completo (webhook → orchestrator → RAG/LLM via Key Vault → resposta) foi
+validado em produção, não só em teste local.
 
 ### WhatsApp — ✅ webhook verificado, envio bloqueado até o chip +55 (Passo 4)
 
