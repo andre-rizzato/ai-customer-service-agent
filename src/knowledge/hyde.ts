@@ -31,5 +31,8 @@ export async function generateHypotheticalPassage(query: string): Promise<string
   return llmProvider.generate(HYDE_SYSTEM_PROMPT, [{ role: "user", content: query }], {
     temperature: 0.3,
     maxTokens: 200,
+    // Etiqueta pro relatório de custo: separa o gasto do HyDE (uma chamada
+    // extra de LLM por pergunta) do gasto da resposta ao cliente.
+    purpose: "hyde",
   });
 }

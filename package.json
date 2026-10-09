@@ -15,6 +15,7 @@
     "build": "tsc -p tsconfig.json",
     "ingest": "tsx src/knowledge/ingest.ts",
     "simulate": "tsx scripts/simulate.ts",
+    "usage:report": "tsx scripts/usageReport.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

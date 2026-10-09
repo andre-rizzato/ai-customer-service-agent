@@ -30,6 +30,7 @@ import { buildSystemPrompt } from "./promptBuilder.js";
 // chama `message` (o InboundMessage) e esconderia esta função.
 import { message as fixedMessage } from "./messages.js";
 import { RateLimiter } from "./rateLimiter.js";
+import { runWithUsageContext } from "../usage/usageMeter.js";
 
 // Mensagens fixas ao cliente (handoff, rate limit, capacidade sem conector,
 // cancelamento de pedido): desde 06/10/2026 vivem em ./messages.ts, em
@@ -84,6 +85,22 @@ export class Orchestrator {
   // "não responda nada" (usado no PASSO 0 abaixo e no rate limit... não, o
   // rate limit continua respondendo algo; só o PASSO 0 devolve vazio).
   async handleMessage(message: InboundMessage): Promise<string> {
+    // Abre o "contexto de consumo" desta mensagem (ver
+    // src/usage/usageMeter.ts): toda chamada paga feita daqui pra baixo —
+    // HyDE, embedding, rerank, resposta do LLM — é gravada no log de
+    // consumo com ESTE conversationId e canal, sem que hyde.ts,
+    // knowledgeBase.ts ou os providers precisem receber esses dados como
+    // parâmetro. O corpo real fica em processMessage() só pra este
+    // embrulho não aumentar a indentação do pipeline inteiro.
+    return runWithUsageContext({ conversationId: message.conversationId, channel: message.channel }, () =>
+      this.processMessage(message)
+    );
+  }
+
+  // Preâmbulo: processMessage() é o pipeline de verdade descrito no
+  // preâmbulo de handleMessage() acima — privado, sempre chamado de dentro
+  // do contexto de consumo aberto por handleMessage().
+  private async processMessage(message: InboundMessage): Promise<string> {
     // Desestrutura os campos usados por este método. `channel` e `userId`
     // entraram na revisão de segurança de 04/10/2026 (item #4) só para
     // montar requesterPhone logo abaixo — fora isso, o pipeline continua
@@ -294,6 +311,9 @@ export class Orchestrator {
       // próxima mensagem, sem reiniciar o processo.
       temperature: agentConfig.temperature,
       maxTokens: agentConfig.maxTokens,
+      // Etiqueta do relatório de custo: esta é a resposta ao cliente (a
+      // outra chamada de LLM por mensagem é o HyDE, marcada em hyde.ts).
+      purpose: "reply",
     });
 
     // PASSO 5.5 — O LLM decidiu transferir? (06/10/2026) Até aqui o modelo

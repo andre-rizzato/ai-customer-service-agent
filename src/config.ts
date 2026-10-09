@@ -295,6 +295,16 @@ const EnvSchema = z.object({
   // — também escrito por src/conversation/store.ts, e é o arquivo que a
   // Fase 7 do runbook recomenda ler semanalmente.
   AUDIT_LOG_PATH: z.string().default("./data/audit-log.jsonl"),
+  // Arquivo de consumo de API (tokens de LLM, embeddings e rerank), também
+  // JSON Lines — uma linha por chamada paga a um provedor, escrita por
+  // src/usage/usageMeter.ts. É a matéria-prima do relatório de custo por
+  // cliente (`npm run usage:report`). Fica SEPARADO do audit-log de
+  // propósito: o audit-log é para revisão humana do que foi dito ao
+  // cliente; este é contabilidade, lido por script, e misturar os dois
+  // atrapalharia as duas leituras. Tem default (e não é obrigatório) pra um
+  // deploy novo não derrubar o boot numa VM que ainda não tem a variável
+  // no .env (lição do incidente de 03/10 com WHATSAPP_APP_SECRET).
+  USAGE_LOG_PATH: z.string().default("./data/usage-log.jsonl"),
 
   // Se true, os segredos listados em SECRET_ENV_VARS (abaixo) são buscados
   // no Azure Key Vault em vez de lidos do .env local — ver

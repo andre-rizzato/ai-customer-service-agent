@@ -4,6 +4,7 @@
 // Diferente da VoyageEmbeddings, aqui usamos o SDK oficial `openai` (já é
 // dependência do projeto por causa do OpenAIProvider de LLM em src/llm/).
 import OpenAI from "openai";
+import { recordUsage } from "../usage/usageMeter.js";
 import type { EmbeddingProvider } from "./types.js";
 
 // Preâmbulo: OpenAIEmbeddings implementa EmbeddingProvider chamando a API
@@ -32,8 +33,14 @@ export class OpenAIEmbeddings implements EmbeddingProvider {
     // texto de entrada, já na ordem correta — diferente da API HTTP crua da
     // Voyage, aqui não precisamos reordenar manualmente.
     const res = await this.client.embeddings.create({ model: this.model, input: texts });
-    // Extrai só o vetor de cada item da resposta, descartando metadados
-    // (índice, contagem de tokens) que o pipeline não usa.
+    // Registra o consumo (ver src/usage/usageMeter.ts). Diferente da
+    // Voyage, esta classe não sabe se está embedando pergunta ou catálogo
+    // (a OpenAI não distingue input_type), então não marca `purpose` — o
+    // relatório separa os dois pelo conversationId (indexação roda fora de
+    // qualquer conversa).
+    recordUsage({ kind: "embedding", provider: "openai", model: this.model, inputTokens: res.usage.total_tokens });
+    // Extrai só o vetor de cada item da resposta, descartando os metadados
+    // restantes (índice) que o pipeline não usa.
     return res.data.map((d) => d.embedding);
   }
 }

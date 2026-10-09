@@ -3,6 +3,7 @@
 // embeddings (Claude não tem endpoint de embeddings próprio). Não usamos um
 // SDK porque a API é um único endpoint REST simples — uma chamada `fetch`
 // direta evita mais uma dependência no package.json.
+import { recordUsage } from "../usage/usageMeter.js";
 import type { EmbeddingProvider } from "./types.js";
 
 // Endpoint fixo da API de embeddings da Voyage — não muda por modelo (o
@@ -79,7 +80,23 @@ export class VoyageEmbeddings implements EmbeddingProvider {
     // por isso ordenamos explicitamente por `index` antes de extrair só os
     // vetores, preservando o contrato de EmbeddingProvider.embed (mesma
     // ordem da entrada).
-    const data = (await res.json()) as { data: { embedding: number[]; index: number }[] };
+    const data = (await res.json()) as {
+      data: { embedding: number[]; index: number }[];
+      usage?: { total_tokens: number };
+    };
+    // Registra o consumo (ver src/usage/usageMeter.ts). A Voyage devolve
+    // usage.total_tokens na resposta; embedding só cobra entrada. purpose =
+    // inputType: "query" é custo por pergunta de cliente, "document" é a
+    // indexação do catálogo (npm run ingest), que o relatório separa.
+    if (data.usage) {
+      recordUsage({
+        kind: "embedding",
+        provider: "voyage",
+        model: this.model,
+        purpose: this.inputType === "query" ? "query" : "ingest",
+        inputTokens: data.usage.total_tokens,
+      });
+    }
     return [...data.data].sort((a, b) => a.index - b.index).map((d) => d.embedding);
   }
 }

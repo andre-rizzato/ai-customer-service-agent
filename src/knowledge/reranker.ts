@@ -19,6 +19,8 @@
 // chave real do Key Vault: api.voyageai.com devolve 403 "This API key
 // cannot access this endpoint" pra chaves emitidas via console do Atlas
 // (mesma causa documentada no comentário de voyageEmbeddings.ts).
+import { recordUsage } from "../usage/usageMeter.js";
+
 const VOYAGE_RERANK_URL = "https://ai.mongodb.com/v1/rerank";
 
 interface RerankResponseItem {
@@ -57,7 +59,14 @@ export async function rerank(
     throw new Error(`Voyage rerank request failed (${res.status}): ${body}`);
   }
 
-  const data = (await res.json()) as { data: RerankResponseItem[] };
+  const data = (await res.json()) as { data: RerankResponseItem[]; usage?: { total_tokens: number } };
+  // Registra o consumo do rerank (ver src/usage/usageMeter.ts). O rerank
+  // cobra pelos tokens da pergunta + TODOS os documentos candidatos — é por
+  // isso que ele roda só sobre o top-N do RRF (CANDIDATE_POOL_SIZE em
+  // knowledgeBase.ts), e este registro permite conferir quanto isso pesa.
+  if (data.usage) {
+    recordUsage({ kind: "rerank", provider: "voyage", model: "rerank-2", purpose: "rerank", inputTokens: data.usage.total_tokens });
+  }
   // .index é a posição do documento na lista ORIGINAL `documents` passada —
   // não um id novo inventado pela Voyage — mesma garantia de
   // bm25Rank()/qdrantStore.query() (tudo endereçado por índice, nunca por

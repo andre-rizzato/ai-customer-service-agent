@@ -3,6 +3,7 @@
 // alternativa ao Claude Haiku, mantida como provedor plugável
 // (LLM_PROVIDER=openai).
 import OpenAI from "openai";
+import { recordUsage } from "../usage/usageMeter.js";
 import type { ChatMessage, GenerateOptions, LLMProvider } from "./types.js";
 
 // Preâmbulo: OpenAIProvider implementa LLMProvider chamando
@@ -33,6 +34,20 @@ export class OpenAIProvider implements LLMProvider {
       temperature: options.temperature,
       max_tokens: options.maxTokens,
     });
+    // Mesmo registro de consumo do AnthropicProvider. Na OpenAI o campo
+    // `usage` é opcional no tipo do SDK (pode faltar em alguns modos), por
+    // isso só grava quando ele existe — gravar zero seria pior que não
+    // gravar, porque o relatório mostraria custo falsamente baixo.
+    if (res.usage) {
+      recordUsage({
+        kind: "llm",
+        provider: "openai",
+        model: res.model,
+        purpose: options.purpose,
+        inputTokens: res.usage.prompt_tokens,
+        outputTokens: res.usage.completion_tokens,
+      });
+    }
     // A resposta vem em `choices` (a API suporta pedir múltiplas
     // completions alternativas); como não pedimos mais de uma, usamos
     // sempre a primeira. `?? ""` cobre o caso (raro) de a API devolver uma

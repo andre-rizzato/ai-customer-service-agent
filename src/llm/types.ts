@@ -20,6 +20,11 @@ export interface ChatMessage {
 export interface GenerateOptions {
   temperature: number;
   maxTokens: number;
+  // Etiqueta de contabilidade (ex.: "reply", "hyde") gravada no log de
+  // consumo (src/usage/usageMeter.ts) — não muda nada na chamada ao
+  // modelo, só permite ao relatório de custo separar quanto cada etapa do
+  // pipeline gasta. Opcional pra não obrigar todo chamador a informar.
+  purpose?: string;
 }
 
 export interface LLMProvider {

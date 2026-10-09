@@ -232,4 +232,5 @@ Detalhes em `docs/HANDOFF_RELAY.md`. O que é fácil quebrar sem perceber:
 - `docs/TUTORIAL_CONFIGURACAO.md` — tutorial: abrir a tela de configuração em produção (túnel SSH), o que acontece ao salvar, desfazer, e por que o site não mexe na config.
 - `docs/SECURITY_AUDIT_2026-10-06.md` + `docs/TUTORIAL_SEGURANCA_LOGS.md` — auditoria da VM e como verificar tentativas de ataque (`scripts/security-check.sh`).
 - `docs/HANDOFF_RELAY.md` — relay de handoff: atendente responde ao cliente pelo Telegram (reply ou Mini App), configuração, segurança e limitações.
+- `docs/CUSTO_API.md` — medição de consumo de API por conversa (`data/usage-log.jsonl`) e relatório de custo por cliente (`npm run usage:report`).
 - `docs/artifacts/` — docs de arquitetura publicados (Blueprint do Agente, Mapa de Capacidades).

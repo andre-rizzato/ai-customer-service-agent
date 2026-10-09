@@ -1,0 +1,14 @@
+{
+  "_comment": "Preços em USD por 1 milhão de tokens, usados por `npm run usage:report` (src/usage/usageReport.ts). A chave é o PREFIXO do nome do modelo: 'claude-haiku-4-5' vale para 'claude-haiku-4-5-20251001'. Preço muda: confira na página de preços de cada provedor e atualize 'checkedAt'. Modelo sem entrada aqui aparece no relatório como 'sem preço' (custo não somado), em vez de ser contado como zero.",
+  "checkedAt": "2026-10-09",
+  "models": {
+    "claude-haiku-4-5": { "input": 1.0, "output": 5.0, "cacheRead": 0.1, "cacheWrite": 1.25 },
+    "claude-sonnet-5-5": { "input": 2.0, "output": 10.0, "cacheRead": 0.2, "cacheWrite": 2.5 },
+    "gpt-4o-mini": { "input": 0.15, "output": 0.6 },
+    "text-embedding-3-small": { "input": 0.02 },
+    "voyage-3.5-lite": { "input": 0.02 },
+    "voyage-3.5": { "input": 0.06 },
+    "rerank-2-lite": { "input": 0.02 },
+    "rerank-2": { "input": 0.05 }
+  }
+}
