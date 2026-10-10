@@ -3,7 +3,7 @@
 // preço certo por modelo (inclusive o prefixo mais longo), indexação fora
 // da média por conversa, e modelo sem preço nunca contado como zero.
 import { describe, expect, it } from "vitest";
-import { buildMonthReports, costOfRecord, findPrice, parseUsageLog, type PricingTable } from "../src/usage/usageReport.js";
+import { brasiliaDate, buildMonthReports, costOfRecord, findPrice, parseUsageLog, type PricingTable } from "../src/usage/usageReport.js";
 import type { UsageRecord } from "../src/usage/usageMeter.js";
 
 const pricing: PricingTable = {
@@ -84,6 +84,26 @@ describe("buildMonthReports", () => {
 
   it("lista modelo sem preço em vez de somar zero", () => {
     expect(oct.unpricedModels).toEqual(["gpt-9"]);
+  });
+});
+
+describe("conversas cobráveis (cliente × dia, horário de Brasília)", () => {
+  it("o mesmo cliente em dois dias conta 2; duas mensagens no mesmo dia contam 1", () => {
+    const [oct] = buildMonthReports(
+      [
+        rec({ conversationId: "5511999", ts: "2026-10-10T13:00:00.000Z", purpose: "reply", inputTokens: 1 }),
+        rec({ conversationId: "5511999", ts: "2026-10-10T18:00:00.000Z", purpose: "reply", inputTokens: 1 }),
+        rec({ conversationId: "5511999", ts: "2026-10-11T13:00:00.000Z", purpose: "reply", inputTokens: 1 }),
+      ],
+      pricing
+    );
+    expect(oct.conversations).toBe(1);
+    expect(oct.billableConversations).toBe(2);
+  });
+
+  it("22h de Brasília (01h UTC do dia seguinte) ainda é o mesmo dia", () => {
+    expect(brasiliaDate("2026-10-11T01:00:00.000Z")).toBe("2026-10-10");
+    expect(brasiliaDate("2026-10-11T03:00:00.000Z")).toBe("2026-10-11");
   });
 });
 

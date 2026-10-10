@@ -1,0 +1,97 @@
+[
+  {
+    "id": "rizzato-sobre",
+    "title": "O que a Rizzato Tech faz — serviços e para quem",
+    "content": "O que fazemos: a Rizzato Tech constrói agentes de atendimento com inteligência artificial para negócios que vivem de conversa: WhatsApp, Telegram e o chat do próprio site. Cada agente é feito sob medida: o catálogo, o tom de voz e as regras de quando chamar um humano vêm do negócio do cliente, não de um modelo pronto. O agente responde só com base no que o negócio realmente oferece e nunca inventa preço, prazo ou política; quando não sabe, transfere para uma pessoa da equipe do cliente. Não somos um chatbot genérico que o cliente configura sozinho, nem um SaaS que deixa o cliente sozinho depois da assinatura. O agente é pensado para negócios como barbearias e salões, clínicas e consultórios, lojas com catálogo próprio, delivery e restaurantes, serviços com agenda e qualquer negócio que vive no WhatsApp. Não divulgamos nomes de clientes."
+  },
+  {
+    "id": "como-funciona",
+    "title": "Como funciona a contratação e prazo para entrar no ar",
+    "content": "São três etapas. 1) Mapeamento: levantamos o catálogo, as políticas, o tom de voz e as perguntas que os clientes de fato fazem — pode estar numa planilha, num caderno ou só na cabeça de quem atende hoje. 2) Conexão: ligamos o agente aos canais (WhatsApp, Telegram, chat do site) e, nos planos com capacidades extras, ao sistema de agenda ou de pedidos que o negócio já usa. 3) Piloto: o agente atende uma fração dos contatos, com a equipe humana acompanhando em paralelo, antes de ir ao ar para todo mundo. Prazo típico para entrar no ar: de 2 a 4 semanas depois do início do mapeamento, dependendo do tamanho do catálogo e das integrações. A mensalidade só começa a ser cobrada quando o agente vai ao ar para todos os contatos; o período de piloto está incluído na implantação."
+  },
+  {
+    "id": "plano-essencial",
+    "title": "Plano Essencial (Atendimento)",
+    "content": "Plano Essencial: agente de atendimento que responde dúvidas com base no catálogo e nas políticas do negócio e transfere para a equipe humana quando precisa. Inclui 1 canal de mensagem (WhatsApp ou Telegram) mais o chat no site do cliente, respostas em português, inglês e italiano, e até 1.000 conversas por mês. Mensalidade: R$ 349,00 por mês. Conversa além da franquia: R$ 0,25 cada. Implantação: R$ 990,00 (ou 3x de R$ 330,00 sem juros no cartão, ou R$ 940,50 no Pix à vista) — ou implantação grátis com fidelidade de 12 meses. Plano anual: R$ 3.490,00 pagos de uma vez, em vez de R$ 4.188,00 em 12 mensalidades — economia de R$ 698,00 (2 meses grátis). No plano anual a implantação é grátis, porque o pagamento anual já vale como os 12 meses de fidelidade. Ajustes de catálogo incluídos: até 2 por mês. Não inclui as tarifas da Meta pelo WhatsApp, pagas pelo cliente direto à Meta (ver custos fora do plano)."
+  },
+  {
+    "id": "plano-profissional",
+    "title": "Plano Profissional (Atendimento + 1 capacidade)",
+    "content": "Plano Profissional: tudo do Plano Essencial mais uma capacidade à escolha — Agenda, Pedidos ou Vendas. Inclui 2 canais de mensagem (WhatsApp e Telegram) mais o chat no site e até 2.500 conversas por mês. Mensalidade: R$ 649,00 por mês. Conversa além da franquia: R$ 0,20 cada. Implantação: R$ 1.990,00 (ou 3x de R$ 663,33 sem juros no cartão, ou R$ 1.890,50 no Pix à vista) — ou implantação grátis com fidelidade de 12 meses. Plano anual: R$ 6.490,00 pagos de uma vez, em vez de R$ 7.788,00 em 12 mensalidades — economia de R$ 1.298,00 (2 meses grátis). No plano anual a implantação é grátis, porque o pagamento anual já vale como os 12 meses de fidelidade. Ajustes de catálogo incluídos: até 4 por mês. Capacidade extra além da escolhida: R$ 300,00 por mês cada. Não inclui as tarifas da Meta pelo WhatsApp, pagas pelo cliente direto à Meta (ver custos fora do plano)."
+  },
+  {
+    "id": "plano-completo",
+    "title": "Plano Completo (Atendimento + Agenda + Pedidos + Vendas)",
+    "content": "Plano Completo: atendimento com as três capacidades — Agenda, Pedidos e Vendas. Inclui 2 canais de mensagem (WhatsApp e Telegram) mais o chat no site e até 5.000 conversas por mês. Mensalidade: R$ 1.190,00 por mês. Conversa além da franquia: R$ 0,15 cada. Implantação: R$ 3.490,00 (ou 3x de R$ 1.163,33 sem juros no cartão, ou R$ 3.315,50 no Pix à vista) — ou implantação grátis com fidelidade de 12 meses. Plano anual: R$ 11.900,00 pagos de uma vez, em vez de R$ 14.280,00 em 12 mensalidades — economia de R$ 2.380,00 (2 meses grátis). No plano anual a implantação é grátis, porque o pagamento anual já vale como os 12 meses de fidelidade. Ajustes de catálogo incluídos: até 8 por mês e suporte com prioridade. Não inclui as tarifas da Meta pelo WhatsApp, pagas pelo cliente direto à Meta (ver custos fora do plano)."
+  },
+  {
+    "id": "comparativo-planos",
+    "title": "Qual plano escolher — comparativo",
+    "content": "Essencial (R$ 349,00 por mês): para quem quer tirar dúvidas dos clientes no automático — preços, horários, políticas, formas de pagamento — e passar para a equipe o que precisa de uma pessoa. Profissional (R$ 649,00 por mês): para quem também precisa de uma ação de verdade no sistema — marcar horário (barbearia, salão, clínica), consultar pedido (loja, delivery) ou vender com link de pagamento. Completo (R$ 1.190,00 por mês): para quem quer as três ações e mais volume de conversas. Todos os planos começam pelo mesmo mapeamento e pelo mesmo piloto, e é possível mudar de plano a qualquer momento: a diferença de mensalidade vale a partir do mês seguinte, e a mudança de plano não cobra nova implantação, só a configuração da capacidade nova quando houver integração."
+  },
+  {
+    "id": "implantacao",
+    "title": "O que está incluído na implantação",
+    "content": "A implantação inclui: mapeamento do catálogo, das políticas e do tom de voz; configuração dos canais; integração com o sistema de agenda ou de pedidos nos planos que têm essas capacidades, quando o sistema tem integração disponível; testes com conversas reais; e o período de piloto com a equipe humana acompanhando. Duas formas de contratar: pagar a implantação (à vista com 5% de desconto no Pix, ou em 3x sem juros no cartão) e ficar livre de fidelidade; ou não pagar implantação e assinar fidelidade de 12 meses. No plano anual, pago de uma vez, a implantação também é grátis. Integração com sistema que não tem integração disponível (por exemplo, um sistema próprio sem API) é orçada à parte, depois do mapeamento."
+  },
+  {
+    "id": "o-que-e-conversa",
+    "title": "O que conta como uma conversa e o que acontece se passar da franquia",
+    "content": "Uma conversa é todo o atendimento de um mesmo cliente final num mesmo dia, não importa quantas mensagens ele mande. Exemplo: um cliente que manda 10 mensagens numa tarde conta como 1 conversa; se ele voltar no dia seguinte, conta como mais 1. Exemplo de excedente: 1.500 conversas num mês no Plano Essencial custam R$ 349,00 de mensalidade mais 500 conversas excedentes a R$ 0,25 (R$ 125,00), ou seja, R$ 474,00 no total. Para outros volumes, a conta é a mesma: mensalidade mais o número de conversas acima da franquia vezes o valor por conversa do plano. Ao chegar a 80% da franquia do mês, o cliente da Rizzato Tech recebe um aviso por email. Se passar da franquia, o agente continua atendendo normalmente — ninguém fica sem resposta — e as conversas excedentes são cobradas na fatura seguinte pelo valor do plano: R$ 0,25 no Essencial, R$ 0,20 no Profissional e R$ 0,15 no Completo. Se o excedente se repetir, sugerimos o plano acima quando ele sair mais barato."
+  },
+  {
+    "id": "formas-pagamento",
+    "title": "Formas de pagamento",
+    "content": "Implantação: Pix à vista com 5% de desconto, boleto à vista, ou cartão de crédito em até 3x sem juros. Mensalidade: Pix, boleto ou cartão de crédito com cobrança recorrente, com vencimento no dia 10 de cada mês. Plano anual: Pix ou boleto à vista, ou cartão em até 3x sem juros. A nota fiscal é emitida a cada pagamento. Em caso de atraso, enviamos lembretes; com mais de 15 dias de atraso o agente pode ser pausado até a regularização, e nada é apagado nesse período."
+  },
+  {
+    "id": "cancelamento",
+    "title": "Cancelamento, fidelidade e garantia",
+    "content": "Quem pagou a implantação não tem fidelidade: pode cancelar a qualquer momento com aviso de 30 dias, sem multa. Quem escolheu a implantação grátis assina fidelidade de 12 meses; se cancelar antes, paga o valor da implantação do plano proporcional aos meses que faltam. Garantia de 30 dias: se nos primeiros 30 dias depois de o agente ir ao ar o cliente não quiser continuar, pode cancelar sem aviso prévio e devolvemos 50% do valor pago de implantação. Plano anual cancelado antes do fim: devolvemos as mensalidades não usadas, calculadas pelo preço mensal do plano. Ao cancelar, o cliente pode pedir a exportação do catálogo e do histórico de conversas antes do desligamento."
+  },
+  {
+    "id": "custos-externos-whatsapp",
+    "title": "O WhatsApp está incluído no preço? Custos que não estão no plano (tarifas da Meta, número, processador de pagamento)",
+    "content": "O atendimento pelo WhatsApp está incluído no plano, mas as tarifas que a própria Meta cobra pelo uso do WhatsApp Business API não estão. A mensalidade cobre o agente, a hospedagem, a inteligência artificial e o suporte. Ficam por conta do cliente, pagos diretamente ao fornecedor: as tarifas da Meta pelo uso do WhatsApp Business API (a conta fica no nome e no cartão do próprio cliente, e ajudamos a criar); o número de telefone dedicado ao WhatsApp, que não pode ser usado ao mesmo tempo no aplicativo comum; e, no plano com Vendas, as taxas do processador de pagamento sobre cada venda. O Telegram e o chat no site não têm custo externo."
+  },
+  {
+    "id": "capacidade-agenda",
+    "title": "Capacidade Agenda (marcar horário)",
+    "content": "Com a capacidade Agenda, o agente consulta a disponibilidade de verdade e marca o horário na agenda do negócio, sem conflito e sem ida e volta manual. Pensado para barbearia, salão, clínica e qualquer serviço com hora marcada. A integração com a agenda do negócio (por exemplo, Google Agenda) é configurada e testada durante a implantação; outras agendas dependem de o sistema ter integração disponível e são avaliadas no mapeamento. Disponível no Plano Profissional (como capacidade escolhida) e no Plano Completo."
+  },
+  {
+    "id": "capacidade-pedidos",
+    "title": "Capacidade Pedidos (status do pedido)",
+    "content": "Com a capacidade Pedidos, o agente consulta o status do pedido direto no sistema do negócio, em tempo real — nunca um status inventado. Pedido de cancelamento é sempre confirmado por uma pessoa da equipe: o agente entende a intenção e transfere, por segurança. Requer que o sistema de pedidos tenha integração disponível. Disponível no Plano Profissional (como capacidade escolhida) e no Plano Completo."
+  },
+  {
+    "id": "capacidade-vendas",
+    "title": "Capacidade Vendas (mostrar produto e link de pagamento)",
+    "content": "Com a capacidade Vendas, o agente mostra os produtos, aplica as regras de desconto definidas pelo negócio e envia um link de pagamento seguro, com Pix ou cartão. O pagamento nunca passa pela conversa: o cliente final paga na página do processador de pagamento, e nem o agente nem a Rizzato Tech veem ou guardam dados de cartão ou Pix. O agente nunca dá desconto que o negócio não autorizou. A integração com o processador de pagamento do negócio é configurada e testada durante a implantação. Disponível no Plano Profissional (como capacidade escolhida) e no Plano Completo."
+  },
+  {
+    "id": "transferencia-humano",
+    "title": "Quando o agente passa para uma pessoa da equipe",
+    "content": "O agente transfere a conversa para a equipe humana do negócio quando o cliente pede para falar com uma pessoa, quando percebe frustração ou reclamação, ou quando não tem a informação para responder. A equipe recebe um alerta no Telegram com o histórico da conversa e responde de lá mesmo — a resposta chega ao cliente no canal em que ele estava (WhatsApp, Telegram ou chat do site). Durante o atendimento humano o agente fica em silêncio, e volta a atender quando a equipe encerra ou devolve a conversa. Disponível em todos os planos."
+  },
+  {
+    "id": "canais-idiomas",
+    "title": "Canais e idiomas atendidos",
+    "content": "Canais: WhatsApp (pela API oficial da Meta; as tarifas da Meta são pagas pelo cliente direto a ela), Telegram e chat no site do cliente. O Plano Essencial inclui 1 canal de mensagem (WhatsApp ou Telegram) mais o chat no site; os planos Profissional e Completo incluem WhatsApp e Telegram mais o chat no site. Idiomas: o agente responde em português, inglês e italiano, no idioma em que o cliente final escrever. Outros canais, como Instagram, podem ser avaliados sob consulta."
+  },
+  {
+    "id": "suporte",
+    "title": "Suporte e ajustes de catálogo",
+    "content": "Suporte por email, com resposta em até 1 dia útil, de segunda a sexta. Ajustes de catálogo — mudar preço, incluir produto, atualizar política ou horário — estão incluídos: até 2 por mês no Essencial, até 4 por mês no Profissional e até 8 por mês no Completo, normalmente feitos em até 2 dias úteis. Ajustes além disso, ou mudanças maiores no comportamento do agente, custam R$ 150,00 por hora de trabalho, com orçamento aprovado antes. O cliente recebe todo mês um resumo com o número de conversas atendidas e de transferências para a equipe."
+  },
+  {
+    "id": "seguranca-privacidade",
+    "title": "Segurança, privacidade e dados",
+    "content": "Os dados de pagamento nunca passam pelo agente: o pagamento acontece na página do processador. As conversas ficam guardadas em servidor na nuvem Microsoft Azure, usadas só para o atendimento do próprio cliente, para a auditoria de qualidade e para o resumo mensal; não vendemos nem compartilhamos dados com terceiros. As senhas e chaves de acesso ficam num cofre de segredos, nunca em texto aberto. Pedidos de acesso ou de exclusão de dados de um cliente final, conforme a LGPD, podem ser feitos por email e são atendidos manualmente. O agente se apresenta como assistente virtual sempre que alguém pergunta se está falando com uma pessoa."
+  },
+  {
+    "id": "demonstracao-contato",
+    "title": "Demonstração e contato",
+    "content": "Este próprio chat é um agente da Rizzato Tech: tudo o que ele responde segue as mesmas regras que um agente sob medida para o seu negócio. Para uma demonstração com o seu caso, sem custo e sem compromisso, ou para montar uma proposta, escreva para contato@rizzatotech.com contando o que o seu negócio faz e por onde seus clientes falam com você hoje. Respondemos em até 1 dia útil. Site: www.rizzatotech.com."
+  }
+]

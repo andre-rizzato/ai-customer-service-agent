@@ -229,7 +229,9 @@ Guia: [`SEGURANCA_PROMPT_INJECTION.md`](SEGURANCA_PROMPT_INJECTION.md) (item #9 
 - [x] ~~Webhook registrado~~ — Telegram testado com mensagem real; WhatsApp verificado, envio pendente do chip `+55`
 - [ ] Chip `+55` registrado na API do WhatsApp (planejado semana de 11/10/2026)
 - [ ] DNS + teste via canal real pro tenant `DistributedOrderSystem` (só validado via `/webhook/web` até agora)
-- [ ] Catálogo real do negócio (hoje ainda é `catalog.example.json`)
+- [x] Catálogo da Rizzato Tech criado (`knowledge/catalog.json`, 09/10/2026), com a tabela de preços **proposta** e testado no bot (29 perguntas). Premissas e margens em [`PRECIFICACAO.md`](PRECIFICACAO.md)
+- [ ] Aprovar os preços e ativar na VM: `knowledgeBasePath`, `businessName: "Rizzato Tech"` (hoje "Rizzato Systems"), `npm run ingest` (passo a passo em `PRECIFICACAO.md`)
+- [ ] Antes de vender Profissional/Completo com Agenda ou Vendas: o catálogo promete a integração na implantação, e hoje essas capacidades caem em atendimento humano
 
 ### Técnico — segurança (ver `SECURITY_REVIEW.md`)
 

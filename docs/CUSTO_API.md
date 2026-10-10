@@ -48,7 +48,10 @@ já corresponde a um cliente só:
 ssh azureuser@20.127.12.103 'cd ~/agente-atendimento && npm run --silent usage:report -- --usd-brl 5.40'
 ```
 
-O relatório mostra o custo total, o custo médio e a mediana **por conversa**,
+O relatório mostra as **conversas cobráveis** (cada par cliente × dia, no
+horário de Brasília, a mesma definição do catálogo; é o número que se
+compara com a franquia do plano em `PRECIFICACAO.md`), os clientes
+distintos, o custo total, o custo médio e a mediana **por conversa**,
 o custo por resposta, e a divisão por etapa, por modelo e por canal. A
 indexação do catálogo entra no total, mas não na média por conversa.
 

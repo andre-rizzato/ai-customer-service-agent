@@ -38,6 +38,13 @@ export interface MonthReport {
   // mês com reindexação pareceria ter conversas mais caras.
   ingestUsd: number;
   conversations: number;
+  // Conversas no sentido da COBRANÇA (knowledge/catalog.json, item "O que
+  // conta como uma conversa"): cada par cliente × dia, no horário de
+  // Brasília. Diferente de `conversations` (ids distintos no mês): no
+  // WhatsApp o id é o telefone, então um cliente que volta todo dia seria 1
+  // em `conversations` e 30 aqui. É este número que se compara com a
+  // franquia do plano.
+  billableConversations: number;
   replies: number;
   avgPerConversationUsd: number;
   medianPerConversationUsd: number;
@@ -131,6 +138,8 @@ function buildMonthReport(month: string, records: UsageRecord[], pricing: Pricin
   // porque é a resposta que gera custo (mensagem que caiu em handoff por
   // palavra-chave não chama API nenhuma).
   const perConversation = new Map<string, { usd: number; replies: number }>();
+  // Pares "conversationId|dia" — ver billableConversations em MonthReport.
+  const billable = new Set<string>();
 
   for (const r of records) {
     const usd = costOfRecord(r, pricing);
@@ -160,6 +169,7 @@ function buildMonthReport(month: string, records: UsageRecord[], pricing: Pricin
     conv.usd += usd;
     if (r.kind === "llm" && r.purpose === "reply") conv.replies += 1;
     perConversation.set(r.conversationId, conv);
+    billable.add(`${r.conversationId}|${brasiliaDate(r.ts)}`);
   }
 
   const convCosts = [...perConversation.values()].map((c) => c.usd).sort((a, b) => a - b);
@@ -172,6 +182,7 @@ function buildMonthReport(month: string, records: UsageRecord[], pricing: Pricin
     totalUsd,
     ingestUsd,
     conversations,
+    billableConversations: billable.size,
     replies,
     avgPerConversationUsd: conversations ? conversationUsd / conversations : 0,
     medianPerConversationUsd: median(convCosts),
@@ -191,6 +202,15 @@ function buildMonthReport(month: string, records: UsageRecord[], pricing: Pricin
 // Mediana além da média porque poucas conversas muito longas puxam a
 // média pra cima — a mediana mostra o custo da conversa "típica", que é o
 // número certo pra dimensionar uma franquia.
+// Preâmbulo: brasiliaDate() devolve a data (AAAA-MM-DD) de um horário ISO
+// em UTC convertida para o horário de Brasília (UTC−3, sem horário de verão
+// desde 2019). Usada pra contar "conversa = cliente × dia" no dia que o
+// cliente enxerga: sem a conversão, uma mensagem às 22h de Brasília (01h
+// UTC) cairia no dia seguinte e contaria uma conversa a mais.
+export function brasiliaDate(isoTs: string): string {
+  return new Date(Date.parse(isoTs) - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
 function median(sorted: number[]): number {
   if (sorted.length === 0) return 0;
   const mid = Math.floor(sorted.length / 2);
@@ -213,7 +233,7 @@ export function formatReport(reports: MonthReport[], detailMonth: string, usdBrl
 
   lines.push("Custo de API por mês");
   for (const r of reports) {
-    lines.push(`  ${r.month}: ${money(r.totalUsd)} | ${r.conversations} conversas | ${r.replies} respostas`);
+    lines.push(`  ${r.month}: ${money(r.totalUsd)} | ${r.billableConversations} conversas cobráveis | ${r.replies} respostas`);
   }
 
   const d = reports.find((r) => r.month === detailMonth);
@@ -225,7 +245,8 @@ export function formatReport(reports: MonthReport[], detailMonth: string, usdBrl
   lines.push("", `Detalhe de ${d.month}`);
   lines.push(`  Total:                    ${money(d.totalUsd)}`);
   lines.push(`  Indexação do catálogo:    ${money(d.ingestUsd)}`);
-  lines.push(`  Conversas com custo:      ${d.conversations}`);
+  lines.push(`  Conversas cobráveis:      ${d.billableConversations} (cliente × dia — compare com a franquia do plano)`);
+  lines.push(`  Clientes distintos:       ${d.conversations}`);
   lines.push(`  Custo médio por conversa: ${money(d.avgPerConversationUsd)}`);
   lines.push(`  Mediana por conversa:     ${money(d.medianPerConversationUsd)}`);
   lines.push(`  Conversa mais cara:       ${money(d.maxPerConversationUsd)}`);

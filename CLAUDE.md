@@ -294,5 +294,6 @@ perceber:
 - `docs/CUSTO_AZURE.md` — o que cobra na assinatura Azure (inclusive com a VM desligada), como conferir e como reduzir.
 - `docs/RAG_QDRANT_MIGRATION.md` — pipeline de busca (Qdrant + BM25 + RRF + rerank, HyDE condicional).
 - `eval/README.md` — eval de qualidade RAGAS e teste de conversa longa: como rodar (inclusive no Windows) e o histórico de resultados.
+- `docs/PRECIFICACAO.md` — tabela de preços proposta da Rizzato Tech (`knowledge/catalog.json`), premissas de custo e margem, o que o catálogo promete que ainda é manual, e como ativar na VM. Regra: todo valor que o bot possa precisar calcular (total anual, parcela, excedente) tem que estar escrito no catálogo, senão a checagem de valores bloqueia.
 - `docs/SEGURANCA_PROMPT_INJECTION.md` — prompt injection e abuso do bot: o que um atacante consegue, as proteções em camadas, o teste adversarial (`npm run eval:adversarial`, 12/16 → 16/16) e as pendências de Nginx/Console.
 - `docs/artifacts/` — docs de arquitetura publicados (Blueprint do Agente, Mapa de Capacidades, Fluxo da Requisição). Mudou o HTML? Rode `node scripts/extract-diagram-svgs.mjs` para atualizar os SVGs em `docs/artifacts/images/`.
