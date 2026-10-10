@@ -143,6 +143,30 @@ export const AgentConfigSchema = z.object({
   // atualiza o comportamento sem reiniciar o processo.
   temperature: z.number().min(0).max(1).default(0.7),
   maxTokens: z.number().int().positive().default(1024),
+
+  // Controles de custo (09/10/2026). Os dois têm default, então nenhum
+  // agent.config.json existente precisa ser editado — e não aparecem na
+  // tela de configuração ainda: são ajuste fino, mexidos à mão quando o
+  // relatório de custo (npm run usage:report) ou o eval de qualidade
+  // (eval/) indicarem.
+  //
+  // hydeSkipScore: o RAG primeiro busca com a pergunta crua (sem HyDE). Se
+  // o melhor trecho, julgado pelo reranker, tiver score >= este valor, a
+  // busca para ali e o HyDE (uma chamada de LLM — ~40% do custo de LLM por
+  // pergunta, medido em 09/10) não roda. Abaixo disso, roda o pipeline
+  // completo com HyDE, como antes. 0.5 fica acima do corte de relevância
+  // (minRelevanceScore 0.4) de propósito: só pula o HyDE quando a busca
+  // simples achou algo com folga, não por pouco. Escala medida neste
+  // catálogo: irrelevante ~0.25-0.31, resposta certa ~0.5-0.65. 1 = HyDE
+  // sempre (comportamento antigo); 0 = nunca.
+  hydeSkipScore: z.number().min(0).max(1).default(0.5),
+  // Quantos turnos (mensagens de cliente/bot/atendente) do histórico
+  // recente vão no prompt da resposta. Antes ia a sessão inteira, e cada
+  // resposta reenviava todos os turnos anteriores — o custo de uma conversa
+  // crescia com o quadrado do tamanho dela. O que fica de fora não é
+  // esquecido: ver src/conversation/memory.ts (resumo + busca nos turnos
+  // antigos).
+  historyWindowTurns: z.number().int().positive().default(15),
 });
 
 // Tipo TypeScript derivado do schema acima — z.infer lê a definição do zod

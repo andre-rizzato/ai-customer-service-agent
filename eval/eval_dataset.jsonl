@@ -6,3 +6,15 @@
 {"question": "quais as formas de pagamento?", "ground_truth": "Pix (5% de desconto à vista), cartão de crédito em até 6x sem juros, e boleto bancário."}
 {"question": "o filtro FX100 precisa de instalação elétrica?", "ground_truth": "Não, o FX100 funciona por gravidade, sem uso de energia elétrica, é só de bancada."}
 {"question": "qual a garantia do FX200?", "ground_truth": "12 meses contra defeito de fabricação."}
+{"question": "a água aqui de casa tem gosto forte de cloro, o que vocês recomendam?", "ground_truth": "O filtro FX200 reduz cloro, sedimentos e metais pesados."}
+{"question": "moro de aluguel e não posso mexer no encanamento, qual filtro serve pra mim?", "ground_truth": "O FX100, que é de bancada e não precisa de instalação na tubulação."}
+{"question": "preciso chamar um encanador pra instalar o FX200?", "ground_truth": "Não, o FX200 acompanha kit de instalação para torneira padrão e instala em até 15 minutos sem encanador."}
+{"question": "de quanto em quanto tempo eu troco o refil do FX100?", "ground_truth": "A cada 4 meses ou 2.000 litros."}
+{"question": "o filtro chegou com defeito, quem paga o frete pra eu devolver?", "ground_truth": "Em caso de defeito, o frete de devolução é por conta da empresa, com devolução em até 7 dias corridos após o recebimento."}
+{"question": "se eu devolver, em quanto tempo recebo meu dinheiro de volta?", "ground_truth": "O reembolso é processado em até 10 dias úteis após o recebimento do produto devolvido."}
+{"question": "moro no interior, demora quanto pra chegar?", "ground_truth": "De 5 a 12 dias úteis para localidades fora das capitais, após a confirmação do pagamento."}
+{"question": "se eu pagar no boleto, quando vocês mandam o pedido?", "ground_truth": "O boleto compensa em até 2 dias úteis e o pedido é enviado após a confirmação do pagamento."}
+{"question": "tem algum desconto pagando à vista?", "ground_truth": "Sim, 5% de desconto no Pix à vista."}
+{"question": "como faço pra acompanhar minha encomenda?", "ground_truth": "O código de rastreio é enviado por mensagem assim que a nota fiscal é emitida."}
+{"question": "o FX200 tira os minerais da água?", "ground_truth": "Não, o FX200 não remove sais minerais."}
+{"question": "dá pra parcelar o FX200?", "ground_truth": "Sim, no cartão de crédito em até 6x sem juros."}

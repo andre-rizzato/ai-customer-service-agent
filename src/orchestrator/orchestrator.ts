@@ -16,6 +16,7 @@
 import { agentConfig } from "../config.js";
 import { ConversationStore } from "../conversation/store.js";
 import { currentSession } from "../conversation/currentSession.js";
+import { ConversationMemory, type DialogueTurn } from "../conversation/memory.js";
 import { createHandoffNotifier, type HandoffNotifier } from "../handoffNotifier/index.js";
 import { HandoffStateStore, type HandoffState } from "./handoffState.js";
 import { KnowledgeBase } from "../knowledge/knowledgeBase.js";
@@ -57,6 +58,12 @@ export class Orchestrator {
   // partir de LLM_PROVIDER no .env — o Orchestrator só enxerga a interface
   // LLMProvider, nunca a classe concreta.
   private readonly llm: LLMProvider = createLLMProvider();
+  // Memória da conversa no prompt (09/10/2026): janela dos últimos turnos +
+  // resumo do que saiu dela + busca BM25 nos turnos antigos — ver
+  // src/conversation/memory.ts. Declarada DEPOIS de `conversations` e
+  // `llm` porque inicializadores de propriedade rodam na ordem em que
+  // aparecem, e ela recebe as duas no construtor.
+  private readonly memory = new ConversationMemory(this.conversations, this.llm);
   // Notificador de handoff concreto (console ou webhook), decidido pela
   // factory a partir de agentConfig.handoffNotifier. Não é mais `readonly`
   // porque reloadConfig() (abaixo) o recria quando a tela de configuração
@@ -275,32 +282,40 @@ export class Orchestrator {
     // (ver knowledgeBase.ts) — pode vir vazio, e é isso que aciona a "regra
     // de vazio" dentro do prompt (ver promptBuilder.ts).
     const retrieved = await this.knowledgeBase.search(text);
-    // PASSO 4 — Monta o system prompt com as 3 regras fixas + o contexto
-    // recuperado (ou a frase de "nada encontrado").
-    const systemPrompt = buildSystemPrompt(retrieved, language);
     // Monta o histórico no formato que o LLMProvider espera (ChatMessage[]:
     // só role "user"/"assistant" + content).
     // currentSession(): só o que veio depois do último atendimento humano
     // ENCERRADO — ver src/conversation/currentSession.ts (bug de 06/10: o
     // modelo reaproveitava um "sim, pode transferir" de um atendimento já
     // encerrado e transferia de novo sem perguntar).
-    const history = currentSession(this.conversations.getHistory(conversationId))
+    const dialogue = currentSession(this.conversations.getHistory(conversationId))
       // Remove qualquer turno "system-note" (ex.: o registro de handoff
       // gravado acima em uma chamada anterior desta mesma conversa) — o
       // modelo nunca deve ver essas anotações internas como se fossem parte
-      // do diálogo real entre usuário e assistente.
-      .filter((turn) => turn.role !== "system-note")
-      .map((turn) => ({
-        // Depois do filtro acima, turn.role só pode ser "user", "assistant"
-        // ou "human-agent". A fala do atendente humano (relay) vai pro LLM
-        // como "assistant": do ponto de vista do cliente é a mesma voz da
-        // empresa, e quando o bot volta a atender depois do handoff ele
-        // precisa saber o que o atendente já disse/prometeu, pra não se
-        // contradizer. O `as` documenta essa garantia pro TypeScript, que
-        // não consegue inferir sozinho o efeito do .filter() anterior.
-        role: (turn.role === "human-agent" ? "assistant" : turn.role) as "user" | "assistant",
-        content: turn.text,
-      }));
+      // do diálogo real entre usuário e assistente. O type guard documenta
+      // pro TypeScript o que o filtro garante (só sobram falas de verdade).
+      .filter((turn): turn is DialogueTurn => turn.role !== "system-note");
+    // Memória (09/10/2026, ver src/conversation/memory.ts): em vez da
+    // sessão inteira, vão literalmente só os últimos
+    // agentConfig.historyWindowTurns turnos (mais os que o resumo ainda não
+    // cobre); o que saiu da janela volta como resumo + trechos antigos
+    // relevantes, no system prompt. Antes ia a sessão inteira e o custo por
+    // resposta crescia sem limite em conversa longa.
+    const prepared = this.memory.prepare(conversationId, dialogue, text);
+    // PASSO 4 — Monta o system prompt com as 3 regras fixas + o contexto
+    // recuperado (ou a frase de "nada encontrado") + a memória da conversa
+    // (só em conversa longa).
+    const systemPrompt = buildSystemPrompt(retrieved, language, prepared.memoryBlock);
+    const history = prepared.history.map((turn) => ({
+      // turn.role aqui só pode ser "user", "assistant" ou "human-agent" (ver
+      // o filtro de system-note acima). A fala do atendente humano (relay)
+      // vai pro LLM como "assistant": do ponto de vista do cliente é a mesma
+      // voz da empresa, e quando o bot volta a atender depois do handoff ele
+      // precisa saber o que o atendente já disse/prometeu, pra não se
+      // contradizer.
+      role: (turn.role === "human-agent" ? "assistant" : turn.role) as "user" | "assistant",
+      content: turn.text,
+    }));
 
     // PASSO 5 — Chama o LLM configurado (Claude ou OpenAI) com o system
     // prompt montado e o histórico da conversa; `generate` devolve só o
@@ -356,6 +371,11 @@ export class Orchestrator {
       timestamp: Date.now(),
       contextUsed: retrieved.map((r) => r.item.id),
     });
+    // Atualiza o resumo da conversa em segundo plano, se já saíram turnos
+    // suficientes da janela (ver ConversationMemory.scheduleSummaryUpdate).
+    // Sem await: o cliente não espera por isso. Só aqui, no caminho normal
+    // de resposta — os ramos de handoff acima encerram a vez do bot.
+    this.memory.scheduleSummaryUpdate(conversationId, prepared);
 
     // PASSO 7 — Devolve o texto da resposta; quem chamou (o ChannelAdapter)
     // é responsável por enviá-la de volta ao usuário pelo canal de origem.

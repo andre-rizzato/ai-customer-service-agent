@@ -33,7 +33,7 @@ from pathlib import Path
 
 import pytest
 import requests
-from anthropic import Anthropic
+from anthropic import AsyncAnthropic
 from dotenv import load_dotenv
 from ragas.llms.base import llm_factory
 from ragas.metrics.collections import ContextPrecisionWithoutReference, Faithfulness
@@ -51,7 +51,12 @@ _EVAL_DATASET_PATH = Path(__file__).parent / "eval_dataset.jsonl"
 # nem `top_p` em Messages.create() - ragas's InstructorModelArgs manda os
 # dois por padrão. model_args é um dict comum na instância, seguro de
 # mutar depois de construída.
-_ragas_llm = llm_factory("claude-sonnet-4-6", provider="anthropic", client=Anthropic())
+# AsyncAnthropic (e não Anthropic): as métricas abaixo são chamadas com
+# .ascore(), que usa agenerate() por dentro — com um cliente síncrono o
+# RAGAS 0.4.3 lança "Cannot use agenerate() with a synchronous client" em
+# todo caso, e o juiz nunca chega a rodar (achado em 09/10/2026, quando este
+# harness foi executado pela primeira vez de ponta a ponta).
+_ragas_llm = llm_factory("claude-sonnet-4-6", provider="anthropic", client=AsyncAnthropic())
 _ragas_llm.model_args.pop("top_p", None)
 _ragas_llm.model_args.pop("temperature", None)
 
@@ -115,12 +120,16 @@ def test_faithfulness_and_context_precision(case_index, case):
     # guarda de privacidade do AgentService irmão para este catálogo).
     assert retrieved_texts, f"Nenhum contexto recuperado para: {case['question']!r}"
 
-    faithfulness_value = asyncio.run(
-        _faithfulness.ascore(user_input=case["question"], response=reply, retrieved_contexts=retrieved_texts)
-    ).value
-    precision_value = asyncio.run(
-        _context_precision.ascore(user_input=case["question"], response=reply, retrieved_contexts=retrieved_texts)
-    ).value
+    # As duas métricas rodam dentro de UM asyncio.run só: o AsyncAnthropic
+    # guarda um pool HTTP ligado ao event loop em que foi usado pela
+    # primeira vez, e abrir um loop novo por métrica arriscaria "Event loop
+    # is closed" na segunda chamada.
+    async def _score():
+        f = await _faithfulness.ascore(user_input=case["question"], response=reply, retrieved_contexts=retrieved_texts)
+        p = await _context_precision.ascore(user_input=case["question"], response=reply, retrieved_contexts=retrieved_texts)
+        return f.value, p.value
+
+    faithfulness_value, precision_value = asyncio.run(_score())
 
     print(f"\n  question={case['question']!r}")
     print(f"  faithfulness={faithfulness_value:.4f}  context_precision={precision_value:.4f}")

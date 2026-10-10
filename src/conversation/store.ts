@@ -9,6 +9,22 @@ import { dirname, resolve } from "node:path";
 import { env } from "../config.js";
 import type { ConversationTurn } from "../types.js";
 
+// Memória de longo prazo de uma conversa, gravada em `<id>.memory.json`
+// (ver getMemory()/saveMemory() abaixo e src/conversation/memory.ts).
+export interface StoredMemory {
+  // Resumo acumulado dos turnos que já saíram da janela do prompt.
+  summary: string;
+  // Quantos turnos de diálogo da sessão atual (contados do início dela) o
+  // resumo já cobre — os seguintes ainda precisam ir literalmente no prompt.
+  coveredTurns: number;
+  // Timestamp do primeiro turno da sessão a que este resumo pertence. Se o
+  // atendimento for encerrado e começar uma sessão nova (ver
+  // currentSession.ts), o primeiro turno muda e o resumo antigo deixa de
+  // valer — senão o bot "lembraria" de um atendimento já encerrado, o
+  // mesmo bug de 06/10 que currentSession() resolveu.
+  sessionStart: number;
+}
+
 // Preâmbulo: ConversationStore é instanciada uma vez pelo Orchestrator e
 // mantém, por processo, um cache em memória do histórico de cada conversa
 // (para não reler o arquivo do disco a cada mensagem), além de escrever em
@@ -51,6 +67,36 @@ export class ConversationStore {
     // contendo "../../etc/passwd").
     const safeId = conversationId.replace(/[^a-zA-Z0-9_-]/g, "_");
     return resolve(this.dir, `${safeId}.json`);
+  }
+
+  // Preâmbulo: getMemory()/saveMemory() leem e gravam a memória de longo
+  // prazo de uma conversa (resumo dos turnos que saíram da janela do prompt
+  // — ver src/conversation/memory.ts) num arquivo ao lado do histórico,
+  // `<id>.memory.json`. Arquivo separado (e não um turno no histórico)
+  // porque o resumo é reescrito a cada atualização, enquanto o histórico é
+  // append-only por contrato (o cursor do polling do widget depende disso,
+  // ver getHumanRepliesSince() no Orchestrator). Sem cache em memória: só é
+  // lido uma vez por resposta do LLM, e é um arquivo de poucos KB.
+  getMemory(conversationId: string): StoredMemory | undefined {
+    const path = this.memoryPathFor(conversationId);
+    if (!existsSync(path)) return undefined;
+    try {
+      return JSON.parse(readFileSync(path, "utf-8")) as StoredMemory;
+    } catch {
+      // Arquivo corrompido: trata como "sem resumo". O pior efeito é o
+      // resumo ser refeito a partir dos turnos antigos — melhor do que
+      // derrubar a resposta ao cliente.
+      return undefined;
+    }
+  }
+
+  saveMemory(conversationId: string, memory: StoredMemory): void {
+    writeFileSync(this.memoryPathFor(conversationId), JSON.stringify(memory, null, 2), "utf-8");
+  }
+
+  // Mesma sanitização de filePathFor(), com outro sufixo.
+  private memoryPathFor(conversationId: string): string {
+    return this.filePathFor(conversationId).replace(/\.json$/, ".memory.json");
   }
 
   // Preâmbulo: exists() diz se uma conversa já tem histórico (no cache ou

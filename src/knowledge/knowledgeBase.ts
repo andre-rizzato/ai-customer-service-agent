@@ -47,31 +47,28 @@ export class KnowledgeBase {
   }
 
   // Preâmbulo: search() é o método público chamado pelo Orchestrator uma
-  // vez por mensagem do usuário. Pipeline: HyDE -> embed -> busca semântica
-  // no Qdrant -> BM25 -> RRF -> rerank -> corte de relevância mínima.
+  // vez por mensagem do usuário (e pela rota /debug/rag-search do eval).
+  //
+  // Desde 09/10/2026 roda em DUAS etapas, pra economizar o HyDE quando ele
+  // não faz falta:
+  //   1. Busca com a PERGUNTA CRUA: embed -> Qdrant -> BM25 -> RRF -> rerank.
+  //      Se o melhor trecho tiver score >= agentConfig.hydeSkipScore, a busca
+  //      simples já achou a resposta com folga — devolve e PARA (sem HyDE,
+  //      sem chamada de LLM).
+  //   2. Senão, roda o pipeline completo de antes: HyDE -> embed da passagem
+  //      hipotética -> Qdrant -> BM25 -> RRF -> rerank.
+  //
+  // Por que isso não piora a precisão: o reranker julga os candidatos
+  // contra a pergunta ORIGINAL nas duas etapas (nunca contra a passagem
+  // hipotética), então o HyDE só muda QUAIS candidatos chegam ao reranker.
+  // Se a etapa 1 já trouxe um candidato que o reranker considera relevante
+  // com folga, o HyDE dificilmente traria outro melhor — e quando a busca
+  // simples falha (pergunta indireta, vocabulário diferente do catálogo),
+  // a etapa 2 é exatamente o comportamento antigo. Custo da etapa 2 em
+  // relação a antes: só um embedding + um rerank a mais (Voyage, frações de
+  // centavo), contra uma chamada de LLM economizada em toda pergunta que
+  // a etapa 1 resolve. Medido com o eval RAGAS (eval/) antes e depois.
   async search(query: string): Promise<RetrievedChunk[]> {
-    // HyDE só muda o que é EMBEDADO pra busca semântica — BM25 e o reranker
-    // abaixo usam sempre a query ORIGINAL, nunca a passagem hipotética.
-    // BM25 casa termo exato, que o vocabulário inventado da passagem só
-    // atrapalharia; o reranker julga relevância de verdade contra o que o
-    // cliente de fato perguntou, não contra um palpite descartável do LLM.
-    const hypothetical = await generateHypotheticalPassage(query);
-    const [queryVector] = await this.queryEmbedder.embed([hypothetical]);
-
-    const semanticHits = await qdrantStore.query(queryVector, CANDIDATE_POOL_SIZE);
-    if (semanticHits.length === 0) return [];
-
-    // Texto usado pro BM25 é título+conteúdo concatenados — o MESMO texto
-    // que ingest.ts embeda pra cada item (ver ingest.ts), pra manter os
-    // dois métodos de ranking comparando o mesmo conteúdo.
-    const candidateTexts = semanticHits.map((h) => `${h.item.title}\n${h.item.content}`);
-    const semanticRanking: [number, number][] = semanticHits.map((h, i) => [h.score, i]);
-    const bm25Ranking = bm25Rank(query, candidateTexts);
-
-    const fused = reciprocalRankFusion([semanticRanking, bm25Ranking]);
-    const fusedChunks = fused.map(([, i]) => semanticHits[i]);
-    const fusedTexts = fused.map(([, i]) => candidateTexts[i]);
-
     // Reranking é OBRIGATÓRIO aqui, não condicional a EMBEDDING_PROVIDER —
     // decisão deliberada, não descuido: o score final que minRelevanceScore
     // compara só faz sentido como um score de relevância tipo 0-1, que é
@@ -102,13 +99,59 @@ export class KnowledgeBase {
           "not from raw RRF/cosine scores)."
       );
     }
-    const reranked = await rerank(env.VOYAGE_API_KEY, query, fusedTexts, agentConfig.topK);
+    const voyageApiKey = env.VOYAGE_API_KEY;
 
-    return reranked
-      .map(([score, index]) => ({ item: fusedChunks[index].item, score }))
-      // "Regra de vazio": descarta qualquer resultado cuja relevância fique
-      // abaixo do corte configurado — mesma regra de sempre, agora aplicada
-      // ao score do reranker em vez do cosseno puro.
-      .filter((chunk) => chunk.score >= agentConfig.minRelevanceScore);
+    // Etapa 1 — pergunta crua.
+    const direct = await this.retrieve(voyageApiKey, query, query);
+    // rerank() já devolve em ordem decrescente de score, então direct[0] é
+    // o melhor trecho.
+    if (direct.length > 0 && direct[0].score >= agentConfig.hydeSkipScore) {
+      return this.applyRelevanceCut(direct);
+    }
+
+    // Etapa 2 — HyDE. Só muda o que é EMBEDADO pra busca semântica — BM25 e
+    // o reranker dentro de retrieve() usam sempre a query ORIGINAL, nunca a
+    // passagem hipotética: BM25 casa termo exato, que o vocabulário
+    // inventado da passagem só atrapalharia; o reranker julga relevância de
+    // verdade contra o que o cliente de fato perguntou, não contra um
+    // palpite descartável do LLM.
+    const hypothetical = await generateHypotheticalPassage(query);
+    return this.applyRelevanceCut(await this.retrieve(voyageApiKey, query, hypothetical));
+  }
+
+  // Preâmbulo: retrieve() é UMA passada do pipeline de busca, usada pelas
+  // duas etapas de search(): embeda `embedText` (a pergunta crua na etapa 1,
+  // a passagem hipotética do HyDE na etapa 2), busca os candidatos no
+  // Qdrant, combina com BM25 via RRF e reordena com o reranker contra
+  // `query` (sempre a pergunta original). Devolve TODOS os trechos
+  // rerankeados, sem o corte de relevância — quem decide o corte é
+  // search(), porque a etapa 1 precisa olhar o score do melhor antes.
+  private async retrieve(voyageApiKey: string, query: string, embedText: string): Promise<RetrievedChunk[]> {
+    const [queryVector] = await this.queryEmbedder.embed([embedText]);
+
+    const semanticHits = await qdrantStore.query(queryVector, CANDIDATE_POOL_SIZE);
+    if (semanticHits.length === 0) return [];
+
+    // Texto usado pro BM25 é título+conteúdo concatenados — o MESMO texto
+    // que ingest.ts embeda pra cada item (ver ingest.ts), pra manter os
+    // dois métodos de ranking comparando o mesmo conteúdo.
+    const candidateTexts = semanticHits.map((h) => `${h.item.title}\n${h.item.content}`);
+    const semanticRanking: [number, number][] = semanticHits.map((h, i) => [h.score, i]);
+    const bm25Ranking = bm25Rank(query, candidateTexts);
+
+    const fused = reciprocalRankFusion([semanticRanking, bm25Ranking]);
+    const fusedChunks = fused.map(([, i]) => semanticHits[i]);
+    const fusedTexts = fused.map(([, i]) => candidateTexts[i]);
+
+    const reranked = await rerank(voyageApiKey, query, fusedTexts, agentConfig.topK);
+    return reranked.map(([score, index]) => ({ item: fusedChunks[index].item, score }));
+  }
+
+  // Preâmbulo: applyRelevanceCut() aplica a "regra de vazio": descarta
+  // qualquer resultado cuja relevância fique abaixo do corte configurado —
+  // mesma regra de sempre, aplicada ao score do reranker em vez do cosseno
+  // puro. Igual nas duas etapas de search().
+  private applyRelevanceCut(chunks: RetrievedChunk[]): RetrievedChunk[] {
+    return chunks.filter((chunk) => chunk.score >= agentConfig.minRelevanceScore);
   }
 }
