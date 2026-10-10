@@ -107,7 +107,7 @@
   </div>
   <div class="meta">
     <div>Repositório: github.com/andre-rizzato/ai-customer-service-agent</div>
-    <div>Versão do documento: 1.0 — Setembro/2026</div>
+    <div>Versão do documento: 1.1 — Outubro/2026 (revisão parcial, ver aviso abaixo)</div>
   </div>
 </div>
 
@@ -126,6 +126,11 @@
   <li><a href="#testes">Testes</a></li>
   <li><a href="#extensao">Como estender o projeto</a></li>
 </ol>
+</div>
+
+<div class="callout warn">
+  <strong>Documento de 28/09/2026 — revisado só em parte em 09/10/2026</strong>
+  Este guia descreve a base original do projeto. Os trechos de RAG e de dados persistidos foram corrigidos, mas o que veio depois não está aqui: Key Vault, capacidades (AgentService), relay de handoff pelo Telegram, idioma do cliente, deploy automático pelo GitHub Actions, medição de custo e memória da conversa. Para o estado atual, veja <code>README.md</code>, <code>docs/STATUS.md</code>, <code>docs/RAG_QDRANT_MIGRATION.md</code>, <code>docs/HANDOFF_RELAY.md</code>, <code>docs/CUSTO_API.md</code> e o diagrama <code>docs/artifacts/fluxo-da-requisicao.html</code>.
 </div>
 
 <section id="visao-geral">
@@ -249,7 +254,9 @@ ChannelAdapter envia a resposta de volta</div>
 <h2>7. Base de conhecimento e RAG</h2>
 <p>Cada linha do catálogo (<code>knowledge/catalog.example.json</code>) representa um produto, serviço ou política, no formato:</p>
 <pre><code>{ "id": "filtro-fx200", "title": "Filtro FX200", "content": "specs, preço, garantia, FAQ..." }</code></pre>
-<p>O script <code>npm run ingest</code> lê esse catálogo, gera um embedding por item (via Voyage/OpenAI/local) e grava tudo em <code>data/vector-store.json</code>. Em tempo de resposta, a pergunta do usuário também vira um embedding e é comparada por similaridade de cosseno contra cada item — os <code>topK</code> mais similares acima de <code>minRelevanceScore</code> entram no prompt.</p>
+<p>O script <code>npm run ingest</code> lê esse catálogo, gera um embedding por item (via Voyage/OpenAI/local) e grava tudo numa coleção do <strong>Qdrant</strong> (local em dev, Azure Container Apps em produção). Em tempo de resposta, a busca combina similaridade semântica (Qdrant) com palavra-chave (BM25), funde os dois rankings (RRF) e reordena os candidatos com o rerank da Voyage. Os <code>topK</code> trechos acima de <code>minRelevanceScore</code> entram no prompt.</p>
+<p>A busca roda primeiro com a pergunta do cliente. Só quando o melhor trecho fica abaixo de <code>hydeSkipScore</code> ela tenta de novo com <strong>HyDE</strong>: uma passagem hipotética, gerada pelo LLM no estilo do catálogo, ajuda em perguntas indiretas. Detalhes em <code>docs/RAG_QDRANT_MIGRATION.md</code>; custo e números medidos em <code>docs/CUSTO_API.md</code>.</p>
+<p><strong>Memória da conversa:</strong> o LLM recebe só os últimos <code>historyWindowTurns</code> turnos (padrão 15). O que sai da janela volta como um resumo acumulado e como trechos antigos relevantes (<code>src/conversation/memory.ts</code>). Assim o custo de uma conversa longa não cresce sem limite, e o bot continua lembrando do que foi dito no começo.</p>
 <div class="callout warn">
   <strong>Regra de vazio</strong>
   Se nenhum item passar no corte de relevância, o prompt informa explicitamente "nenhum trecho relevante encontrado" — é isso que permite à regra fixa nº 1 instruir o modelo a admitir que não sabe, em vez de inventar uma resposta.
@@ -281,7 +288,7 @@ ChannelAdapter envia a resposta de volta</div>
 
 <section id="testes">
 <h2>10. Testes</h2>
-<p>A suíte automatizada (<code>npm test</code>, Vitest) cobre a parte determinística da matriz de testes da Fase 5 do runbook original — detecção de handoff, montagem do prompt, rate limiting e ranking do vector store — sem depender de nenhuma API externa. O script <code>npm run simulate</code> complementa isso com um chat interativo no terminal, para rodar manualmente os casos que dependem do LLM responder (pergunta dentro/fora do escopo, "você é IA?", reclamação).</p>
+<p>A suíte automatizada (<code>npm test</code>, Vitest) cobre a parte determinística da matriz de testes da Fase 5 do runbook original — detecção de handoff, montagem do prompt, rate limiting, ranking da busca (BM25/RRF), relay de handoff, memória da conversa e medição de custo — sem depender de nenhuma API externa. A qualidade com LLM de verdade é medida sob demanda pelo eval RAGAS e pelo teste de conversa longa (<code>eval/README.md</code>). O script <code>npm run simulate</code> complementa isso com um chat interativo no terminal, para rodar manualmente os casos que dependem do LLM responder (pergunta dentro/fora do escopo, "você é IA?", reclamação).</p>
 </section>
 
 <section id="extensao">
@@ -292,7 +299,8 @@ ChannelAdapter envia a resposta de volta</div>
 <tr><td>Trocar de LLM</td><td>Mudar <code>LLM_PROVIDER</code> no <code>.env</code>, ou implementar <code>LLMProvider</code> e registrar em <code>src/llm/index.ts</code></td></tr>
 <tr><td>Trocar de embeddings</td><td>Mudar <code>EMBEDDING_PROVIDER</code>, ou implementar <code>EmbeddingProvider</code> em <code>src/embeddings/</code></td></tr>
 <tr><td>Adicionar um canal novo</td><td>Implementar <code>ChannelAdapter</code> em <code>src/channels/</code> e registrar em <code>src/server.ts</code></td></tr>
-<tr><td>Crescer o catálogo além de dezenas de itens</td><td>Trocar <code>FileVectorStore</code> por uma implementação com a mesma interface sobre Pinecone/pgvector/Supabase</td></tr>
+<tr><td>Crescer o catálogo</td><td>Já suportado: a busca roda no Qdrant (<code>src/knowledge/qdrantStore.ts</code>). Reindexe com <code>npm run ingest</code></td></tr>
+<tr><td>Saber quanto cada cliente custa</td><td><code>npm run usage:report</code> (lê <code>data/usage-log.jsonl</code>; ver <code>docs/CUSTO_API.md</code>)</td></tr>
 <tr><td>Notificar handoff em outro lugar</td><td>Implementar <code>HandoffNotifier</code> (ex.: e-mail, Teams) em <code>src/handoffNotifier/</code></td></tr>
 </tbody>
 </table>

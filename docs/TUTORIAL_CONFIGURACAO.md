@@ -197,6 +197,23 @@ pm2 logs agente-atendimento --lines 20   # confira que subiu sem erro de valida�
 Se o JSON ficar inválido, o processo **não sobe** (a validação do boot recusa).
 O log diz qual campo está errado. Corrija ou restaure o `.bak`.
 
+### Campos que só existem no JSON (sem campo na tela)
+
+Desde 09/10/2026, quatro ajustes (dois de custo, dois de proteção contra
+abuso) têm valor padrão e não aparecem na tela. Para mudá-los, edite o arquivo como acima. Salvar pela tela **preserva**
+esses campos: a tela reenvia tudo o que leu, inclusive o que ela não mostra.
+
+| Chave no JSON | Padrão | O que faz |
+|---|---|---|
+| `hydeSkipScore` | `0.5` | A busca tenta primeiro sem o HyDE (uma chamada de LLM a mais). Se o melhor trecho tiver nota de relevância pelo menos igual a esta, o HyDE não roda. `1` = HyDE sempre (comportamento anterior); `0` = nunca |
+| `historyWindowTurns` | `15` | Quantos turnos recentes vão literalmente para o LLM. O que sai da janela volta como resumo e trechos relevantes. Valor alto (ex.: `1000`) = histórico completo, como antes |
+| `maxMessageChars` | `2000` | Mensagem de cliente maior que isso é recusada com um aviso, sem chamar nenhuma API |
+| `webIpRateLimit` | `{ "maxMessagesPerWindow": 20, "windowSeconds": 60 }` | Mensagens por IP no widget do site. Só o canal web. Ver `docs/SEGURANCA_PROMPT_INJECTION.md` |
+
+Quando mexer: o `npm run usage:report` mostra quanto cada etapa custa, e o
+eval de qualidade (`eval/README.md`) mostra se a mudança piorou alguma
+resposta. Ver `docs/CUSTO_API.md`.
+
 ---
 
 ## 4. Tutorial: configurar o atendimento humano

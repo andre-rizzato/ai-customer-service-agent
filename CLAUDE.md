@@ -112,6 +112,10 @@ preserva esse raciocínio entre sessões, em vez de ele se perder.
   logo depois do push, o run mais recente ainda é o do deploy **anterior**
   (já "completed: success"), e conferir só o status dá falso positivo.
   Confirme na VM (uptime do PM2 de poucos segundos, arquivo novo presente).
+- **VM desligada = deploy falha.** Antes de um push, confira o estado
+  (`az vm list -d --query "[].powerState" -o tsv`). Se o disco tiver sido
+  rebaixado para Standard HDD para economizar, volte para Premium antes de
+  ligar (`docs/CUSTO_AZURE.md`).
 - O deploy **nunca** sobrescreve `.env` nem `config/agent.config.json`
   (`--exclude`). Segredos ficam no Key Vault; variáveis que não são segredo
   (`HANDOFF_TELEGRAM_CHAT_IDS`, `PUBLIC_BASE_URL`) ficam no `.env` da VM.
@@ -200,10 +204,63 @@ Detalhes em `docs/HANDOFF_RELAY.md`. O que é fácil quebrar sem perceber:
   `npm ci --omit=optional`, endurecimento de SSH/headers) estão em
   `docs/SECURITY_AUDIT_2026-10-06.md` e no `docs/STATUS.md`.
 
+## Custo de API e memória da conversa: invariantes
+
+Detalhes em `docs/CUSTO_API.md`. O que é fácil quebrar sem perceber:
+
+1. **Toda chamada paga nova chama `recordUsage()`** (`src/usage/usageMeter.ts`)
+   com um `purpose` próprio. Sem isso, o custo some do relatório de
+   cobrança. `recordUsage()` nunca lança: contabilidade não pode derrubar o
+   atendimento.
+2. **Mudança no RAG ou no prompt = rodar o eval antes e depois**
+   (`eval/README.md`) e comparar a *context precision* de cada caso, não só
+   o total de aprovados, porque o juiz varia. Para a memória:
+   `npm run eval:long-conversation`.
+3. **O resumo da conversa (`memory.ts`) guarda só fatos do cliente e
+   decisões, nunca preço ou especificação.** A primeira versão atribuiu ao
+   FX100 uma característica do FX200. Fato de produto vem sempre do
+   catálogo.
+4. **O histórico enviado ao LLM nunca começa com fala do assistente**
+   (`splitWindow`), e nenhum turno fica sem ser visto: o que o resumo ainda
+   não cobre vai literal.
+5. **Ajustes de custo ficam no JSON** (`hydeSkipScore`, `historyWindowTurns`,
+   sem campo na tela). A tela preserva esses campos ao salvar (`...loadedConfig`).
+
+## Prompt injection e abuso: invariantes
+
+Detalhes em `docs/SEGURANCA_PROMPT_INJECTION.md`. O que é fácil quebrar sem
+perceber:
+
+1. **Nenhum texto do cliente entra no system prompt.** Isso inclui o que é
+   derivado dele, como o resumo da conversa. A memória vai na primeira
+   mensagem do cliente, entre `<memoria>`. O system prompt só tem regras,
+   catálogo e avisos fixos.
+2. **Toda resposta do LLM ao cliente passa pela checagem de valores**
+   (`outputGuard.ts`, PASSO 5.7 do Orchestrator). Caminho novo de resposta
+   gerada (outra capacidade, outro canal) = passar pela mesma checagem.
+3. **Mensagem fixa ao cliente sai de `messages.ts`**, nunca de texto gerado,
+   quando o objetivo é recusar ou bloquear (tamanho, valor não confirmado,
+   rate limit).
+4. **Rota nova que chame API paga a partir do widget** = aplicar o
+   `webIpRateLimit`. O limite por conversa não protege o canal web.
+5. **Mudou prompt, modelo ou a checagem = `npm run eval:adversarial` antes e
+   depois.** Confira também se o tráfego normal não passou a ser bloqueado
+   (`system-note` "Checagem de valores" no audit log).
+
 ## Armadilhas do ambiente de desenvolvimento (Windows)
 
 - **Não chamar `python`**: no Windows é o atalho da Microsoft Store e fica
-  travado esperando. Para scripts auxiliares, use `node -e`.
+  travado esperando. Para scripts auxiliares, use `node -e`. Para o eval
+  RAGAS (Python de verdade), use o launcher `py -3.13 -m venv ...`.
+- **Qdrant local sem Docker**: o `qdrant.exe` oficial funciona, mas com a
+  pasta de dados num caminho **curto** (ex. `%TEMP%\qd-eval`). No scratchpad
+  (caminho longo), ele estoura o limite de 260 caracteres e a criação da
+  coleção falha com `Gridstore IO error`. Nunca rode `npm run ingest` contra
+  o Qdrant de produção: ele recria a coleção.
+- **Substituição de texto com `node -e '...'` no Bash perde `\`** (`\s`
+  virou `s`, `\n` virou quebra de linha real). Um regex de normalização
+  ficou quebrado assim, e só o teste pegou. Para trecho com barra invertida,
+  use a ferramenta de edição de arquivo.
 - **`curl` no Git Bash corrompe argumentos não-ASCII** (o emoji `🆔` virou
   outro texto e o relay "não funcionou"). Para payload com acento/emoji,
   grave em arquivo e mande com `--data-binary @arquivo.json`.
@@ -212,7 +269,8 @@ Detalhes em `docs/HANDOFF_RELAY.md`. O que é fácil quebrar sem perceber:
   com o código **antigo**, o que confunde o teste seguinte). Depois de cada
   teste, confira a porta e mate o processo e o pai (`npm run stop` faz isso na
   3000). Para testes, use outra porta (ex. `PORT=3999`) e pastas temporárias
-  (`CONVERSATIONS_DIR`, `AUDIT_LOG_PATH`, `AGENT_CONFIG_PATH` no scratchpad),
+  (`CONVERSATIONS_DIR`, `AUDIT_LOG_PATH`, `USAGE_LOG_PATH`, `AGENT_CONFIG_PATH`
+  no scratchpad),
   pra não misturar com os dados locais.
 - **Nunca rodar `setWebhook` com o token de um bot de produção**
   (`@rizzatotech_atendimento_bot`, e o bot de clientes depois da migração da
@@ -232,5 +290,9 @@ Detalhes em `docs/HANDOFF_RELAY.md`. O que é fácil quebrar sem perceber:
 - `docs/TUTORIAL_CONFIGURACAO.md` — tutorial: abrir a tela de configuração em produção (túnel SSH), o que acontece ao salvar, desfazer, e por que o site não mexe na config.
 - `docs/SECURITY_AUDIT_2026-10-06.md` + `docs/TUTORIAL_SEGURANCA_LOGS.md` — auditoria da VM e como verificar tentativas de ataque (`scripts/security-check.sh`).
 - `docs/HANDOFF_RELAY.md` — relay de handoff: atendente responde ao cliente pelo Telegram (reply ou Mini App), configuração, segurança e limitações.
-- `docs/CUSTO_API.md` — medição de consumo de API por conversa (`data/usage-log.jsonl`) e relatório de custo por cliente (`npm run usage:report`).
-- `docs/artifacts/` — docs de arquitetura publicados (Blueprint do Agente, Mapa de Capacidades).
+- `docs/CUSTO_API.md` — medição de consumo de API por conversa (`data/usage-log.jsonl`), relatório de custo por cliente (`npm run usage:report`) e as economias aplicadas (HyDE condicional, cache, janela + memória) com os números medidos.
+- `docs/CUSTO_AZURE.md` — o que cobra na assinatura Azure (inclusive com a VM desligada), como conferir e como reduzir.
+- `docs/RAG_QDRANT_MIGRATION.md` — pipeline de busca (Qdrant + BM25 + RRF + rerank, HyDE condicional).
+- `eval/README.md` — eval de qualidade RAGAS e teste de conversa longa: como rodar (inclusive no Windows) e o histórico de resultados.
+- `docs/SEGURANCA_PROMPT_INJECTION.md` — prompt injection e abuso do bot: o que um atacante consegue, as proteções em camadas, o teste adversarial (`npm run eval:adversarial`, 12/16 → 16/16) e as pendências de Nginx/Console.
+- `docs/artifacts/` — docs de arquitetura publicados (Blueprint do Agente, Mapa de Capacidades, Fluxo da Requisição). Mudou o HTML? Rode `node scripts/extract-diagram-svgs.mjs` para atualizar os SVGs em `docs/artifacts/images/`.

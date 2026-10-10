@@ -9,7 +9,9 @@ o que foi corrigido, e — pros dois itens que não viraram código ainda — o
 que falta e por quê.
 
 Ver também [`STATUS.md`](STATUS.md) para o checklist geral do projeto; este
-documento é só o recorte da revisão de segurança.
+documento é só o recorte da revisão de segurança. O item #9 (prompt
+injection e abuso do bot) foi acrescentado em 09/10/2026, com guia próprio:
+[`SEGURANCA_PROMPT_INJECTION.md`](SEGURANCA_PROMPT_INJECTION.md).
 
 ---
 
@@ -282,7 +284,14 @@ dependendo da decisão, de implementação:
   que quer que o cliente digite.
 - **Retenção e expurgo:** `ConversationStore` grava todo o histórico em
   disco, em texto plano, indefinidamente — não existe hoje nenhuma política
-  de quanto tempo guardar nem rotina de expurgo automático.
+  de quanto tempo guardar nem rotina de expurgo automático. Desde
+  09/10/2026 há mais dois lugares com dado pessoal, que precisam entrar em
+  qualquer expurgo ou pedido de eliminação (art. 18):
+  - `data/conversations/<id>.memory.json`: resumo gerado por LLM das
+    conversas longas, que pode conter nome, cidade e o problema relatado;
+  - `data/usage-log.jsonl`: contém o `conversationId`, que **no WhatsApp é
+    o número de telefone do cliente**. Só tem tokens e modelo, nunca o
+    texto da conversa.
 - **Direitos do titular:** acesso, correção e eliminação de dados (art. 18)
   — não existe hoje nenhum mecanismo pra um titular pedir isso.
 - **Criptografia em repouso:** o histórico em disco (`data/conversations/`)
@@ -299,6 +308,34 @@ aqui para não ser esquecido quando/se um cliente do vertical de clínica
 entrar em produção.
 
 ---
+
+## #9 — Prompt injection e abuso do bot (acrescentado em 09/10/2026)
+
+Não fazia parte da revisão original, que não olhou para o que um cliente
+consegue fazer **pela própria conversa**. Revisado e testado em 09/10/2026.
+Guia completo: [`SEGURANCA_PROMPT_INJECTION.md`](SEGURANCA_PROMPT_INJECTION.md).
+
+- **Risco:** oferta falsa em nome da empresa (CDC art. 30), abuso de custo e
+  alertas falsos ao atendente. Vazamento de dados de terceiros não é
+  possível no lado Node: o bot não tem ferramentas e só vê o catálogo
+  público e a própria conversa.
+- **Teste adversarial** (`npm run eval:adversarial`, 16 ataques): **12/16
+  antes, 16/16 depois.** As falhas iniciais:
+  - desconto falso calculado na resposta;
+  - mensagem de 100 mil caracteres processada;
+  - rate limit burlado trocando o id da conversa;
+  - transferência disparada pelo cliente.
+- **Corrigido:**
+  - teto do corpo HTTP e do texto por mensagem;
+  - rate limit por IP no widget;
+  - limpeza do mapa do rate limiter;
+  - memória da conversa fora do system prompt;
+  - sinal de transferência neutralizado;
+  - checagem determinística de preço e porcentagem na resposta;
+  - busca que falha não vira mais erro 500.
+- **Pendente:** Nginx mandar o IP real (`X-Forwarded-For`) e `limit_req` na
+  borda, limite de gasto no Console da Anthropic, e teste adversarial no
+  AgentService. Ver a seção 5 do guia.
 
 ## Fora de escopo nesta revisão (já identificado, não corrigido)
 

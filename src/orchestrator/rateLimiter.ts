@@ -42,11 +42,16 @@ export class RateLimiter {
   // gravar a mensagem no histórico) — se retornar false, o Orchestrator
   // responde com um aviso de "desacelera" e não gasta nenhuma chamada de
   // API com aquela mensagem.
+  //
+  // Desde 09/10/2026 também é usado com IP como chave (limite por IP do
+  // canal web, ver webIpRateLimit em config.ts e src/server.ts) — a classe
+  // não sabe nem precisa saber o que a chave representa.
   isAllowed(conversationId: string): boolean {
     const now = Date.now();
     // Converte a duração da janela de segundos (mais legível na
     // configuração) para milissegundos (unidade usada por Date.now()).
     const windowMs = this.windowSeconds * 1000;
+    this.pruneIfLarge(now, windowMs);
     const entry = this.windows.get(conversationId);
 
     // Duas situações tratadas como "ainda não há janela válida": (a) esta é
@@ -71,4 +76,28 @@ export class RateLimiter {
     entry.count++;
     return true;
   }
+
+  // Preâmbulo: pruneIfLarge() apaga as janelas já expiradas quando o mapa
+  // passa de PRUNE_THRESHOLD entradas. Antes de 09/10/2026 o mapa nunca era
+  // limpo: cada conversationId (ou IP) novo ficava pra sempre, e no widget
+  // web qualquer um pode inventar ids à vontade — um jeito trivial de
+  // encher a memória de uma VM de 892MB. Uma janela expirada pode ser
+  // apagada sem mudar nenhum resultado: isAllowed() já a trataria como "sem
+  // janela" e criaria outra do zero. Só varre quando o mapa está grande,
+  // pra não pagar O(n) em toda mensagem.
+  private pruneIfLarge(now: number, windowMs: number): void {
+    if (this.windows.size < PRUNE_THRESHOLD) return;
+    for (const [key, entry] of this.windows) {
+      if (now - entry.windowStart >= windowMs) this.windows.delete(key);
+    }
+  }
+
+  // Quantas chaves estão sendo acompanhadas — usado só pelos testes.
+  get size(): number {
+    return this.windows.size;
+  }
 }
+
+// Acima de quantas entradas o mapa é varrido. 1000 janelas ocupam poucos
+// centésimos de MB; o limite existe pra varredura ser rara, não por memória.
+const PRUNE_THRESHOLD = 1000;

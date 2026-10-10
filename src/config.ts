@@ -167,6 +167,30 @@ export const AgentConfigSchema = z.object({
   // esquecido: ver src/conversation/memory.ts (resumo + busca nos turnos
   // antigos).
   historyWindowTurns: z.number().int().positive().default(15),
+
+  // Proteções contra abuso (09/10/2026, docs/SEGURANCA_PROMPT_INJECTION.md).
+  // Têm default, então nenhum agent.config.json existente precisa mudar.
+  //
+  // maxMessageChars: mensagem de cliente maior que isso é recusada com uma
+  // mensagem fixa, ANTES de chamar qualquer API. Sem limite, o teste
+  // adversarial mandou 100 mil caracteres (~25 mil tokens) e o bot
+  // processou, e esse texto ainda voltaria nos 15 turnos seguintes da
+  // janela. 2000 cobre com folga qualquer pergunta real de atendimento (o
+  // próprio Telegram limita uma mensagem a 4096).
+  maxMessageChars: z.number().int().positive().default(2000),
+  // Rate limit POR IP, só no canal web (widget). O rate limit normal
+  // (rateLimit, acima) é por conversationId, e no widget quem escolhe esse
+  // id é o próprio navegador — trocar de id a cada mensagem burlava o
+  // limite (teste adversarial: 25/25 mensagens passaram). Telegram e
+  // WhatsApp NÃO usam este limite: as requisições deles vêm dos servidores
+  // da plataforma (o mesmo IP para todos os clientes), e lá o id do usuário
+  // é verificado pela plataforma, então o limite por conversa já basta.
+  webIpRateLimit: z
+    .object({
+      maxMessagesPerWindow: z.number().int().positive(),
+      windowSeconds: z.number().int().positive(),
+    })
+    .default({ maxMessagesPerWindow: 20, windowSeconds: 60 }),
 });
 
 // Tipo TypeScript derivado do schema acima — z.infer lê a definição do zod

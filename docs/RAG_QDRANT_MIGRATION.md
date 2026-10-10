@@ -7,8 +7,9 @@
 > de `KnowledgeBase.search()`. Ver também a documentação equivalente do
 > lado Python: `DistributedOrderSystem/docs/AGENT_SERVICE_RAG_DOCUMENTATION.md`.
 
-Última atualização: 10/2026 (commit `f2788e8`, branch `master`, **não
-enviado ao remoto ainda** — ver "Estado do deploy" abaixo).
+Última atualização: 09/10/2026. A migração (commit `f2788e8`) já está no
+`origin/master` e em produção. Em 09/10 o pipeline ganhou o **HyDE
+condicional** e o cache (commit `af0128f`), descritos abaixo.
 
 ---
 
@@ -40,16 +41,33 @@ A **assinatura pública não mudou**: `new KnowledgeBase()` e
 
 ## O pipeline (`KnowledgeBase.search()`, `src/knowledge/knowledgeBase.ts`)
 
+Desde 09/10/2026 a busca roda em **duas etapas**. A etapa 2 é o pipeline
+original da migração. A etapa 1 existe para não pagar o HyDE (uma chamada de
+LLM, ~40% do custo de LLM por pergunta) quando ele não faz falta:
+
 ```
 search(query)
-  1. hyde.ts           generateHypotheticalPassage(query)        -> LLMProvider (Claude/OpenAI), descartável
-  2. embeddings/*.ts   queryEmbedder.embed([hypothetical])        -> Voyage/OpenAI/local, conforme EMBEDDING_PROVIDER
-  3. qdrantStore.ts     query(queryVector, 15)                     -> busca semântica, top 15 candidatos
-  4. bm25.ts            bm25Rank(query, candidateTexts)            -> ranking por palavra-chave, mesmo pool
-  5. hybridSearch.ts    reciprocalRankFusion([semantic, bm25])     -> combina os dois rankings
-  6. reranker.ts         rerank(VOYAGE_API_KEY, query, fusedTexts) -> Voyage rerank-2, top 3
+  ETAPA 1 — pergunta crua
+    embeddings/*.ts   queryEmbedder.embed([query])                -> Voyage/OpenAI/local, conforme EMBEDDING_PROVIDER
+    qdrantStore.ts    query(queryVector, 15)                      -> busca semântica, top 15 candidatos
+    bm25.ts           bm25Rank(query, candidateTexts)             -> ranking por palavra-chave, mesmo pool
+    hybridSearch.ts   reciprocalRankFusion([semantic, bm25])      -> combina os dois rankings
+    reranker.ts       rerank(VOYAGE_API_KEY, query, fusedTexts)   -> Voyage rerank-2, top 3
+    melhor score >= hydeSkipScore (padrão 0.5)?  -> devolve e PARA (sem HyDE)
+
+  ETAPA 2 — só se a etapa 1 não achou nada com folga
+    hyde.ts           generateHypotheticalPassage(query)          -> LLM, descartável, com cache por pergunta normalizada
+    embed([hypothetical]) -> Qdrant -> BM25 -> RRF -> rerank       -> mesmas peças da etapa 1
+
   -> RetrievedChunk[] filtrado por minRelevanceScore (score do RERANKER, não cosseno)
 ```
+
+Nas duas etapas, BM25 e rerank usam a pergunta **original**: o HyDE só muda
+quais candidatos chegam ao reranker. Por isso pular o HyDE quando a etapa 1
+já achou um trecho bem avaliado não muda a qualidade da busca. Medido com o
+eval RAGAS (20 perguntas): a *context precision* ficou idêntica nos 20 casos,
+e o HyDE rodou em 2/20 perguntas. Detalhes e números em
+[`CUSTO_API.md`](CUSTO_API.md).
 
 Reranking é **obrigatório**, não condicional a `EMBEDDING_PROVIDER` — decisão
 deliberada: o score que `minRelevanceScore` compara só faz sentido como
@@ -119,16 +137,15 @@ um dos dois falhar.
 `tests/bm25.test.ts`, `tests/hybridSearch.test.ts` (funções puras),
 `tests/webContract.test.ts` (contrato `/webhook/web/*`, não existia antes),
 `tests/agentServiceClient.test.ts` (contrato HTTP com o `AgentService`).
-76/76 passando, `tsc --noEmit` limpo.
+76/76 passando, `tsc --noEmit` limpo na época. Em 09/10/2026,
+`tests/costSavings.test.ts` passou a cobrir o HyDE condicional e o cache
+(104 testes no total).
 
-## Estado do deploy (importante)
+## Estado do deploy
 
-Commitado localmente (`f2788e8`, branch `master`) **sem push** — decisão
-deliberada, aguardando confirmação explícita antes de qualquer deploy
-automático (o `deploy.yml` dispara em todo push pra `master`). Havia
-também, no mesmo working tree, um bloco de trabalho não relacionado (login
-de admin via Firebase, `src/admin/`) em andamento — deixado de fora deste
-commit, intacto e ainda não commitado.
+A migração (`f2788e8`) foi publicada pelo deploy de 08/10/2026 (run do commit `260aeb9`, sucesso) e roda em produção, com a VM desligada desde 09/10. O HyDE condicional
+(`af0128f`, 09/10/2026) ainda não foi enviado: ver o `STATUS.md`, seção
+"Custo de API e economia". O deploy depende de a VM estar ligada.
 
 ## Documentação relacionada
 

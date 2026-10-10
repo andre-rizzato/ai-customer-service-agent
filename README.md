@@ -16,18 +16,30 @@ Channel adapter normaliza -> InboundMessage
         │
         ▼
 Orchestrator:
+  −1. Mensagem grande demais? → recusa sem chamar API (widget: também rate limit por IP)
+  0. Conversa em atendimento humano? → repassa ao atendente, bot fica em silêncio
   1. Rate limit por conversa
   2. Gatilho de handoff (palavra-chave / frustração) — roda ANTES do LLM
         ├─ Sim → notifica humano com histórico anexado, responde "vou te conectar"
         └─ Não → continua
-  3. Busca na base de conhecimento (RAG, embeddings + cosine similarity)
-  4. Monta o system prompt (3 regras fixas: só contexto, transparência, handoff)
-  5. Chama o LLM (Claude ou OpenAI, plugável)
-  6. Loga o turno (histórico + audit log JSONL)
+  2.5 Capacidade (pedido/agenda/venda)? → delega ao AgentService ou faz handoff
+  3. Busca na base (Qdrant + BM25 + RRF + rerank; HyDE só se a busca simples falhar)
+  4. Monta o system prompt (3 regras fixas + contexto + memória da conversa)
+  5. Chama o LLM (Claude ou OpenAI) com os últimos 15 turnos
+  5.7 Checagem de valores: todo R$/% da resposta precisa estar no catálogo
+  6. Loga o turno (histórico + audit log JSONL) e atualiza o resumo em 2º plano
         │
         ▼
 Channel adapter envia a resposta de volta
+
+Toda chamada paga de API (LLM, embedding, rerank) grava os tokens em
+data/usage-log.jsonl  →  npm run usage:report
 ```
+
+Detalhes de cada etapa: `docs/RAG_QDRANT_MIGRATION.md` (busca),
+`docs/CUSTO_API.md` (custo e economias), `docs/HANDOFF_RELAY.md` (atendimento
+humano), `docs/SEGURANCA_PROMPT_INJECTION.md` (proteções contra prompt
+injection e abuso) e o diagrama `docs/artifacts/fluxo-da-requisicao.html`.
 
 Cada peça é uma interface plugável:
 
@@ -36,8 +48,10 @@ Cada peça é uma interface plugável:
 | Canal | `ChannelAdapter` (`src/channels/types.ts`) | Telegram, WhatsApp Cloud API, Web (REST simples) |
 | LLM | `LLMProvider` (`src/llm/types.ts`) | Anthropic (Claude), OpenAI |
 | Embeddings | `EmbeddingProvider` (`src/embeddings/types.ts`) | Voyage AI (padrão), OpenAI, local (sem API key) |
-| Base vetorial | `FileVectorStore` (`src/knowledge/vectorStore.ts`) | Arquivo JSON local (cosine similarity) — troque por Pinecone/pgvector se o catálogo crescer muito |
-| Notificação de handoff | `HandoffNotifier` (`src/handoffNotifier/types.ts`) | Console, Webhook (Slack/Discord/custom) |
+| Base vetorial | `src/knowledge/qdrantStore.ts` | Qdrant (local em dev, Azure Container Apps em produção), com BM25 + RRF + rerank Voyage por cima (`knowledgeBase.ts`) |
+| Notificação de handoff | `HandoffNotifier` (`src/handoffNotifier/types.ts`) | Console, Webhook (Slack/Discord/custom), Telegram (com relay de resposta ao cliente) |
+| Memória da conversa | `ConversationMemory` (`src/conversation/memory.ts`) | Janela de turnos recentes + resumo acumulado + busca BM25 nos turnos antigos |
+| Medição de custo | `recordUsage()` (`src/usage/usageMeter.ts`) | JSONL por chamada paga; relatório em `src/usage/usageReport.ts` |
 | Capacidade extra (pedido/agenda/venda) | `capabilityRouter.ts` detecta, `agentServiceClient.ts` delega | `AgentService` (Python, standalone — ver `docs/artifacts/mapa-capacidades.html`) |
 
 ### Capacidades além de RAG (`enabledCapabilities`)
@@ -70,7 +84,9 @@ seu próprio arquivo) com uma linha por produto/serviço/política, no formato:
 { "id": "...", "title": "...", "content": "specs, preço, garantia, FAQ..." }
 ```
 
-Depois, indexe a base:
+A busca usa um Qdrant. Sem `QDRANT_URL` no `.env`, o padrão é
+`http://localhost:6333`: suba um Qdrant local antes (Docker, ou o binário
+oficial no Windows — ver `eval/README.md`). Depois, indexe a base:
 
 ```bash
 npm run ingest
@@ -96,6 +112,11 @@ externas):
 ```bash
 npm test
 ```
+
+Qualidade do RAG com LLM de verdade (custa API, roda sob demanda): harness
+RAGAS em `eval/`, o teste de conversa longa
+(`npm run eval:long-conversation`) e o teste adversarial de prompt injection
+(`npm run eval:adversarial`). Ver `eval/README.md`.
 
 ## Rodar o servidor (canais reais)
 
@@ -150,3 +171,9 @@ mensagem veio.
 - Se o bot estiver fazendo handoff demais/de menos, ajuste
   `handoffKeywords`/`frustrationKeywords`/`minRelevanceScore` em
   `agent.config.json`.
+- Custo de API por mês, por conversa e por etapa: `npm run usage:report`
+  (lê `data/usage-log.jsonl`; preços em `config/pricing.json`). Ajustes de
+  custo em `agent.config.json`: `hydeSkipScore` e `historyWindowTurns`. Ver
+  `docs/CUSTO_API.md`.
+- Custo da infraestrutura Azure (o que cobra mesmo com a VM desligada):
+  `docs/CUSTO_AZURE.md`.

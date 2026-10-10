@@ -1,7 +1,8 @@
 # Custo de API por cliente
 
 Como medir quanto cada cliente gasta de API (LLM, embeddings, rerank) para
-repassar esse custo.
+repassar esse custo. O custo da infraestrutura Azure (VM, disco, IP) está em
+[`CUSTO_AZURE.md`](CUSTO_AZURE.md).
 
 ## O que é medido
 
@@ -12,10 +13,16 @@ Cada chamada paga grava uma linha em `data/usage-log.jsonl`
 | Etapa (`purpose`) | Chamada | Onde |
 |---|---|---|
 | `reply` | LLM: resposta ao cliente | `src/orchestrator/orchestrator.ts` |
-| `hyde` | LLM: passagem hipotética do RAG | `src/knowledge/hyde.ts` |
+| `hyde` | LLM: passagem hipotética do RAG (só quando a busca simples falha) | `src/knowledge/hyde.ts` |
+| `summary` | LLM: resumo da conversa longa, a cada 10 turnos fora da janela | `src/conversation/memory.ts` |
+| `reply-retry` | LLM: nova tentativa quando a resposta citou preço ou % fora do catálogo (raro; ver `SEGURANCA_PROMPT_INJECTION.md`) | `src/orchestrator/orchestrator.ts` |
 | `query` | Embedding da pergunta | `src/embeddings/voyageEmbeddings.ts` |
 | `rerank` | Rerank dos candidatos | `src/knowledge/reranker.ts` |
 | `ingest` | Embedding do catálogo (`npm run ingest`), sem conversa | `src/embeddings/voyageEmbeddings.ts` |
+
+Uma chamada feita fora de qualquer conversa fica sem `conversationId`, e o
+relatório a soma em "Indexação do catálogo". Isso vale para o `npm run
+ingest` e também para a rota `/debug/rag-search`, usada pelo eval só em dev.
 
 A conversa chega até os providers por `AsyncLocalStorage`
 (`src/usage/usageMeter.ts`), sem mudar nenhuma assinatura. Se a gravação

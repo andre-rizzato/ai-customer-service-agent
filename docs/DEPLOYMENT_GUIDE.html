@@ -119,7 +119,7 @@
   </div>
   <div class="meta">
     <div>Repositório: github.com/andre-rizzato/ai-customer-service-agent</div>
-    <div>Versão do documento: 1.0 — Setembro/2026</div>
+    <div>Versão do documento: 1.1 — Outubro/2026 (revisão parcial, ver aviso abaixo)</div>
   </div>
 </div>
 
@@ -138,6 +138,11 @@
   <li><a href="#troubleshooting">Troubleshooting comum</a></li>
   <li><a href="#seguranca">Segurança e segredos</a></li>
 </ol>
+</div>
+
+<div class="callout warn">
+  <strong>Documento de 28/09/2026 — revisado só em parte em 09/10/2026</strong>
+  Este guia descreve a base original do projeto. Os trechos de RAG e de dados persistidos foram corrigidos, mas o que veio depois não está aqui: Key Vault, capacidades (AgentService), relay de handoff pelo Telegram, idioma do cliente, deploy automático pelo GitHub Actions, medição de custo e memória da conversa. Para o estado atual, veja <code>README.md</code>, <code>docs/STATUS.md</code>, <code>docs/RAG_QDRANT_MIGRATION.md</code>, <code>docs/HANDOFF_RELAY.md</code>, <code>docs/CUSTO_API.md</code>, <code>docs/CUSTO_AZURE.md</code>, <code>docs/WEBHOOKS_E_URLS.md</code> e o diagrama <code>docs/artifacts/fluxo-da-requisicao.html</code>.
 </div>
 
 <section id="prereq">
@@ -181,11 +186,13 @@
 <tr><td><code>HANDOFF_WEBHOOK_URL</code></td><td><code>agent.config.json</code> → <code>handoffNotifier: "webhook"</code></td><td>URL (ex.: Incoming Webhook do Slack) para alertas de handoff</td></tr>
 <tr><td><code>CONVERSATIONS_DIR</code></td><td>Nunca (default <code>./data/conversations</code>)</td><td>Pasta com histórico por conversa</td></tr>
 <tr><td><code>AUDIT_LOG_PATH</code></td><td>Nunca (default <code>./data/audit-log.jsonl</code>)</td><td>Log de auditoria (JSON Lines)</td></tr>
+<tr><td><code>USAGE_LOG_PATH</code></td><td>Nunca (default <code>./data/usage-log.jsonl</code>)</td><td>Consumo de API por chamada (tokens, modelo, conversa) — lido por <code>npm run usage:report</code></td></tr>
+<tr><td><code>QDRANT_URL</code> / <code>QDRANT_API_KEY</code></td><td>Sempre que houver busca (sem URL: <code>http://localhost:6333</code>)</td><td>Qdrant da base de conhecimento; em produção vêm do Key Vault (<code>qdrant-url</code> / <code>qdrant-api-key</code>)</td></tr>
 </tbody>
 </table>
 <div class="callout warn">
   <strong>Persistência dos dados</strong>
-  <code>CONVERSATIONS_DIR</code> e <code>AUDIT_LOG_PATH</code> (e o índice vetorial em <code>config.vectorStorePath</code>) vivem em disco local. Em qualquer deploy containerizado ou com múltiplas réplicas, isso PRECISA ser um volume persistente — sem isso, um redeploy apaga todo o histórico e o índice do catálogo.
+  <code>CONVERSATIONS_DIR</code> (histórico e resumos <code>.memory.json</code>), <code>AUDIT_LOG_PATH</code> e <code>USAGE_LOG_PATH</code> vivem em disco local. Em qualquer deploy containerizado ou com múltiplas réplicas, isso PRECISA ser um volume persistente — sem isso, um redeploy apaga o histórico, a memória das conversas e a base do relatório de custo. O índice do catálogo fica no Qdrant, fora do processo.
 </div>
 </section>
 

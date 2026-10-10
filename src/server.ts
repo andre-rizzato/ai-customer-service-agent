@@ -19,6 +19,8 @@ import { TelegramDesk } from "./handoff/telegramDesk.js";
 import { attendantChatIds, deskBotToken } from "./handoff/attendants.js";
 import { validateTelegramInitData } from "./handoff/telegramInitData.js";
 import type { ChannelName } from "./types.js";
+import { RateLimiter } from "./orchestrator/rateLimiter.js";
+import { message as fixedMessage, normalizeLanguage } from "./orchestrator/messages.js";
 
 // Augmenta o tipo Request do Express com o campo rawBody (ver o hook
 // `verify` do express.json() logo abaixo) — fazer isso via "declare
@@ -36,6 +38,16 @@ declare global {
 
 // Cria a aplicação Express — o framework HTTP usado para expor os webhooks.
 const app = express();
+// Confia no X-Forwarded-For SÓ quando a conexão vem do próprio servidor
+// (o Nginx, na mesma VM, faz proxy pra localhost:3000). É o que faz req.ip
+// ser o IP real do visitante, usado pelo rate limit por IP do widget (ver
+// webIpRateLimit abaixo). "loopback" em vez de `true`: com `true`, qualquer
+// um que alcançasse a porta direto poderia inventar um X-Forwarded-For e
+// ganhar um IP novo a cada requisição. Sem o header (Nginx não configurado
+// pra mandar, ver docs/SEGURANCA_PROMPT_INJECTION.md), req.ip vira o IP do
+// próprio Nginx e o limite passa a valer para todos os visitantes juntos —
+// mais restritivo, nunca mais frouxo.
+app.set("trust proxy", "loopback");
 // Middleware que faz o parse automático do corpo de requisições com
 // Content-Type: application/json para um objeto JS acessível em req.body —
 // sem isso, cada adapter teria que fazer esse parse manualmente.
@@ -53,6 +65,16 @@ const app = express();
 // do parse e não haveria como recuperá-los depois.
 app.use(
   express.json({
+    // Teto do corpo da requisição (09/10/2026). O padrão do Express é
+    // 100kb, e o teste adversarial mandou 100 mil caracteres numa mensagem
+    // que o bot processou inteira. 64kb sobra para qualquer webhook real
+    // (um update do Telegram ou do WhatsApp tem poucos KB; o limite de
+    // texto do Telegram é 4096 caracteres) e para o POST da tela de
+    // configuração. Acima disso o Express responde 413 sem chegar em
+    // nenhum handler. O limite de TEXTO por mensagem, mais apertado, fica
+    // no Orchestrator (agentConfig.maxMessageChars), porque vale pra todos
+    // os canais.
+    limit: "64kb",
     // O tipo de `req` aqui vem do body-parser (http.IncomingMessage), não
     // de Express.Request — por isso a augmentação "declare global" acima
     // não se aplica automaticamente a este parâmetro, e o cast abaixo é
@@ -188,11 +210,38 @@ function widgetCors(req: express.Request, res: express.Response, next: express.N
 // Telegram e Web só usam POST; deixar o próprio adapter decidir o que fazer
 // com cada método (ver WhatsAppAdapter.handleWebhook) evita ter que
 // registrar rotas diferentes por canal aqui.
+// Rate limit POR IP do canal web (09/10/2026, ver webIpRateLimit em
+// config.ts). O limite por conversa do Orchestrator não protege o widget:
+// lá o conversationId vem do navegador, e no teste adversarial 25 mensagens
+// com 25 ids diferentes passaram todas. Aqui a chave é o IP (req.ip, com
+// "trust proxy" configurado acima). Reaproveita a mesma classe
+// RateLimiter do Orchestrator — ela não sabe o que a chave representa.
+const webIpLimiter = new RateLimiter(agentConfig.webIpRateLimit.maxMessagesPerWindow, agentConfig.webIpRateLimit.windowSeconds);
+
+// Preâmbulo: webIpRateLimit() é o middleware que aplica o limite acima, só
+// nas rotas de MENSAGEM do canal web (POST /webhook/web e o alias
+// /webhook/web/message). Health e polling ficam de fora: não chamam API
+// paga, e o polling roda a cada poucos segundos durante um handoff — contá-lo
+// bloquearia o próprio atendimento humano. OPTIONS (preflight de CORS) já é
+// respondido pelo widgetCors antes de chegar aqui. Responde 429 com a mesma
+// mensagem fixa do rate limit por conversa, no formato {reply, message} do
+// canal web, pro widget mostrar o aviso em vez de um erro genérico.
+function webIpRateLimit(req: express.Request, res: express.Response, next: express.NextFunction): void {
+  if (req.method !== "POST") return next();
+  if (webIpLimiter.isAllowed(req.ip ?? "desconhecido")) return next();
+  console.warn(`Rate limit por IP no canal web: ${req.ip}`);
+  const text = fixedMessage("rateLimit", normalizeLanguage(req.body?.language ?? req.body?.locale));
+  res.status(429).json({ reply: text, message: text });
+}
+
 for (const adapter of adapters) {
   // Só o canal "web" é pensado pra ser chamado de um browser em outro
   // domínio (o widget embarcável) — Telegram e WhatsApp chamam o webhook
-  // deles mesmos, server-to-server, sem CORS envolvido.
-  const middlewares = adapter.name === "web" ? [widgetCors] : [];
+  // deles mesmos, server-to-server, sem CORS envolvido. Pelo mesmo motivo,
+  // só ele leva o rate limit por IP: as requisições do Telegram e do
+  // WhatsApp vêm dos servidores da plataforma (um IP para todos os
+  // clientes), e lá o id do usuário é verificado pela plataforma.
+  const middlewares = adapter.name === "web" ? [widgetCors, webIpRateLimit] : [];
   // Extraído como função nomeada (em vez de inline só em um app.all) porque
   // o canal "web" precisa dela montada em DOIS caminhos — ver o alias
   // /webhook/web/message logo abaixo.
@@ -454,6 +503,9 @@ app.post("/api/config", (req, res) => {
   // do rate limiter, timeout de handoff, tipo de handoff notifier) — ver
   // Orchestrator.reloadConfig().
   orchestrator.reloadConfig();
+  // O limite por IP do widget vive aqui no server.ts (não no
+  // Orchestrator), então é atualizado à parte.
+  webIpLimiter.updateLimits(agentConfig.webIpRateLimit.maxMessagesPerWindow, agentConfig.webIpRateLimit.windowSeconds);
 
   res.json({ ok: true, config: agentConfig });
 });

@@ -6,7 +6,7 @@ repositórios envolvidos: `ai-customer-service-agent` (este),
 institucional). Para os passos manuais de domínio/email/WhatsApp, ver
 [`GO_LIVE_CHECKLIST.md`](GO_LIVE_CHECKLIST.md).
 
-Última atualização: 07/10/2026.
+Última atualização: 09/10/2026.
 
 ---
 
@@ -122,7 +122,7 @@ Relatório: [`SECURITY_AUDIT_2026-10-06.md`](SECURITY_AUDIT_2026-10-06.md). Como
 - [x] Botão **✅ Encerrar atendimento** no alerta do Telegram e no Mini App, mais o comando `/encerrar`: aviso ao cliente + devolve ao bot (diferente de "Devolver ao bot", que não avisa)
 - [x] Encerramento automático por inatividade (`handoffInactivityMinutes`, padrão 30, 0 desliga; campo na tela de configuração): varredura a cada minuto, aviso ao cliente e ao atendente
 - [x] Widget e simulador mostram o aviso automático sem o rótulo "Atendente" (`fromHuman` no polling)
-- [ ] Deploy (commit/push) — código e widget ainda não enviados
+- [x] Deploy do código — commit `3a1cfa3`, já no `origin/master` e o widget no `rizzatotech-site` (commit `0a8f680`, já no `origin/main`)
 
 ### RAG avançado: hybrid search + HyDE + reranking + Qdrant (07/10/2026)
 
@@ -158,10 +158,40 @@ AgentService: `AGENT_SERVICE_RAG_DOCUMENTATION.md` (`DistributedOrderSystem/docs
   `generate_reply_node` e os nós de resposta fixa (`cancel_order_agent`,
   `create/update/product_info_stub`, `clarify`) ficaram idioma-aware
   (`messages.py`, espelha `src/orchestrator/messages.ts`)
-- ⚠️ Custo de latência, não corrigido (decisão em aberto): HyDE (chamada de
-  LLM) + rerank (chamada à Voyage) somam 2 round-trips de rede por mensagem
-  ANTES da resposta final, nos dois lados — vale decidir se compensa pro
-  tamanho atual do catálogo/base de notas, ou se é desproporcional
+- [x] ~~Custo de latência do HyDE~~ — resolvido no lado Node em 09/10/2026:
+  HyDE condicional (só roda quando a busca simples falha, ~10% das perguntas
+  no eval) + cache. Ver seção "Custo de API" abaixo. No AgentService o HyDE
+  continua rodando sempre (decisão em aberto lá)
+
+### Custo de API e economia (09/10/2026)
+
+Guias: [`CUSTO_API.md`](CUSTO_API.md) (API) e [`CUSTO_AZURE.md`](CUSTO_AZURE.md) (infraestrutura).
+
+- [x] **Medição** (commit `f3a7495`): toda chamada paga (LLM, embedding, rerank) grava os tokens em `data/usage-log.jsonl`, com conversa e canal; `npm run usage:report` mostra custo por mês, por conversa, por etapa e por modelo (preços em `config/pricing.json`)
+- [x] **Economia** (commit `af0128f`): HyDE condicional (`hydeSkipScore`), cache do HyDE, janela de histórico (`historyWindowTurns`, 15 turnos) + memória do que saiu dela (resumo acumulado em segundo plano + busca BM25 nos turnos antigos, `src/conversation/memory.ts`)
+- [x] Medido antes/depois com o eval RAGAS (20 perguntas): *context precision* idêntica nos 20 casos, HyDE em 2/20 perguntas (antes 20/20), custo por pergunta US$ 0,0027 → US$ 0,0017. Conversa longa de 16 mensagens: bot lembrou 3/3 fatos do começo, igual ao histórico completo (`npm run eval:long-conversation`)
+- [x] **Bug corrigido no harness RAGAS**: o juiz nunca tinha rodado (cliente síncrono numa métrica assíncrona); dataset ampliado de 8 para 20 perguntas, com 12 indiretas
+- [x] Avaliado e descartado: trocar o HyDE por modelo local (não cabe na B1s; numa VM maior só empata com a API perto de ~40 mil perguntas/mês)
+- [x] Azure: VM desligada pelo usuário em 09/10 (01:18 UTC); disco trocado para Standard HDD e 2 workspaces Log Analytics sem uso apagados, também pelo usuário. O IP público estático continua cobrando (~R$ 0,63/dia), deliberadamente
+- [ ] **Deploy dos commits de custo e segurança** (`f3a7495`, `af0128f` e os seguintes): exige **ligar a VM antes** (com a VM desligada, o deploy do push falha) e voltar o disco para Premium antes de ligar (ver `CUSTO_AZURE.md`)
+- [ ] Conferir os preços da Voyage e da OpenAI em `config/pricing.json` (os da Anthropic foram conferidos em 09/10; os outros foram estimados)
+- [ ] O AgentService (capacidade `order`) chama o LLM no próprio processo e **não** é medido pelo `usage-log` — só aparece no Console da Anthropic
+- [ ] Falhas de *faithfulness* que se repetem no eval (ex.: "como acompanho minha encomenda?" — a resposta acrescenta orientação fora do catálogo): ajuste de prompt, não de RAG
+- [ ] Definir o preço por cliente depois de algumas semanas de `usage-log` real (mediana por conversa → franquia mensal, ver `CUSTO_API.md`)
+
+### Prompt injection e abuso do bot (09/10/2026)
+
+Guia: [`SEGURANCA_PROMPT_INJECTION.md`](SEGURANCA_PROMPT_INJECTION.md) (item #9 da `SECURITY_REVIEW.md`).
+
+- [x] Teste adversarial `npm run eval:adversarial` (`scripts/evalAdversarial.ts`): 16 ataques (preço e desconto falsos, vazar prompt, falso "SYSTEM", fechar `<memoria>`, dizer que é humano, fora de escopo, produto e garantia inventados, forçar transferência, inglês, ofensa, injeção que sobrevive no resumo, mensagem gigante, burla do rate limit). **12/16 antes → 16/16 depois**
+- [x] Antes do LLM: teto de 64kb no corpo HTTP, `maxMessageChars` (2000) por mensagem, rate limit por IP no widget (`webIpRateLimit`, 20/min), limpeza do mapa do rate limiter, sinal `[[TRANSFERIR]]` neutralizado na fala do cliente, busca que falha responde sem contexto em vez de erro 500
+- [x] No prompt: memória da conversa longa saiu do system prompt e foi para a primeira mensagem do cliente (injeção armazenada)
+- [x] Depois do LLM: checagem determinística de preço e porcentagem contra o catálogo (`outputGuard.ts`), com uma nova tentativa e, se falhar de novo, mensagem fixa oferecendo o atendente; transferência pedida pelo próprio cliente vira só oferta
+- [x] Tráfego normal sem regressão: 0 intervenções da checagem nas 20 perguntas do eval e na conversa longa; memória 3/3
+- [ ] **Nginx** (VM ligada): `X-Forwarded-For` no `proxy_pass` (sem ele, o limite por IP vale para todos os visitantes juntos) + `limit_req` na borda. Passo a passo na seção 5 do guia
+- [ ] **Limite de gasto no Console da Anthropic** (última rede contra abuso distribuído)
+- [ ] Teste adversarial no AgentService (capacidade "pedido")
+- [ ] Limitações aceitas: valor citado pelo próprio cliente cai na mensagem fixa; preço de um produto atribuído a outro e prazos/specs em texto não têm trava determinística
 
 ### CI/CD
 

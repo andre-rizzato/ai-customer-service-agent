@@ -144,8 +144,11 @@ function formatTurns(turns: DialogueTurn[]): string {
     .join("\n");
 }
 
-// Preâmbulo: buildMemoryBlock() monta o texto que o promptBuilder coloca
-// no system prompt: o resumo acumulado e os trechos antigos recuperados.
+// Preâmbulo: buildMemoryBlock() monta o texto que o Orchestrator coloca,
+// entre marcas <memoria>, no começo da primeira mensagem do cliente: o
+// resumo acumulado e os trechos antigos recuperados. NÃO vai no system
+// prompt (mudança de 09/10/2026): é texto derivado do cliente, e lá teria
+// a autoridade das regras fixas — ver docs/SEGURANCA_PROMPT_INJECTION.md.
 // Devolve undefined quando não há nada (conversa curta), pra o prompt de
 // conversas curtas ficar exatamente igual ao de antes.
 export function buildMemoryBlock(summary: string | undefined, recalled: DialogueTurn[]): string | undefined {
@@ -160,7 +163,8 @@ export function buildMemoryBlock(summary: string | undefined, recalled: Dialogue
 export interface PreparedMemory {
   // Mensagens literais: turnos não cobertos pelo resumo + janela.
   history: DialogueTurn[];
-  // Texto pro system prompt (undefined = conversa curta, nada a lembrar).
+  // Bloco de memória pra primeira mensagem do cliente (undefined = conversa
+  // curta, nada a lembrar).
   memoryBlock: string | undefined;
   // Estado usado depois da resposta pra decidir se o resumo precisa ser
   // atualizado (ver scheduleSummaryUpdate()).

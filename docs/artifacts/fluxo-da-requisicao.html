@@ -258,29 +258,29 @@
 
         <!-- step 8 RAG -->
         <rect x="110" y="800" width="560" height="60" rx="5" fill="var(--surface-2)" stroke="var(--border)" />
-        <text x="126" y="820" font-size="11" font-weight="700" fill="var(--ink)">8 · knowledge/knowledgeBase.ts + vectorStore.ts</text>
-        <text x="126" y="835" font-size="9.5" fill="var(--ink-muted)">busca por similaridade de cosseno no índice local (top-K)</text>
-        <text x="126" y="848" font-size="9" fill="var(--ink-muted)" font-style="italic">embeda a pergunta primeiro — ver seta pra Voyage →</text>
+        <text x="126" y="820" font-size="11" font-weight="700" fill="var(--ink)">8 · knowledge/knowledgeBase.ts (Qdrant + BM25 + rerank)</text>
+        <text x="126" y="835" font-size="9.5" fill="var(--ink-muted)">pergunta crua → Qdrant + BM25 → RRF → rerank; HyDE só se o melhor &lt; 0.5</text>
+        <text x="126" y="848" font-size="9" fill="var(--ink-muted)" font-style="italic">embeda a pergunta (e a passagem do HyDE, se rodar) — ver seta pra Voyage →</text>
         <line x1="670" y1="830" x2="810" y2="831" stroke="var(--accent)" stroke-width="2" marker-end="url(#arrowFlow)" color="var(--accent)" />
         <line x1="390" y1="860" x2="390" y2="874" stroke="var(--accent)" stroke-width="1.75" marker-end="url(#arrowFlow)" color="var(--accent)" />
 
         <!-- step 9 -->
         <rect x="110" y="876" width="560" height="50" rx="5" fill="var(--surface-2)" stroke="var(--border)" />
         <text x="126" y="895" font-size="11" font-weight="700" fill="var(--ink)">9 · orchestrator/promptBuilder.ts</text>
-        <text x="126" y="910" font-size="9.5" fill="var(--ink-muted)">monta o system prompt: regras fixas + contexto recuperado</text>
+        <text x="126" y="910" font-size="9.5" fill="var(--ink-muted)">regras fixas + contexto recuperado + memória (só em conversa longa)</text>
         <line x1="390" y1="926" x2="390" y2="940" stroke="var(--accent)" stroke-width="1.75" marker-end="url(#arrowFlow)" color="var(--accent)" />
 
         <!-- step 10 -->
         <rect x="110" y="942" width="560" height="54" rx="5" fill="var(--surface-2)" stroke="var(--border)" />
         <text x="126" y="962" font-size="11" font-weight="700" fill="var(--ink)">10 · llm/anthropicProvider.ts</text>
-        <text x="126" y="977" font-size="9.5" fill="var(--ink-muted)">chama o modelo com o prompt + histórico da conversa</text>
-        <line x1="670" y1="969" x2="780" y2="1020" stroke="var(--accent)" stroke-width="2" marker-end="url(#arrowFlow)" color="var(--accent)" />
+        <text x="126" y="977" font-size="9.5" fill="var(--ink-muted)">prompt + últimos 15 turnos (conversation/memory.ts); tokens → usage-log</text>
+        <line x1="670" y1="969" x2="812" y2="1165" stroke="var(--accent)" stroke-width="2" marker-end="url(#arrowFlow)" color="var(--accent)" />
         <line x1="390" y1="996" x2="390" y2="1010" stroke="var(--accent)" stroke-width="1.75" marker-end="url(#arrowFlow)" color="var(--accent)" />
 
         <!-- step 11 -->
         <rect x="110" y="1012" width="560" height="54" rx="5" fill="var(--surface-2)" stroke="var(--border)" />
         <text x="126" y="1032" font-size="11" font-weight="700" fill="var(--ink)">11 · conversation/store.ts</text>
-        <text x="126" y="1047" font-size="9.5" fill="var(--ink-muted)">grava o turno no histórico + audit log (JSONL)</text>
+        <text x="126" y="1047" font-size="9.5" fill="var(--ink-muted)">grava o turno no histórico + audit log; resumo em 2º plano (memory.ts)</text>
         <text x="126" y="1060" font-size="9" fill="var(--ink-muted)" font-style="italic">caminho RAG e caminho order (7a-7e) convergem aqui</text>
         <line x1="390" y1="1066" x2="390" y2="1080" stroke="var(--accent)" stroke-width="1.75" marker-end="url(#arrowFlow)" color="var(--accent)" />
 
@@ -341,8 +341,8 @@
         <!-- External: Voyage -->
         <rect x="820" y="800" width="400" height="70" rx="6" fill="var(--surface)" stroke="var(--border-strong)" />
         <text x="840" y="825" font-size="12" font-weight="700" fill="var(--ink)">Voyage AI (via MongoDB)</text>
-        <text x="840" y="841" font-size="9.5" fill="var(--ink-muted)">ai.mongodb.com/v1/embeddings</text>
-        <text x="840" y="855" font-size="9" fill="var(--ink-muted)">embedding da pergunta do usuário</text>
+        <text x="840" y="841" font-size="9.5" fill="var(--ink-muted)">ai.mongodb.com/v1/embeddings e /v1/rerank</text>
+        <text x="840" y="855" font-size="9" fill="var(--ink-muted)">embedding da pergunta + rerank dos candidatos</text>
 
         <!-- External: API de envio — depende do canal de origem da mensagem (passo 2) -->
         <rect x="820" y="1000" width="400" height="90" rx="6" fill="var(--surface)" stroke="var(--border-strong)" />
@@ -352,13 +352,15 @@
         <text x="840" y="1068" font-size="9" fill="var(--ink-muted)">(fecha o ciclo — volta ao topo deste diagrama)</text>
 
         <!-- External: Anthropic -->
-        <rect x="820" y="1140" width="400" height="110" rx="6" fill="var(--surface)" stroke="var(--border-strong)" />
+        <rect x="820" y="1140" width="400" height="140" rx="6" fill="var(--surface)" stroke="var(--border-strong)" />
         <text x="840" y="1163" font-size="12" font-weight="700" fill="var(--ink)">Anthropic API</text>
         <text x="840" y="1179" font-size="9.5" fill="var(--ink-muted)">api.anthropic.com</text>
-        <text x="840" y="1195" font-size="9" fill="var(--ink-muted)">3 chamadas possíveis por mensagem:</text>
+        <text x="840" y="1195" font-size="9" fill="var(--ink-muted)">chamadas possíveis por mensagem:</text>
         <text x="840" y="1209" font-size="9" fill="var(--ink-muted)">· classificação de intenção (7b)</text>
         <text x="840" y="1222" font-size="9" fill="var(--ink-muted)">· resposta com RAG (10)</text>
         <text x="840" y="1235" font-size="9" fill="var(--ink-muted)">· resposta grounded em pedido (7e)</text>
+        <text x="840" y="1248" font-size="9" fill="var(--ink-muted)">· HyDE (8), só quando a busca simples falha</text>
+        <text x="840" y="1261" font-size="9" fill="var(--ink-muted)">· resumo da conversa (11), a cada 10 turnos</text>
 
         <!-- External: Order backend -->
         <rect x="820" y="1462" width="400" height="70" rx="6" fill="var(--surface)" stroke="var(--border-strong)" />
@@ -393,10 +395,10 @@
           <tr><td>5</td><td>orchestrator/rateLimiter.ts</td><td>Limite de mensagens/min por conversa</td></tr>
           <tr><td>6</td><td>orchestrator/handoff.ts</td><td>Gatilho por palavra-chave para transferência humana</td></tr>
           <tr><td>7</td><td>orchestrator/capabilityRouter.ts</td><td>Decide entre RAG local e delegar pro agent-service</td></tr>
-          <tr><td>8</td><td>knowledge/knowledgeBase.ts, vectorStore.ts</td><td>Busca por similaridade no índice vetorial local</td></tr>
-          <tr><td>9</td><td>orchestrator/promptBuilder.ts</td><td>Monta o system prompt com as regras fixas + contexto</td></tr>
-          <tr><td>10</td><td>llm/anthropicProvider.ts</td><td>Chamada ao modelo (caminho RAG)</td></tr>
-          <tr><td>11</td><td>conversation/store.ts</td><td>Histórico + log de auditoria (JSONL)</td></tr>
+          <tr><td>8</td><td>knowledge/knowledgeBase.ts, hyde.ts, reranker.ts</td><td>Busca no Qdrant + BM25, combinadas por RRF e reordenadas pelo rerank da Voyage. Primeiro com a pergunta crua; o HyDE (chamada de LLM) só roda quando o melhor trecho fica abaixo de <code>hydeSkipScore</code>, e as passagens ficam em cache</td></tr>
+          <tr><td>9</td><td>orchestrator/promptBuilder.ts</td><td>Monta o system prompt com as regras fixas + contexto + memória da conversa (resumo e trechos antigos, só quando a conversa passa da janela)</td></tr>
+          <tr><td>10</td><td>llm/anthropicProvider.ts, conversation/memory.ts</td><td>Chamada ao modelo com os últimos <code>historyWindowTurns</code> turnos (caminho RAG); os tokens gastos vão para <code>data/usage-log.jsonl</code>. Antes de responder, <code>outputGuard.ts</code> confere se todo preço e porcentagem da resposta está no catálogo</td></tr>
+          <tr><td>11</td><td>conversation/store.ts, conversation/memory.ts</td><td>Histórico + log de auditoria (JSONL); a cada 10 turnos fora da janela, atualiza o resumo em segundo plano</td></tr>
           <tr><td>7a</td><td>AgentService/main.py</td><td>Endpoint FastAPI que recebe a delegação do orchestrator</td></tr>
           <tr><td>7b</td><td>AgentService/intent_classifier.py</td><td>Classifica a intenção da mensagem (few-shot + saída estruturada)</td></tr>
           <tr><td>7c</td><td>AgentService/graph.py</td><td>Roteamento por confiança — função pura, sem chamar modelo</td></tr>

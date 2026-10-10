@@ -35,6 +35,8 @@
   "maxTokens": 1024,
   "hydeSkipScore": 0.5,
   "historyWindowTurns": 15,
+  "maxMessageChars": 2000,
+  "webIpRateLimit": { "maxMessagesPerWindow": 20, "windowSeconds": 60 },
   "enabledCapabilities": ["order", "scheduling", "sales"],
   "orderKeywords": ["status do pedido", "status do meu pedido", "cancelar pedido", "rastrear pedido"],
   "schedulingKeywords": ["marcar horário", "marcar um horário", "agendar", "tem horário"],

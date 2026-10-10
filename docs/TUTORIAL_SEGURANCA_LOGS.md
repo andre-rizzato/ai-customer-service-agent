@@ -116,6 +116,8 @@ nenhum ✅
 | Erros do Nginx (TLS, upstream fora) | `/var/log/nginx/error.log` | idem |
 | Saída e erros do agente | `~/.pm2/logs/agente-atendimento-out.log` / `-error.log` | até apagar (`pm2 flush`) |
 | Conversas e handoffs (auditoria do bot) | `~/agente-atendimento/data/audit-log.jsonl` | permanente |
+| Consumo de API por chamada (tokens, modelo, conversa) | `~/agente-atendimento/data/usage-log.jsonl` (`npm run usage:report`) | permanente |
+| Resumo das conversas longas (memória do bot) | `~/agente-atendimento/data/conversations/<id>.memory.json` | permanente |
 | Quem mudou recursos no Azure (VM, NSG, Key Vault) | Azure Activity Log | 90 dias |
 | Updates automáticos | `/var/log/unattended-upgrades/` | rotativo |
 

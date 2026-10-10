@@ -124,9 +124,9 @@
         <text x="840" y="444" font-size="10.5" fill="#152138" font-family="IBM Plex Mono, monospace">anthropic-api-key</text>
         <circle cx="828" cy="460" r="3.5" fill="#2F8F62" />
         <text x="840" y="464" font-size="10.5" fill="#152138" font-family="IBM Plex Mono, monospace">voyage-api-key</text>
-        <circle cx="828" cy="480" r="3.5" fill="#9FB0C8" />
-        <text x="840" y="484" font-size="10.5" fill="#58698A" font-family="IBM Plex Mono, monospace">+ 6 pendentes</text>
-        <text x="840" y="500" font-size="9.5" fill="#58698A" font-family="IBM Plex Mono, monospace">(telegram · whatsapp · handoff)</text>
+        <circle cx="828" cy="480" r="3.5" fill="#2F8F62" />
+        <text x="840" y="484" font-size="10.5" fill="#152138" font-family="IBM Plex Mono, monospace">+ 6 configurados</text>
+        <text x="840" y="500" font-size="9.5" fill="#58698A" font-family="IBM Plex Mono, monospace">(telegram · whatsapp) · handoff-webhook-url pendente</text>
 
         <!-- amber arrow config.ts -> key vault -->
         <line x1="372" y1="464" x2="817" y2="462" stroke="#B5701E" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrowSecret)" />

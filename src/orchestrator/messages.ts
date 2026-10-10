@@ -41,7 +41,10 @@ type MessageKey =
   | "capabilityNotWired"
   | "cancelOrderHandoff"
   | "closedByAttendant"
-  | "closedByInactivity";
+  | "closedByInactivity"
+  | "messageTooLong"
+  | "valueNotConfirmed"
+  | "handoffOffer";
 
 const MESSAGES: Record<MessageKey, Record<Language, string>> = {
   handoff: {
@@ -73,6 +76,34 @@ const MESSAGES: Record<MessageKey, Record<Language, string>> = {
     pt: "Encerramos este atendimento por falta de interação. Se ainda precisar de ajuda, é só mandar uma nova mensagem.",
     en: "We closed this conversation due to inactivity. If you still need help, just send a new message.",
     it: "Abbiamo chiuso questa conversazione per inattività. Se hai ancora bisogno di aiuto, basta inviare un nuovo messaggio.",
+  },
+  // Mensagem do cliente acima de agentConfig.maxMessageChars (09/10/2026):
+  // recusada antes de qualquer chamada de API. Pede pra resumir em vez de
+  // só recusar, porque o caso legítimo (alguém colando um texto grande)
+  // existe.
+  messageTooLong: {
+    pt: "Sua mensagem ficou muito longa para eu processar. Pode me mandar um resumo do que precisa, em poucas linhas?",
+    en: "Your message is too long for me to process. Could you send me a short summary of what you need?",
+    it: "Il tuo messaggio è troppo lungo per me. Puoi mandarmi un breve riassunto di ciò che ti serve?",
+  },
+  // A resposta do LLM citou um preço ou porcentagem que não está no
+  // catálogo, nem na primeira tentativa nem na segunda (outputGuard.ts,
+  // 09/10/2026). Em vez de arriscar uma oferta falsa em nome da empresa,
+  // o cliente recebe isto. Oferece o atendente, mas não transfere sozinho:
+  // a regra 3 do prompt só transfere com pedido explícito.
+  valueNotConfirmed: {
+    pt: "Não consigo confirmar esse valor por aqui. Os preços e condições que posso garantir são os do nosso catálogo — quer que eu chame um atendente para confirmar com você?",
+    en: "I can't confirm that amount here. The prices and terms I can guarantee are the ones in our catalog — would you like me to bring in a human agent to confirm it with you?",
+    it: "Non posso confermare questo importo da qui. I prezzi e le condizioni che posso garantire sono quelli del nostro catalogo — vuoi che chiami un operatore per confermarlo con te?",
+  },
+  // O cliente escreveu o sinal interno de transferência ([[TRANSFERIR]])
+  // e o modelo obedeceu (09/10/2026, ver orchestrator.ts PASSO 5.5): em vez
+  // de transferir pela porta dos fundos, o bot oferece a transferência
+  // pelo caminho normal.
+  handoffOffer: {
+    pt: "Posso te conectar com um atendente humano, se você preferir — é só me dizer \"quero falar com atendente\". Enquanto isso, posso ajudar com alguma dúvida?",
+    en: "I can connect you with a human agent if you prefer — just tell me \"I want to talk to an agent\". Meanwhile, can I help with anything?",
+    it: "Posso metterti in contatto con un operatore se preferisci — basta scrivermi \"voglio parlare con un operatore\". Nel frattempo, posso aiutarti con qualcosa?",
   },
 };
 

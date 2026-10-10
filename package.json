@@ -16,6 +16,8 @@
     "ingest": "tsx src/knowledge/ingest.ts",
     "simulate": "tsx scripts/simulate.ts",
     "usage:report": "tsx scripts/usageReport.ts",
+    "eval:long-conversation": "tsx scripts/evalLongConversation.ts",
+    "eval:adversarial": "tsx scripts/evalAdversarial.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

@@ -32,6 +32,16 @@ localmente — o canal `web` (`src/channels/web.ts`) existe justamente pra
 isso: é um adapter REST simples, sem credencial nenhuma, pensado pra testar
 com `curl`. Veja a seção 6 se quiser testar Telegram/WhatsApp de verdade.
 
+A busca usa um **Qdrant**. Sem `QDRANT_URL` no `.env`, o padrão é
+`http://localhost:6333`, então suba um local antes:
+- com Docker: `docker run -p 6333:6333 qdrant/qdrant`;
+- sem Docker, no Windows: o `qdrant.exe` oficial, com uma pasta de dados de
+  caminho curto (ver `eval/README.md`, passo 1, pelo erro de caminho
+  longo).
+
+Nunca aponte o dev para o Qdrant de produção: o `npm run ingest` recria a
+coleção.
+
 Gere o índice vetorial da base de conhecimento (precisa rodar de novo sempre
 que `knowledge/catalog.json` mudar):
 
@@ -45,9 +55,12 @@ npm run ingest
 npm test
 ```
 
-24 testes cobrindo rate limiter, dedupe cache, detecção de handoff,
-capability router, prompt builder e vector store — tudo determinístico, sem
-custo de API. Rode isso primeiro sempre que mudar algo: é o jeito mais
+117 testes (09/10/2026) cobrindo rate limiter, dedupe cache, detecção de
+handoff, capability router, prompt builder, BM25/RRF, relay de handoff,
+contrato do widget, medição e relatório de custo, HyDE condicional, cache do
+HyDE, memória da conversa e as proteções contra prompt injection (checagem
+de valores, sinal de transferência, limpeza do rate limiter) — tudo determinístico, sem custo de API (as APIs
+são simuladas). Rode isso primeiro sempre que mudar algo: é o jeito mais
 rápido de pegar regressão óbvia antes de gastar uma chamada real de LLM.
 
 ## 3. Chat interativo no terminal (sem subir servidor HTTP)
@@ -107,11 +120,20 @@ Depois de testar, confira o que foi persistido:
 - `data/conversations/<conversationId>.json` — histórico da conversa
 - `data/audit-log.jsonl` — log de auditoria, uma linha por turno, com
   `contextUsed` mostrando quais itens da base entraram no prompt
+- `data/usage-log.jsonl` — uma linha por chamada paga de API (LLM,
+  embedding, rerank), com tokens, modelo e etapa (`reply`, `hyde`,
+  `query`, `rerank`, `summary`). `npm run usage:report` resume o custo
+- `data/conversations/<conversationId>.memory.json` — só em conversa que
+  passou de `historyWindowTurns` (15) turnos: resumo do que saiu da janela
+  (ver `src/conversation/memory.ts`)
 
 `data/` está no `.gitignore`, então dados de teste não vão pro commit — mas
 se quiser manter o repo limpo entre sessões de debug, apague os arquivos de
-teste manualmente (`rm data/conversations/teste-*.json`) e remova as linhas
-correspondentes do `audit-log.jsonl`.
+teste manualmente (`rm data/conversations/teste-*.json`, que também apaga
+os `.memory.json`) e remova as linhas correspondentes do `audit-log.jsonl` e
+do `usage-log.jsonl`. Mais simples: teste com pastas próprias
+(`CONVERSATIONS_DIR`, `AUDIT_LOG_PATH`, `USAGE_LOG_PATH` apontando para uma
+pasta temporária).
 
 Se preferir não ficar montando JSON de `curl` na mão, as duas seções
 seguintes cobrem o mesmo canal `web` por uma interface visual.
@@ -379,8 +401,18 @@ idioma do navegador. No Telegram, vale o idioma do app de quem escreve.
   `VOYAGE_API_KEY` (ou `OPENAI_API_KEY`, se `EMBEDDING_PROVIDER=openai`) está
   preenchida no `.env`. Sem nenhuma API key, use `EMBEDDING_PROVIDER=local`.
 - **Servidor sobe mas RAG nunca encontra nada** — rode `npm run ingest`
-  depois de qualquer mudança em `knowledge/catalog.json`; o vector store em
-  `data/vector-store.json` não se atualiza sozinho.
+  depois de qualquer mudança em `knowledge/catalog.json`; a coleção
+  `catalog` do Qdrant não se atualiza sozinha. Confira também se o Qdrant
+  está de pé (`curl localhost:6333/collections`).
+- **`npm run ingest` falha com `Gridstore IO error: O sistema não pode
+  encontrar o caminho especificado`** — Qdrant local no Windows com a pasta de
+  dados num caminho longo demais (limite de 260 caracteres). Use uma pasta
+  curta, ex. `%TEMP%\qd` (ver `eval/README.md`).
+- **Bot "esqueceu" algo dito no começo de uma conversa longa** — esperado só
+  se o fato não estiver no resumo (`data/conversations/<id>.memory.json`) nem
+  for achado pela busca nos turnos antigos. Para reproduzir:
+  `npm run eval:long-conversation`. Para comparar com o comportamento
+  antigo, use `"historyWindowTurns": 1000` no `agent.config.json` local.
 - **Processo não morre depois de `Ctrl+C` no `npm run dev`** — no Windows,
   `tsx watch` sobe um processo filho pra rodar `server.ts` de verdade e
   reinicia só ele a cada arquivo salvo; matar só o processo da porta não
