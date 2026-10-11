@@ -27,7 +27,7 @@ import { callAgentService } from "./agentServiceClient.js";
 import { detectCapability } from "./capabilityRouter.js";
 import { containsHandoffSignalAttempt, detectAssistantHandoff, detectHandoffTrigger, neutralizeHandoffSignal } from "./handoff.js";
 import { checkReplyValues, chunksText, retryInstruction } from "./outputGuard.js";
-import { catalogText } from "../knowledge/catalogText.js";
+import { catalogItems, catalogText } from "../knowledge/catalogText.js";
 import { buildSystemPrompt } from "./promptBuilder.js";
 // Importado como fixedMessage porque o parâmetro de handleMessage() já se
 // chama `message` (o InboundMessage) e esconderia esta função.
@@ -331,7 +331,10 @@ export class Orchestrator {
     // recuperado (ou a frase de "nada encontrado") + um AVISO de que pode
     // haver memória na conversa (só em conversa longa). O texto da memória
     // em si NÃO vai no system prompt — ver o comentário logo abaixo.
-    const systemPrompt = buildSystemPrompt(retrieved, language, prepared.memoryBlock !== undefined);
+    // Mensageria já fornece um endereço de resposta (ID do chat ou telefone);
+    // o widget web não revela um contato fora da conversa, então só nesse
+    // caso o prompt permite pedi-lo — e apenas com consentimento.
+    const systemPrompt = buildSystemPrompt(retrieved, language, prepared.memoryBlock !== undefined, channel !== "web");
     const history = prepared.history.map((turn) => ({
       // turn.role aqui só pode ser "user", "assistant" ou "human-agent" (ver
       // o filtro de system-note acima). A fala do atendente humano (relay)
@@ -432,7 +435,8 @@ export class Orchestrator {
     // Referência = catálogo inteiro + trechos recuperados (ver o preâmbulo
     // de checkReplyValues sobre por que o catálogo inteiro).
     const reference = `${catalogText()}\n${chunksText(retrieved)}`;
-    const guard = checkReplyValues(reply, reference);
+    const items = catalogItems();
+    const guard = checkReplyValues(reply, reference, items);
     if (!guard.ok) {
       console.warn(`Resposta com valores fora do contexto em ${conversationId}: ${guard.unsupported.join(", ")}`);
       const retry = await this.llm.generate(systemPrompt + retryInstruction(guard.unsupported), history, {
@@ -442,7 +446,7 @@ export class Orchestrator {
         // tentativas extras custam e com que frequência acontecem.
         purpose: "reply-retry",
       });
-      const retryGuard = checkReplyValues(retry, reference);
+      const retryGuard = checkReplyValues(retry, reference, items);
       // A segunda tentativa precisa passar na checagem E não pode ser um
       // pedido de transferência (o handoff só é executado no PASSO 5.5,
       // sobre a primeira resposta; aqui não há como executá-lo sem duplicar

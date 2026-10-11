@@ -117,12 +117,30 @@ e corrigiu cinco problemas do catálogo:
 Na rodada final, a checagem de valores não precisou bloquear nenhuma
 resposta.
 
+## Respostas de preço e encaminhamento comercial
+
+Quando o cliente pergunta preço, o agente informa os valores publicados com
+transparência e associa cada implantação ao plano correto. Não pode criar uma
+faixa combinando o menor preço de um plano com o maior de outro; faixas só
+passam pela checagem se estiverem declaradas no catálogo. Perguntas que pedem
+comparação recebem mais trechos do RAG para que os três planos possam ser
+apresentados juntos.
+
+Se houver interesse, o agente pode oferecer — sem pressão e sem transferir
+antes do aceite — que a equipe entenda o caso ou prepare uma proposta. Nos
+canais em que a equipe já consegue responder na conversa, não se pede outro
+contato. No chat do site, nome e um meio de contato só podem ser solicitados
+quando a pessoa pedir retorno fora do chat, com explicação do uso e
+consentimento.
+
 **Regra para editar o catálogo:** todo valor que o bot possa precisar
 **calcular** precisa estar **escrito** no catálogo. Isso inclui total
 anual, economia, parcela e exemplo de excedente. A checagem de valores
-(`outputGuard.ts`) aceita direto só o preço com desconto do Pix e a parcela
-"Nx de". O resto ela bloqueia, para proteger contra oferta falsa. Depois de
-mudar o catálogo:
+(`outputGuard.ts`) aceita valores escritos no catálogo, descontos calculáveis
+com percentuais autorizados e parcelas quando a resposta identifica o número
+de parcelas. Também verifica associações entre nome do plano e preço e bloqueia
+faixas não declaradas no catálogo. O resto ela bloqueia, para proteger contra
+oferta falsa. Depois de mudar o catálogo:
 1. rode `npm run ingest`;
 2. faça algumas perguntas de cálculo ao bot;
 3. confira no audit log se apareceu alguma `system-note` "Checagem de

@@ -10,6 +10,7 @@ import { checkReplyValues, chunksText, extractMoney, parseNumber } from "../src/
 import { containsHandoffSignalAttempt, detectAssistantHandoff, HANDOFF_SIGNAL, neutralizeHandoffSignal } from "../src/orchestrator/handoff.js";
 import { RateLimiter } from "../src/orchestrator/rateLimiter.js";
 import type { RetrievedChunk } from "../src/types.js";
+import type { KnowledgeItem } from "../src/types.js";
 
 // Contexto igual ao catálogo de exemplo (knowledge/catalog.example.json).
 const chunk = (title: string, content: string): RetrievedChunk => ({ item: { id: title, title, content }, score: 0.6 });
@@ -18,6 +19,11 @@ const context = chunksText([
   chunk("Formas de pagamento aceitas", "Aceitamos Pix (5% de desconto à vista), cartão de crédito em até 6x sem juros, e boleto bancário."),
   chunk("Prazo e política de entrega", "Frete grátis para compras acima de R$ 300,00."),
 ]);
+const planItems: KnowledgeItem[] = [
+  { id: "essencial", title: "Plano Essencial", content: "Implantação: R$ 990,00." },
+  { id: "profissional", title: "Plano Profissional", content: "Implantação: R$ 1.990,00." },
+  { id: "completo", title: "Plano Completo", content: "Implantação: R$ 3.490,00." },
+];
 
 describe("parseNumber / extractMoney", () => {
   it("entende separadores brasileiros e americanos", () => {
@@ -58,6 +64,26 @@ describe("checkReplyValues (checagem de valores da resposta)", () => {
   it("pega preço trocado e valor em outra moeda", () => {
     expect(checkReplyValues("Confirmado: o FX200 custa R$ 50,00.", context).ok).toBe(false);
     expect(checkReplyValues("Sure, the FX200 costs $5.", context).ok).toBe(false);
+  });
+
+  it("blocks a cross-plan setup-price range, while accepting a catalog-authorized range", () => {
+    const catalog = chunksText(planItems.map((item) => ({ item, score: 1 })));
+    expect(
+      checkReplyValues("Todos os planos têm implantação de R$ 990,00 a R$ 1.990,00.", catalog, planItems).ok
+    ).toBe(false);
+    expect(
+      checkReplyValues(
+        "A implantação custa de R$ 990,00 a R$ 3.490,00.",
+        `${catalog}\nImplantação: de R$ 990,00 a R$ 3.490,00 conforme o plano.`,
+        planItems
+      ).ok
+    ).toBe(true);
+  });
+
+  it("blocks a valid catalog price assigned to the wrong named plan", () => {
+    const catalog = chunksText(planItems.map((item) => ({ item, score: 1 })));
+    expect(checkReplyValues("O Plano Completo tem implantação de R$ 1.990,00.", catalog, planItems).ok).toBe(false);
+    expect(checkReplyValues("O Plano Completo tem implantação de R$ 3.490,00.", catalog, planItems).ok).toBe(true);
   });
 
   it("sem contexto recuperado, qualquer valor é suspeito", () => {

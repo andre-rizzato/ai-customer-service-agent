@@ -41,8 +41,17 @@ describe("HyDE condicional (KnowledgeBase.search)", () => {
     const results = await new KnowledgeBase().search("tem frete grátis?");
     expect(h.generate).not.toHaveBeenCalled();
     expect(h.embed).toHaveBeenCalledWith(["tem frete grátis?"]);
+    expect(h.rerank.mock.calls[0][3]).toBe(3);
     // O corte de relevância continua valendo: 0.3 fica de fora.
     expect(results.map((r) => r.score)).toEqual([0.62]);
+  });
+
+  it("retorna mais trechos para perguntas comparativas sobre todos os planos", async () => {
+    h.rerank.mockResolvedValue([[0.62, 0], [0.6, 1]]);
+    const knowledgeBase = new KnowledgeBase();
+    await knowledgeBase.search("quais são todos os planos?");
+    await knowledgeBase.search("compare the plans");
+    expect(h.rerank.mock.calls.map((call) => call[3])).toEqual([6, 6]);
   });
 
   it("roda o HyDE quando a busca simples fica abaixo de hydeSkipScore, e reranka sempre contra a pergunta original", async () => {

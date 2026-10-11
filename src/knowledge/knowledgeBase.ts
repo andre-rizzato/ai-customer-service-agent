@@ -27,6 +27,17 @@ import type { RetrievedChunk } from "../types.js";
 // rerank, pequeno o bastante pra manter a chamada de rerank (a etapa cara)
 // rápida e barata. Mesmo valor do AgentService irmão.
 const CANDIDATE_POOL_SIZE = 15;
+// Perguntas comparativas precisam ver os três registros de plano juntos.
+// O topK configurado continua valendo para perguntas comuns; só consultas que
+// explicitamente pedem comparação ou todos os planos ampliam a saída do rerank.
+const COMPARISON_TOP_K = 6;
+
+// Preâmbulo: isPlanComparisonQuery() identifica pedidos explícitos para ver ou
+// comparar todos os planos, para que o reranker não descarte as opções além
+// dos três documentos que cabem no topK padrão.
+function isPlanComparisonQuery(query: string): boolean {
+  return /\b(todos?\s+os?\s+planos?|compar(?:e|ar|ativo|ação|acao)|diferen(?:ça|ca)s?\s+entre\s+os?\s+planos?|qual\s+plano\s+(?:escolher|é melhor|e melhor)|all\s+(?:the\s+)?plans?|compare\s+(?:the\s+)?plans?|plan\s+comparison|differences?\s+between\s+(?:the\s+)?plans?|what\s+plans?\s+(?:do\s+you\s+offer|are\s+available)|tutti\s+i\s+piani|confront(?:a|are)\s+i\s+piani|quali\s+piani\s+offrite)\b/i.test(query);
+}
 
 export class KnowledgeBase {
   // Provider de embeddings especializado em "query" (pergunta do usuário),
@@ -102,7 +113,8 @@ export class KnowledgeBase {
     const voyageApiKey = env.VOYAGE_API_KEY;
 
     // Etapa 1 — pergunta crua.
-    const direct = await this.retrieve(voyageApiKey, query, query);
+    const resultCount = isPlanComparisonQuery(query) ? Math.max(agentConfig.topK, COMPARISON_TOP_K) : agentConfig.topK;
+    const direct = await this.retrieve(voyageApiKey, query, query, resultCount);
     // rerank() já devolve em ordem decrescente de score, então direct[0] é
     // o melhor trecho.
     if (direct.length > 0 && direct[0].score >= agentConfig.hydeSkipScore) {
@@ -116,7 +128,7 @@ export class KnowledgeBase {
     // verdade contra o que o cliente de fato perguntou, não contra um
     // palpite descartável do LLM.
     const hypothetical = await generateHypotheticalPassage(query);
-    return this.applyRelevanceCut(await this.retrieve(voyageApiKey, query, hypothetical));
+    return this.applyRelevanceCut(await this.retrieve(voyageApiKey, query, hypothetical, resultCount));
   }
 
   // Preâmbulo: retrieve() é UMA passada do pipeline de busca, usada pelas
@@ -126,7 +138,7 @@ export class KnowledgeBase {
   // `query` (sempre a pergunta original). Devolve TODOS os trechos
   // rerankeados, sem o corte de relevância — quem decide o corte é
   // search(), porque a etapa 1 precisa olhar o score do melhor antes.
-  private async retrieve(voyageApiKey: string, query: string, embedText: string): Promise<RetrievedChunk[]> {
+  private async retrieve(voyageApiKey: string, query: string, embedText: string, resultCount: number): Promise<RetrievedChunk[]> {
     const [queryVector] = await this.queryEmbedder.embed([embedText]);
 
     const semanticHits = await qdrantStore.query(queryVector, CANDIDATE_POOL_SIZE);
@@ -143,7 +155,7 @@ export class KnowledgeBase {
     const fusedChunks = fused.map(([, i]) => semanticHits[i]);
     const fusedTexts = fused.map(([, i]) => candidateTexts[i]);
 
-    const reranked = await rerank(voyageApiKey, query, fusedTexts, agentConfig.topK);
+    const reranked = await rerank(voyageApiKey, query, fusedTexts, resultCount);
     return reranked.map(([score, index]) => ({ item: fusedChunks[index].item, score }));
   }
 

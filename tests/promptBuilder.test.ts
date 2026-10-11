@@ -49,4 +49,17 @@ describe("buildSystemPrompt (Fase 4 — as 3 regras fixas)", () => {
     expect(prompt.toLowerCase()).not.toContain("whatsapp");
     expect(prompt.toLowerCase()).not.toContain("telegram");
   });
+
+  it("answers prices transparently and offers optional sales follow-up", () => {
+    const prompt = buildSystemPrompt([]);
+    expect(prompt).toMatch(/sem esconder valores nem\s+misturar planos/i);
+    expect(prompt).toMatch(/transferência é opcional/i);
+    expect(prompt).toMatch(/não peça telefone, email ou nome apenas para transferir/i);
+  });
+
+  it("only asks for off-chat contact when it is unavailable and the customer wants follow-up", () => {
+    const prompt = buildSystemPrompt([], undefined, false, false);
+    expect(prompt).toMatch(/só peça nome e UM meio de contato se o cliente pedir retorno fora deste chat/i);
+    expect(prompt).toMatch(/peça consentimento antes/i);
+  });
 });
