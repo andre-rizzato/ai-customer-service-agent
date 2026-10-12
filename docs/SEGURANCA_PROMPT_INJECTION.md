@@ -128,40 +128,27 @@ O juiz varia entre execuções. Compare caso a caso, não só o total.
 
 ## 5. Pendências (precisam da VM ligada ou do Console)
 
-1. **Nginx: mandar o IP real e limitar na borda.** Em
-   `/etc/nginx/sites-available/rizzato-tech.rizzatotech.com`, no `location`
-   que faz `proxy_pass` para `localhost:3000`:
-   ```nginx
-   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-   proxy_set_header X-Real-IP $remote_addr;
-   ```
-   Para limitar também na borda (defesa em profundidade, antes de chegar ao
-   Node), em `/etc/nginx/conf.d/agente-rate-limit.conf`:
-   ```nginx
-   limit_req_zone $binary_remote_addr zone=widget:10m rate=30r/m;
-   ```
-   E, no server block, um `location` só para as mensagens do widget (regex
-   case-insensitive, pela mesma razão do bloqueio da tela de configuração):
-   ```nginx
-   location ~* ^/webhook/web(/message)?$ {
-       limit_req zone=widget burst=10 nodelay;
-       client_max_body_size 64k;
-       proxy_pass http://localhost:3000;
-       proxy_set_header Host $host;
-       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-       proxy_set_header X-Real-IP $remote_addr;
-   }
-   ```
-   Depois: `sudo nginx -t && sudo systemctl reload nginx`. Para conferir,
-   mande mais de 20 mensagens em um minuto pelo widget: as excedentes devem
-   receber o aviso de "desacelerar". No log do PM2 deve aparecer
-   `Rate limit por IP no canal web: <seu IP>`, e não `127.0.0.1`.
-2. **Limite de gasto mensal no Console da Anthropic** (Settings → Limits),
+**Concluído em 10/10/2026 — Nginx: IP do cliente e limite na borda.** O
+`location /` existente já encaminhava `X-Forwarded-For` e `X-Real-IP`; foi
+adicionado um `location ~* ^/webhook/web(/message)?$` com limite de
+`30r/m`, `burst=10`, `nodelay` e corpo máximo de `64k`, além da zona
+`widget:10m` em `/etc/nginx/conf.d/agente-rate-limit.conf`. `nginx -t`
+passou, o Nginx foi recarregado e `/health` respondeu `{ "ok": true }`.
+Um teste externo enviou 21 mensagens acima do limite de tamanho, recusadas
+antes de qualquer chamada paga: a 21ª recebeu HTTP 429 e o log do Node
+registrou o IP encaminhado do cliente, não `127.0.0.1`. Outra verificação
+enviou 12 mensagens em rajada: as 11 primeiras passaram e a 12ª recebeu
+HTTP 503 do limite de borda do Nginx.
+Também foi bloqueado externamente, com regex case-insensitive, o endpoint
+`/debug/rag-search`, que estava público porque o processo da VM não define
+`NODE_ENV=production`; o acesso direto local continua disponível para debug.
+
+1. **Limite de gasto mensal no Console da Anthropic** (Settings → Limits),
    de preferência num Workspace por cliente (ver `CUSTO_API.md`). É a única
    proteção contra abuso distribuído que não depende do código.
-3. **Rodar o teste adversarial também no AgentService**, quando a
+2. **Rodar o teste adversarial também no AgentService**, quando a
    capacidade "pedido" for usada por um cliente real.
-4. **Repetir `npm run eval:adversarial` a cada mudança de prompt ou de
+3. **Repetir `npm run eval:adversarial` a cada mudança de prompt ou de
    modelo.** Um modelo novo pode resistir melhor ou pior.
 
 ## 6. Como rodar o teste adversarial
