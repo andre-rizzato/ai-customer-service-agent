@@ -17,6 +17,17 @@ export interface AgentServiceResponse {
   intent?: string;
   confidence?: number;
   order_id?: string;
+  // Integração com agendas (11/10/2026) — espelham appointment_id/
+  // scheduling_link em main.py (AgentResponse) do AgentService. Só
+  // log/auditoria pro orchestrator.ts (contextUsed), igual order_id já é —
+  // a decisão de forçar handoff em cancel_appointment/reschedule_appointment
+  // é tomada só por `intent`, nunca por esses dois campos. appointment_id é
+  // o id do evento criado de verdade (Google/Microsoft); scheduling_link é
+  // o link de uso único que o CalendlyBackend devolve quando não há como
+  // criar o evento direto (ver connectors/base.py do AgentService) — os
+  // dois nunca vêm preenchidos juntos.
+  appointment_id?: string;
+  scheduling_link?: string;
 }
 
 // Preâmbulo: callAgentService() é chamada pelo Orchestrator quando

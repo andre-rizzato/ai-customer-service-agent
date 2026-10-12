@@ -313,6 +313,8 @@
         </thead>
         <tbody>
           <tr><td>SchedulingBackend</td><td>GoogleCalendarBackend</td><td><span class="reuse good"><span class="dot"></span>total</span></td><td>cobre qualquer cliente que use Google Agenda — API padronizada</td></tr>
+          <tr><td>SchedulingBackend</td><td>MicrosoftCalendarBackend</td><td><span class="reuse good"><span class="dot"></span>total</span></td><td>Microsoft 365/Outlook via Graph, app-only (client-credentials) — mesmo modelo "um clique do dono" do Google, sem OAuth interativo</td></tr>
+          <tr><td>SchedulingBackend</td><td>CalendlyBackend</td><td><span class="reuse good"><span class="dot"></span>total</span></td><td>disponibilidade e cancelamento são diretos pela API; marcar/reagendar não (a API do Calendly não cria evento em horário arbitrário) — o bot entrega um link de agendamento de uso único e o cliente finaliza na página do Calendly</td></tr>
           <tr><td>SchedulingBackend</td><td>RestSchedulingBackend</td><td><span class="reuse accent"><span class="dot"></span>alto</span></td><td>cliente tem sistema de agendamento próprio com API</td></tr>
           <tr><td>SchedulingBackend</td><td>CustomBackend</td><td><span class="reuse warn"><span class="dot"></span>nenhum</span></td><td>sem API — acesso direto a planilha/banco, evitar se possível</td></tr>
           <tr><td>SalesBackend</td><td>PaymentLinkBackend</td><td><span class="reuse good"><span class="dot"></span>total</span></td><td>gera link de checkout hospedado (Stripe, Mercado Pago, PagSeguro…)</td></tr>

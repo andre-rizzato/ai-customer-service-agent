@@ -246,6 +246,14 @@ perceber:
 5. **Mudou prompt, modelo ou a checagem = `npm run eval:adversarial` antes e
    depois.** Confira também se o tráfego normal não passou a ser bloqueado
    (`system-note` "Checagem de valores" no audit log).
+6. **Cancelar ou reagendar um agendamento é sempre handoff humano** (mesma
+   regra de "cancelamento de pedido é sempre handoff" da revisão de
+   segurança original), em qualquer provedor de agenda. Duas camadas: o
+   AgentService nunca chama `SchedulingBackend.cancel()` a partir do bot
+   (só um atendente, depois de confirmar, acionaria isso); o Node
+   (`orchestrator.ts`) força o handoff de novo ao ver
+   `intent === "cancel_appointment" | "reschedule_appointment"`, mesmo se o
+   lado Python tivesse um bug. Ver `docs/AGENDA_INTEGRATION.md`.
 
 ## Armadilhas do ambiente de desenvolvimento (Windows)
 
@@ -296,4 +304,5 @@ perceber:
 - `eval/README.md` — eval de qualidade RAGAS e teste de conversa longa: como rodar (inclusive no Windows) e o histórico de resultados.
 - `docs/PRECIFICACAO.md` — tabela de preços proposta da Rizzato Tech (`knowledge/catalog.json`), premissas de custo e margem, o que o catálogo promete que ainda é manual, e como ativar na VM. Regra: todo valor que o bot possa precisar calcular (total anual, parcela, excedente) tem que estar escrito no catálogo, senão a checagem de valores bloqueia.
 - `docs/SEGURANCA_PROMPT_INJECTION.md` — prompt injection e abuso do bot: o que um atacante consegue, as proteções em camadas, o teste adversarial (`npm run eval:adversarial`, 12/16 → 16/16) e as pendências de Nginx/Console.
+- `docs/AGENDA_INTEGRATION.md` — integração com agendas (Google Calendar, Microsoft Calendar, Calendly) pela capacidade `scheduling`: onde o conector vive (AgentService, não este repo), as três credenciais, o caso especial do Calendly (sem marcar/reagendar direto via API) e a política de handoff pra cancelamento/reagendamento.
 - `docs/artifacts/` — docs de arquitetura publicados (Blueprint do Agente, Mapa de Capacidades, Fluxo da Requisição). Mudou o HTML? Rode `node scripts/extract-diagram-svgs.mjs` para atualizar os SVGs em `docs/artifacts/images/`.

@@ -274,7 +274,73 @@ export class Orchestrator {
         return fixedMessage("handoff", language);
       }
     }
-    if (capability === "scheduling" || capability === "sales") {
+    if (capability === "scheduling") {
+      // Integração com agendas (11/10/2026): mesmo caminho de "order" acima
+      // — o AgentService (Python) já sabe classificar as 4 intents de
+      // agendamento (check_availability/book_appointment/cancel_appointment/
+      // reschedule_appointment, ver intent_classifier.py no outro repo) e
+      // falar com o Google Calendar/Microsoft/Calendly por trás. callAgentService
+      // é o MESMO client HTTP de "order" — o contrato /agent/message é
+      // genérico, não sabe nem precisa saber qual capacidade acionou a
+      // chamada.
+      try {
+        const agentResponse = await callAgentService(text, conversationId, requesterPhone, language);
+
+        // Mesma política de cancelamento de pedido (item #4 da revisão de
+        // segurança), replicada aqui pro domínio de agenda: cancelar OU
+        // reagendar um compromisso é SEMPRE handoff humano, nunca uma ação
+        // que o bot executa sozinho — mesmo com confiança alta na
+        // classificação. O AgentService nunca chama o SchedulingBackend
+        // pra essas duas intents (ver cancel_reschedule_appointment_node,
+        // scheduling_node.py); esta checagem aqui é a segunda camada —
+        // mesmo se aquele lado tivesse um bug, o Node ainda força o
+        // handoff antes de repassar qualquer resposta ao cliente.
+        if (agentResponse.intent === "cancel_appointment" || agentResponse.intent === "reschedule_appointment") {
+          const history = this.conversations.getHistory(conversationId);
+          await this.handoffNotifier.notify(conversationId, "explicit_request", history, channel, language);
+          this.conversations.append(conversationId, {
+            role: "system-note",
+            text: `Handoff acionado: ${agentResponse.intent} (cancelamento/reagendamento sempre passa por humano, appointment_id=${agentResponse.appointment_id ?? "não informado"})`,
+            timestamp: Date.now(),
+            handoff: true,
+          });
+          this.handoffState.activate(conversationId, channel, language);
+          return fixedMessage(
+            agentResponse.intent === "cancel_appointment" ? "cancelAppointmentHandoff" : "rescheduleAppointmentHandoff",
+            language
+          );
+        }
+
+        // contextUsed guarda a referência (id do evento criado, ou o link
+        // de agendamento do Calendly) só pra auditoria — mesmo raciocínio
+        // de `order:${agentResponse.order_id}` acima, nunca usado pra
+        // decidir fluxo.
+        const reference = agentResponse.appointment_id
+          ? [`appointment:${agentResponse.appointment_id}`]
+          : agentResponse.scheduling_link
+            ? [`scheduling_link:${agentResponse.scheduling_link}`]
+            : [];
+        this.conversations.append(conversationId, {
+          role: "assistant",
+          text: agentResponse.reply,
+          timestamp: Date.now(),
+          contextUsed: reference,
+        });
+        return agentResponse.reply;
+      } catch (err) {
+        console.error("AgentService call failed (scheduling), falling back to handoff:", err);
+        await this.handoffNotifier.notify(conversationId, "explicit_request", this.conversations.getHistory(conversationId), channel, language);
+        this.conversations.append(conversationId, {
+          role: "system-note",
+          text: "Handoff acionado: scheduling (AgentService indisponível)",
+          timestamp: Date.now(),
+          handoff: true,
+        });
+        this.handoffState.activate(conversationId, channel, language);
+        return fixedMessage("handoff", language);
+      }
+    }
+    if (capability === "sales") {
       // Capacidade habilitada e detectada, mas sem conector real ainda
       // (ver capabilityRouter.ts) — handoff honesto em vez de resposta
       // inventada, registrado do mesmo jeito que um handoff por palavra-

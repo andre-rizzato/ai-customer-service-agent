@@ -40,6 +40,8 @@ type MessageKey =
   | "rateLimit"
   | "capabilityNotWired"
   | "cancelOrderHandoff"
+  | "cancelAppointmentHandoff"
+  | "rescheduleAppointmentHandoff"
   | "closedByAttendant"
   | "closedByInactivity"
   | "messageTooLong"
@@ -66,6 +68,25 @@ const MESSAGES: Record<MessageKey, Record<Language, string>> = {
     pt: "Entendi que você quer cancelar um pedido — para confirmar isso com segurança, vou te conectar com um atendente humano. Só um instante.",
     en: "I understand you want to cancel an order — to confirm this safely, I'll connect you with a human agent. Just a moment.",
     it: "Ho capito che vuoi annullare un ordine — per confermarlo in sicurezza, ti metto in contatto con un operatore. Un attimo.",
+  },
+  // Integração com agendas (11/10/2026) — mesma política de cancelOrderHandoff
+  // acima, replicada pro domínio de agendamento (ver orchestrator.ts,
+  // capability === "scheduling"): cancelar ou reagendar um compromisso
+  // NUNCA é uma ação que o bot executa sozinho, sempre handoff humano.
+  // Espelha cancel_appointment_handoff/reschedule_appointment_handoff em
+  // messages.py do lado do AgentService (mesmo texto, mesma política —
+  // existem duas cópias porque main.py também é chamado direto por outro
+  // consumidor que não é este Node, ver o comentário no topo daquele
+  // arquivo).
+  cancelAppointmentHandoff: {
+    pt: "Entendi que você quer cancelar um agendamento — para confirmar isso com segurança, vou te conectar com um atendente humano. Só um instante.",
+    en: "I understand you want to cancel an appointment — to confirm this safely, I'll connect you with a human agent. Just a moment.",
+    it: "Ho capito che vuoi annullare un appuntamento — per confermarlo in sicurezza, ti metto in contatto con un operatore. Un attimo.",
+  },
+  rescheduleAppointmentHandoff: {
+    pt: "Entendi que você quer reagendar um horário — para combinar o novo horário com segurança, vou te conectar com um atendente humano. Só um instante.",
+    en: "I understand you want to reschedule an appointment — to arrange the new time safely, I'll connect you with a human agent. Just a moment.",
+    it: "Ho capito che vuoi riprogrammare un appuntamento — per concordare il nuovo orario in sicurezza, ti metto in contatto con un operatore. Un attimo.",
   },
   closedByAttendant: {
     pt: "Atendimento encerrado. Obrigado pelo contato! Se precisar de mais alguma coisa, é só mandar uma nova mensagem.",
