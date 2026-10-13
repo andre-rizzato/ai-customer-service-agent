@@ -76,3 +76,6 @@ process("docs/artifacts/mapa-capacidades.html", [
 process("docs/artifacts/fluxo-da-requisicao.html", [
   "docs/artifacts/images/fluxo-da-requisicao.svg",
 ]);
+process("docs/artifacts/settings-multi-tenant.html", [
+  "docs/artifacts/images/settings-multi-tenant.svg",
+]);

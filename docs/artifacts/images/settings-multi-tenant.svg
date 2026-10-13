@@ -1,0 +1,80 @@
+<svg viewBox="0 0 1000 900" role="img" aria-label="Diagrama de sequência com 7 passos: usuário loga no site via Firebase, o site consulta uma nova coleção Firestore de tenants pra achar qual bot pertence a esse usuário, decide o destino, chama a API daquele bot específico com o mesmo token, o bot valida esse token contra uma nova lógica de autorização que consulta o Firestore em vez de uma lista fixa de e-mails, e por fim libera a tela de configuração certa. Os passos 3, 4 e 6 são marcados como peças novas que não existem hoje; os demais já existem e seriam reaproveitados."><rect x="0" y="0" width="1000" height="900" fill="#F3F6FA" />
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor" />
+          </marker>
+        </defs>
+
+        <!-- step template: box at y, height 86, connecting arrow to next at y+86..y+120 -->
+
+        <!-- 1 -->
+        <rect x="140" y="10" width="720" height="86" rx="8" fill="#FFFFFF" stroke="#2F8F62" stroke-width="1.5" />
+        <circle cx="110" cy="53" r="15" fill="#E7ECF3" stroke="#2F8F62" />
+        <text x="110" y="58" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="700" fill="#2F8F62">1</text>
+        <text x="500" y="38" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="700" fill="#152138">Usuário no navegador</text>
+        <text x="500" y="60" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#58698A">abre www.rizzatotech.com/minha-conta e entra com Google</text>
+        <text x="500" y="78" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#2F8F62">já existe — login concluído 11/10/2026</text>
+
+        <line x1="500" y1="96" x2="500" y2="128" stroke="#58698A" stroke-width="1.75" marker-end="url(#arrow)" />
+
+        <!-- 2 -->
+        <rect x="140" y="130" width="720" height="86" rx="8" fill="#FFFFFF" stroke="#2F8F62" stroke-width="1.5" />
+        <circle cx="110" cy="173" r="15" fill="#E7ECF3" stroke="#2F8F62" />
+        <text x="110" y="178" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="700" fill="#2F8F62">2</text>
+        <text x="500" y="158" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="700" fill="#152138">Firebase Authentication (projeto rizzato-tech)</text>
+        <text x="500" y="180" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#58698A">emite um ID token (JWT) com o uid desse usuário</text>
+        <text x="500" y="198" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#2F8F62">já existe — mesmo projeto Firebase de hoje</text>
+
+        <line x1="500" y1="216" x2="500" y2="248" stroke="#B4432E" stroke-width="1.75" marker-end="url(#arrow)" />
+
+        <!-- 3 -->
+        <rect x="140" y="250" width="720" height="98" rx="8" fill="#FFFFFF" stroke="#B4432E" stroke-width="1.5" />
+        <circle cx="110" cy="299" r="15" fill="#E7ECF3" stroke="#B4432E" />
+        <text x="110" y="304" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="700" fill="#B4432E">3</text>
+        <text x="500" y="276" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="700" fill="#152138">Firestore — coleção "tenants" (NOVO)</text>
+        <text x="500" y="298" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#58698A">o site consulta: existe um tenant com este uid em adminUids?</text>
+        <text x="500" y="316" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#58698A">cada tenant guarda: adminUids[], apiBaseUrl, nome do cliente</text>
+        <text x="500" y="336" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#B4432E">não existe nada disso hoje — nem o banco, nem o modelo</text>
+
+        <line x1="500" y1="348" x2="500" y2="380" stroke="#B4432E" stroke-width="1.75" marker-end="url(#arrow)" />
+
+        <!-- 4 -->
+        <rect x="140" y="382" width="720" height="98" rx="8" fill="#FFFFFF" stroke="#B4432E" stroke-width="1.5" />
+        <circle cx="110" cy="431" r="15" fill="#E7ECF3" stroke="#B4432E" />
+        <text x="110" y="436" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="700" fill="#B4432E">4</text>
+        <text x="500" y="408" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="700" fill="#152138">Site decide o destino (NOVO)</text>
+        <text x="500" y="430" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#58698A">achou tenant → sabe a apiBaseUrl daquele bot específico</text>
+        <text x="500" y="448" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#58698A">não achou → "nenhum bot vinculado a esta conta ainda"</text>
+        <text x="500" y="468" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#B4432E">página nova no Next.js, não existe hoje</text>
+
+        <line x1="500" y1="480" x2="500" y2="512" stroke="#58698A" stroke-width="1.75" marker-end="url(#arrow)" />
+
+        <!-- 5 -->
+        <rect x="140" y="514" width="720" height="86" rx="8" fill="#FFFFFF" stroke="#2F8F62" stroke-width="1.5" />
+        <circle cx="110" cy="557" r="15" fill="#E7ECF3" stroke="#2F8F62" />
+        <text x="110" y="562" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="700" fill="#2F8F62">5</text>
+        <text x="500" y="542" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="700" fill="#152138">Bot do cliente (apiBaseUrl do tenant)</text>
+        <text x="500" y="564" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#58698A">GET /api/config com o MESMO ID token, header Authorization</text>
+        <text x="500" y="582" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#2F8F62">rota já existe — src/server.ts, requireAdmin</text>
+
+        <line x1="500" y1="600" x2="500" y2="632" stroke="#B4432E" stroke-width="1.75" marker-end="url(#arrow)" />
+
+        <!-- 6 -->
+        <rect x="140" y="634" width="720" height="98" rx="8" fill="#FFFFFF" stroke="#B4432E" stroke-width="1.5" />
+        <circle cx="110" cy="683" r="15" fill="#E7ECF3" stroke="#B4432E" />
+        <text x="110" y="688" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="700" fill="#B4432E">6</text>
+        <text x="500" y="660" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="700" fill="#152138">requireAdmin v2 (NOVO)</text>
+        <text x="500" y="682" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#58698A">em vez de checar ADMIN_EMAILS fixo no .env deste bot...</text>
+        <text x="500" y="700" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#58698A">...consulta se este uid está nos adminUids DESTE tenant</text>
+        <text x="500" y="720" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#B4432E">reescreve a autorização — ver risco principal abaixo</text>
+
+        <line x1="500" y1="732" x2="500" y2="764" stroke="#58698A" stroke-width="1.75" marker-end="url(#arrow)" />
+
+        <!-- 7 -->
+        <rect x="140" y="766" width="720" height="86" rx="8" fill="#FFFFFF" stroke="#2F8F62" stroke-width="1.5" />
+        <circle cx="110" cy="809" r="15" fill="#E7ECF3" stroke="#2F8F62" />
+        <text x="110" y="814" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="700" fill="#2F8F62">7</text>
+        <text x="500" y="794" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="700" fill="#152138">Tela de configuração do bot certo</text>
+        <text x="500" y="816" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="12" fill="#58698A">mesma UI de hoje (settings.html), alcançada a partir do site</text>
+        <text x="500" y="834" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#2F8F62">já existe — nenhuma mudança visual necessária</text>
+      </svg>
