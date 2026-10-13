@@ -21,6 +21,7 @@ import { validateTelegramInitData } from "./handoff/telegramInitData.js";
 import type { ChannelName } from "./types.js";
 import { RateLimiter } from "./orchestrator/rateLimiter.js";
 import { message as fixedMessage, normalizeLanguage } from "./orchestrator/messages.js";
+import { fetchGoogleKeys, isAdmin, parseAdminEmails, verifyFirebaseIdToken } from "./admin/firebaseAuth.js";
 
 // Augmenta o tipo Request do Express com o campo rawBody (ver o hook
 // `verify` do express.json() logo abaixo) — fazer isso via "declare
@@ -38,6 +39,16 @@ declare global {
 
 // Cria a aplicação Express — o framework HTTP usado para expor os webhooks.
 const app = express();
+// Em desenvolvimento local, CONFIG_AUTH_DISABLED=true mantém a tela acessível
+// sem Firebase. Fora desse modo, qualquer falha de configuração ou validação
+// bloqueia o acesso — nunca se interpreta ausência de credenciais como acesso
+// liberado.
+const configAuthDisabled =
+  env.CONFIG_AUTH_DISABLED === "true" && process.env.NODE_ENV !== "production";
+const adminEmails = parseAdminEmails(env.ADMIN_EMAILS);
+if (env.CONFIG_AUTH_DISABLED === "true" && process.env.NODE_ENV === "production") {
+  console.warn("WARNING: CONFIG_AUTH_DISABLED=true is ignored in production — /api/config remains protected.");
+}
 // Confia no X-Forwarded-For SÓ quando a conexão vem do próprio servidor
 // (o Nginx, na mesma VM, faz proxy pra localhost:3000). É o que faz req.ip
 // ser o IP real do visitante, usado pelo rate limit por IP do widget (ver
@@ -445,12 +456,81 @@ setInterval(() => {
     });
 }, INACTIVITY_SWEEP_MS).unref();
 
+// Preâmbulo: requireAdmin protege as rotas de leitura e gravação da
+// configuração. A tela só envia um ID token do Firebase; a autorização real
+// acontece aqui, no servidor, usando assinatura, projeto, e-mail verificado
+// e a lista ADMIN_EMAILS — nunca confiamos numa decisão feita pelo navegador.
+async function requireAdmin(
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+): Promise<void> {
+  if (configAuthDisabled) {
+    next();
+    return;
+  }
+
+  // Sem estes dados não é possível validar a identidade e decidir quem é
+  // admin. Responder 503 deixa explícito que falta configuração, sem abrir a
+  // API como fallback.
+  if (!env.FIREBASE_PROJECT_ID || adminEmails.size === 0) {
+    res.status(503).json({ error: "Autenticação de admin não está configurada no servidor." });
+    return;
+  }
+
+  const match = /^Bearer\s+(.+)$/i.exec(req.header("authorization") ?? "");
+  if (!match) {
+    res.status(401).json({ error: "Entre com uma conta de administrador para continuar." });
+    return;
+  }
+
+  let identity;
+  try {
+    identity = await verifyFirebaseIdToken(match[1], env.FIREBASE_PROJECT_ID, fetchGoogleKeys);
+  } catch (err) {
+    // Falha de rede ao buscar/atualizar as chaves do Google não significa que
+    // a sessão seja inválida. Retornamos indisponibilidade, não um 401 que
+    // faria a tela deslogar o usuário.
+    console.error("Failed to verify Firebase admin token:", err);
+    res.status(503).json({ error: "Não foi possível verificar a sessão agora. Tente novamente." });
+    return;
+  }
+
+  if (!identity) {
+    res.status(401).json({ error: "Sessão inválida ou expirada. Entre novamente." });
+    return;
+  }
+  if (!isAdmin(identity, adminEmails)) {
+    const account = identity.email ? ` (${identity.email})` : "";
+    res.status(403).json({ error: `A conta${account} não tem acesso de administrador.` });
+    return;
+  }
+
+  next();
+}
+
+// GET /api/auth/config — fornece ao navegador apenas a configuração web
+// pública necessária para iniciar o Firebase Auth. A API key do Firebase não
+// é segredo; a autorização para ler/gravar a configuração continua no
+// middleware requireAdmin, aplicado às rotas /api/config.
+app.get("/api/auth/config", (_req, res) => {
+  const firebase =
+    env.FIREBASE_API_KEY && env.FIREBASE_AUTH_DOMAIN && env.FIREBASE_PROJECT_ID
+      ? {
+          apiKey: env.FIREBASE_API_KEY,
+          authDomain: env.FIREBASE_AUTH_DOMAIN,
+          projectId: env.FIREBASE_PROJECT_ID,
+        }
+      : null;
+
+  res.json({ enabled: !configAuthDisabled, firebase });
+});
+
 // GET /api/config — devolve a configuração de negócio atual (agentConfig),
 // consumida pela tela de configuração (public/settings.html) pra preencher
-// o formulário. Nada em agentConfig é segredo (ver separação env/agentConfig
-// em src/config.ts — API keys e tokens vivem só no .env e nunca passam por
-// aqui), então devolver o objeto inteiro é seguro.
-app.get("/api/config", (_req, res) => {
+// o formulário. A configuração não contém segredos, mas permite alterar o
+// comportamento do agente, então a rota exige autorização de admin.
+app.get("/api/config", requireAdmin, (_req, res) => {
   res.json(agentConfig);
 });
 
@@ -459,7 +539,7 @@ app.get("/api/config", (_req, res) => {
 // protegem a leitura do arquivo na inicialização do processo (ver
 // src/config.ts) — nunca confia no payload vindo do browser sem passar pela
 // mesma validação que já protege o arquivo em disco.
-app.post("/api/config", (req, res) => {
+app.post("/api/config", requireAdmin, (req, res) => {
   let candidate;
   try {
     candidate = AgentConfigSchema.parse(req.body);
