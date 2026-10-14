@@ -322,12 +322,15 @@ const EnvSchema = z.object({
   // são segredo (o Firebase restringe pelos "domínios autorizados", não por
   // sigilo), por isso não vão pro Key Vault. FIREBASE_PROJECT_ID também é
   // usado no servidor pra validar o `aud`/`iss` do ID token.
+  //
+  // Quem é admin NÃO é mais configurado aqui (13/10/2026): até então havia
+  // uma ADMIN_EMAILS nesta lista, comparada por e-mail — trocada por um
+  // custom claim no próprio token do usuário (ver isAdmin() em
+  // src/admin/firebaseAuth.ts e scripts/setAdminClaim.mjs), porque promover
+  // um admin novo não precisa mais editar .env nem reiniciar o PM2.
   FIREBASE_PROJECT_ID: z.string().optional(),
   FIREBASE_API_KEY: z.string().optional(),
   FIREBASE_AUTH_DOMAIN: z.string().optional(),
-  // E-mails (separados por vírgula) com acesso de admin à tela de
-  // configuração. Só valem com e-mail verificado (ver isAdmin()).
-  ADMIN_EMAILS: z.string().optional(),
   // "true" desliga a exigência de login na tela de configuração — SÓ pra
   // desenvolvimento local, onde não há Firebase configurado. String (e não
   // z.coerce.boolean) de propósito: coerce.boolean transforma a string

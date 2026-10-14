@@ -8,7 +8,9 @@
 //
 // O navegador faz login com o Firebase JS SDK e manda o ID token (um JWT
 // RS256 assinado pelo Google) no header Authorization; aqui validamos esse
-// JWT e conferimos se o e-mail é de um admin (ADMIN_EMAILS).
+// JWT e conferimos se o usuário tem o custom claim "admin" (setado via
+// scripts/setAdminClaim.mjs — ver isAdmin() mais abaixo; até 13/10/2026 essa
+// checagem comparava o e-mail contra uma lista fixa ADMIN_EMAILS no .env).
 //
 // Por que verificar "na mão" em vez de usar o pacote firebase-admin: ele traz
 // dezenas de MB de dependências (gRPC, google-auth-library...) e mais memória
@@ -30,10 +32,23 @@ const CLOCK_SKEW_SECONDS = 60;
 
 // Quem é o usuário, depois de um token válido — só o que a checagem de admin
 // precisa.
+//
+// `admin` (13/10/2026, substitui a lista ADMIN_EMAILS do .env): um CUSTOM
+// CLAIM do Firebase — um par chave/valor que a gente mesmo escreve no
+// usuário via Admin SDK (scripts/setAdminClaim.mjs), e que o Firebase passa
+// a incluir automaticamente em TODO ID token daquele usuário, assinado junto
+// com o resto (não dá pra um cliente forjar isso sozinho, só quem tem a
+// Service Account consegue setar). Por isso `admin` já sai direto da
+// decodificação do payload do JWT abaixo, do mesmo jeito que `email`/
+// `email_verified` sempre saíram — nenhuma chamada de rede nova, nenhuma
+// lista pra manter. Sempre um boolean definido (nunca undefined): claim
+// ausente e claim setado como `false` chegam igual aqui (`false`) — a
+// distinção não importa pra isAdmin(), que só libera no `true` exato.
 export interface FirebaseIdentity {
   uid: string;
   email?: string;
   emailVerified: boolean;
+  admin: boolean;
 }
 
 // Mapa kid -> chave pública. Função injetável (parâmetro de
@@ -129,25 +144,29 @@ export async function verifyFirebaseIdToken(
     uid: payload.sub,
     email: typeof payload.email === "string" ? payload.email : undefined,
     emailVerified: payload.email_verified === true,
+    // Custom claim "admin" (ver comentário de FirebaseIdentity acima) —
+    // chega como uma chave de nível superior no payload, exatamente como
+    // email_verified, porque o Firebase funde os custom claims no próprio
+    // ID token antes de assinar. `=== true` em vez de só `Boolean(...)`:
+    // um claim que por acaso viesse como string "true" (nunca deveria, mas
+    // JSON arbitrário não garante tipo) não deve contar como admin — só o
+    // booleano exato que setCustomUserClaims() de fato grava.
+    admin: payload.admin === true,
   };
 }
 
-// Preâmbulo: parseAdminEmails() transforma ADMIN_EMAILS ("a@x.com, b@y.com")
-// num Set em minúsculas — e-mail é comparado sem diferenciar maiúsculas.
-export function parseAdminEmails(raw: string | undefined): Set<string> {
-  return new Set(
-    (raw ?? "")
-      .split(",")
-      .map((email) => email.trim().toLowerCase())
-      .filter(Boolean)
-  );
-}
-
-// Preâmbulo: isAdmin() decide se uma identidade válida é admin. Exige
-// email_verified: com login por e-mail/senha, o Firebase deixa qualquer um
-// criar uma conta com QUALQUER e-mail (inclusive o seu) — só não marca como
-// verificado. Sem esta checagem, bastaria alguém se cadastrar no site com o
-// e-mail do admin. Login com Google já vem verificado.
-export function isAdmin(identity: FirebaseIdentity, adminEmails: Set<string>): boolean {
-  return identity.emailVerified && !!identity.email && adminEmails.has(identity.email.toLowerCase());
+// Preâmbulo: isAdmin() decide se uma identidade válida é admin — desde
+// 13/10/2026, só checando o custom claim (ver FirebaseIdentity.admin acima),
+// nunca mais uma lista de e-mails. Fica como função própria (e não só
+// `identity.admin` inline nos chamadores) por dois motivos: documenta a
+// regra num lugar só, e deixa espaço pra crescer sem tocar em quem chama —
+// ex.: se um dia isAdmin precisar olhar emailVerified de novo, ou um campo
+// novo tipo `tenants`, só este arquivo muda.
+//
+// NÃO exige email_verified aqui: diferente da lista ADMIN_EMAILS antiga
+// (vulnerável a "qualquer um se cadastra com o e-mail do admin", porque
+// comparava e-mail em texto), o claim é setado por uid via Admin SDK — não
+// tem como um cadastro novo, verificado ou não, ganhar esse claim sozinho.
+export function isAdmin(identity: FirebaseIdentity): boolean {
+  return identity.admin === true;
 }

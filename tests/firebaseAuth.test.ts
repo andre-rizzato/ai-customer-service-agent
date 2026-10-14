@@ -6,7 +6,7 @@
 // no próprio teste, injetado no lugar das chaves públicas do Google.
 import { generateKeyPairSync, sign } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
-import { isAdmin, parseAdminEmails, verifyFirebaseIdToken, type KeyFetcher } from "../src/admin/firebaseAuth.js";
+import { isAdmin, verifyFirebaseIdToken, type KeyFetcher } from "../src/admin/firebaseAuth.js";
 
 const PROJECT = "rizzatotech-test";
 const NOW = 1_760_000_000_000;
@@ -42,10 +42,26 @@ function makeToken(claims: Record<string, unknown> = {}, header: Record<string, 
 describe("verifyFirebaseIdToken", () => {
   // Preâmbulo: caminho feliz — token válido devolve a identidade.
   it("aceita um token válido", async () => {
+    // admin: false porque makeToken() não inclui o claim por padrão (ver
+    // seus parâmetros default) — payload.admin === true dá false pra
+    // "claim ausente" exatamente como daria pra "claim setado como false".
     expect(await verifyFirebaseIdToken(makeToken(), PROJECT, fetcher, NOW)).toEqual({
       uid: "uid-123",
       email: "Admin@Example.com",
       emailVerified: true,
+      admin: false,
+    });
+  });
+
+  // Custom claim "admin" (13/10/2026, substitui ADMIN_EMAILS): precisa sair
+  // decodificado do payload igual email/email_verified já saem — sem isso,
+  // isAdmin() nunca teria o que checar.
+  it("decodifica o custom claim admin quando presente", async () => {
+    expect(await verifyFirebaseIdToken(makeToken({ admin: true }), PROJECT, fetcher, NOW)).toEqual({
+      uid: "uid-123",
+      email: "Admin@Example.com",
+      emailVerified: true,
+      admin: true,
     });
   });
 
@@ -91,23 +107,30 @@ describe("verifyFirebaseIdToken", () => {
   });
 });
 
+// isAdmin (13/10/2026): reescrito pra custom claim, substitui a antiga
+// lista ADMIN_EMAILS comparada por e-mail. Cada teste monta a identidade à
+// mão (não passa mais por verifyFirebaseIdToken) porque é exatamente a
+// FirebaseIdentity, já decodificada, que isAdmin() recebe — testar os dois
+// juntos esconderia qual dos dois quebrou se um teste falhasse.
 describe("isAdmin", () => {
-  const admins = parseAdminEmails(" admin@example.com , outro@x.com ");
-
-  // Preâmbulo: e-mail na lista e verificado = admin, sem diferenciar
-  // maiúsculas.
-  it("aceita e-mail verificado da lista", () => {
-    expect(isAdmin({ uid: "u", email: "ADMIN@example.com", emailVerified: true }, admins)).toBe(true);
+  it("aceita quando o claim admin é true", () => {
+    expect(isAdmin({ uid: "u", email: "qualquer@x.com", emailVerified: true, admin: true })).toBe(true);
   });
 
-  // Preâmbulo: o motivo do email_verified — qualquer um pode criar uma conta
-  // de e-mail/senha com o e-mail do admin; ela só não fica verificada.
-  it("recusa e-mail da lista não verificado", () => {
-    expect(isAdmin({ uid: "u", email: "admin@example.com", emailVerified: false }, admins)).toBe(false);
+  it("recusa quando o claim admin é false", () => {
+    expect(isAdmin({ uid: "u", email: "admin@example.com", emailVerified: true, admin: false })).toBe(false);
   });
 
-  it("recusa e-mail fora da lista ou ausente", () => {
-    expect(isAdmin({ uid: "u", email: "eu@x.com", emailVerified: true }, admins)).toBe(false);
-    expect(isAdmin({ uid: "u", emailVerified: true }, admins)).toBe(false);
+  // Antes (ADMIN_EMAILS) isso era obrigatório — um e-mail não verificado
+  // nunca passava, mesmo estando na lista, porque qualquer um podia se
+  // cadastrar com esse e-mail via senha. O claim não tem esse problema (só
+  // quem tem a Service Account consegue setá-lo), então agora emailVerified
+  // não entra na decisão — este teste trava esse comportamento de propósito.
+  it("aceita com admin:true mesmo sem email_verified", () => {
+    expect(isAdmin({ uid: "u", email: "admin@example.com", emailVerified: false, admin: true })).toBe(true);
+  });
+
+  it("recusa sem e-mail nenhum, desde que admin não seja true", () => {
+    expect(isAdmin({ uid: "u", emailVerified: true, admin: false })).toBe(false);
   });
 });

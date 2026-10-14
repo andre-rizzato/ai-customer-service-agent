@@ -85,11 +85,11 @@ Guia completo: [`HANDOFF_RELAY.md`](HANDOFF_RELAY.md).
 
 Guia: [`ADMIN_AUTH.md`](ADMIN_AUTH.md). Tutorial de uso (túnel, fluxo do save, desfazer): [`TUTORIAL_CONFIGURACAO.md`](TUTORIAL_CONFIGURACAO.md). `settings.html` e `/api/config` estavam abertos pra internet em produção.
 
-- [x] `/api/config` exige ID token do Firebase (mesmo projeto do site) de um e-mail verificado em `ADMIN_EMAILS`, verificado sem `firebase-admin`; falha fechada (503) sem config
-- [x] `settings.html` com login (Google ou e-mail/senha) e botão Sair; `CONFIG_AUTH_DISABLED=true` só pra dev local
-- [ ] **Projeto Firebase não configurado em lugar nenhum**: secrets `NEXT_PUBLIC_FIREBASE_*` ausentes no GitHub do site (o login do site também não funciona em produção). Criar o projeto, cadastrar os secrets e preencher `FIREBASE_*` + `ADMIN_EMAILS` na VM (ver `ADMIN_AUTH.md` seção 5)
-- [ ] Teste real de login pelo navegador (depende do item acima)
-- [x] **Medida imediata em produção:** `/settings.html` e `/api/config` bloqueados no Nginx da VM (404, regex case-insensitive); acesso só por túnel SSH (`ssh -L 3000:localhost:3000 ...`). Ver `ADMIN_AUTH.md`
+- [x] `/api/config` exige ID token do Firebase (mesmo projeto do site) com o custom claim `admin: true`, verificado sem `firebase-admin`; falha fechada (503) sem config, 403 sem o claim. `ADMIN_EMAILS` (lista fixa no `.env`) foi removida em 13/10/2026 — promover/revogar admin agora é `scripts/setAdminClaim.ts`, sem tocar na VM
+- [x] `settings.html` com login (Google; Facebook/Microsoft prontos no código mas comentados, sem provider habilitado no Firebase ainda) e botão Sair; `CONFIG_AUTH_DISABLED=true` só pra dev local
+- [x] **Projeto Firebase criado e configurado** (11-12/10/2026): projeto `rizzato-tech`, secrets `NEXT_PUBLIC_FIREBASE_*` cadastrados no GitHub do site, `FIREBASE_*` na VM — ver `ADMIN_AUTH.md` seção 5
+- [x] Teste real de login pelo navegador, em produção, pelo domínio público (12/10/2026)
+- [x] **Bloqueio do Nginx removido em 12/10/2026**, já com o login real no ar — `/settings.html` responde 200 de fora, `/api/config` sem token continua 401. Backup do server block antigo: `rizzato-tech.rizzatotech.com.bak-2026-10-12`. Ver `ADMIN_AUTH.md`
 
 ### Idioma do cliente + bot separado para o atendente (06/10/2026)
 

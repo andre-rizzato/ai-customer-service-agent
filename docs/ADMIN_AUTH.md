@@ -5,7 +5,7 @@ A tela de configuração (`/settings.html`) e a API dela (`GET`/`POST
 Authentication** do site institucional (`rizzatotech-site`): mesmas contas,
 mesmo login com Google.
 
-Última atualização: 05/10/2026.
+Última atualização: 13/10/2026.
 
 ---
 
@@ -18,38 +18,29 @@ comportamento do bot (palavras de handoff, tom, temperatura, capacidades) ou
 desligar a notificação de handoff. Nenhum segredo vazava: tokens e chaves
 ficam no Key Vault e nunca passam por essa API.
 
-### Medida em vigor hoje: bloqueio no Nginx (opção "rápida", 05/10/2026)
+### Status em produção desde 12/10/2026: login real, sem bloqueio no Nginx
 
-Enquanto o Firebase não está configurado (seção 5), a tela está **fechada
-para a internet no Nginx da VM**:
-
-- `/etc/nginx/snippets/agente-admin-block.conf`, incluído no server block de
-  `rizzato-tech.rizzatotech.com`, devolve 404 para `/settings.html`,
-  `/api/config` e `/api/auth/config`. Backup do arquivo original:
-  `/etc/nginx/sites-available/rizzato-tech.rizzatotech.com.bak-2026-10-05`.
-- A regex é **case-insensitive**, porque o Express casa rotas sem
-  diferenciar maiúsculas (`/API/CONFIG` também chega no handler).
-- Verificado: 404 de fora para `/settings.html`, `/SETTINGS.HTML`,
-  `/api/config`, `/API/Config`, `/api/config/`, `/api/config?x=1`,
-  `/settings%2Ehtml` e `POST /api/config`. Widget, `/health` e
-  `/webhook/web/*` continuam 200.
-- A porta 3000 do Node está fechada no firewall (NSG) do Azure, então não dá
-  pra contornar o Nginx.
-
-**Como acessar a tela agora** (túnel SSH, que fala direto com o Node sem passar
-pelo Nginx):
+O projeto Firebase (`rizzato-tech`) foi criado e configurado (seção 5), o
+login foi testado de ponta a ponta pelo domínio público, e o bloqueio
+temporário no Nginx (`agente-admin-block.conf`) foi **removido** — a tela
+responde normalmente de fora, protegida pelo login de verdade, não mais por
+um 404 na borda:
 
 ```bash
-ssh -L 3000:localhost:3000 azureuser@20.127.12.103
-# e no navegador: http://localhost:3000/settings.html
+curl https://rizzato-tech.rizzatotech.com/settings.html       # 200
+curl https://rizzato-tech.rizzatotech.com/api/config           # 401 sem token
 ```
 
-**Quando o login de admin for pro ar**, o túnel também passa a pedir login
-Firebase. Para manter o acesso só por túnel sem login, defina
-`CONFIG_AUTH_DISABLED=true` na VM. Isso é seguro **só enquanto o bloqueio do
-Nginx existir**. Para abrir a tela pela internet com login, remova o
-`include snippets/agente-admin-block.conf;` e mantenha
-`CONFIG_AUTH_DISABLED` vazio.
+Backup do server block de antes da remoção:
+`/etc/nginx/sites-available/rizzato-tech.rizzatotech.com.bak-2026-10-12`.
+Se algum dia for preciso reativar o bloqueio (ex.: suspeita de problema no
+login), descomentar o `include snippets/agente-admin-block.conf;` naquele
+arquivo e `sudo systemctl reload nginx` já resolve — o snippet continua no
+disco, só não está mais incluído.
+
+Pra desenvolvimento local sem Firebase nenhum, `CONFIG_AUTH_DISABLED=true`
+no `.env` continua funcionando (nunca em produção — o servidor ignora e avisa
+no log se `NODE_ENV=production`).
 
 ## 2. Como funciona
 
@@ -64,7 +55,7 @@ sequenceDiagram
     F-->>N: ID token (JWT RS256, vale 1h, renovado sozinho)
     N->>S: GET/POST /api/config + Authorization: Bearer <token>
     S->>S: valida assinatura (chaves públicas do Google), aud/iss = projeto, validade
-    S->>S: e-mail verificado e em ADMIN_EMAILS?
+    S->>S: custom claim "admin" === true?
     S-->>N: 200 (admin) / 401 (sem login) / 403 (não é admin)
 ```
 
@@ -79,12 +70,31 @@ sequenceDiagram
 
 ## 3. Quem é admin
 
-`ADMIN_EMAILS` no `.env` do servidor (separados por vírgula), **com e-mail
-verificado**. A verificação é obrigatória porque, com login por e-mail/senha,
-o Firebase deixa qualquer pessoa criar uma conta com qualquer e-mail
-(inclusive o seu); ela só não fica marcada como verificada. **Use "Entrar com
-Google"**: o e-mail já vem verificado. A lista só muda editando o `.env` e
-reiniciando, nunca pela própria tela.
+Um **custom claim** do Firebase (`admin: true`) gravado no próprio usuário —
+não mais uma lista de e-mails. Até 13/10/2026 isso era `ADMIN_EMAILS` no
+`.env`, comparado contra o e-mail do token (e por isso exigia e-mail
+verificado, pra ninguém se auto-promover criando uma conta com e-mail/senha
+usando o e-mail do admin). O claim não tem esse risco — só quem tem a
+Service Account do Firebase consegue gravá-lo, então `isAdmin()`
+(`src/admin/firebaseAuth.ts`) não precisa mais checar `email_verified` pra
+decidir isso.
+
+**Promover um admin novo** (da sua máquina, nunca precisa da VM):
+
+```bash
+FIREBASE_SERVICE_ACCOUNT_FILE=<caminho-do-json> \
+  npx tsx scripts/setAdminClaim.ts <email-da-pessoa>
+```
+
+**Revogar:** mesmo comando com `--revoke` no final. Em ambos os casos, a
+pessoa só sente o efeito depois de deslogar/logar de novo (ou até 1h, quando
+o Firebase renova o token sozinho) — o claim só entra em tokens *novos*.
+
+A Service Account (JSON) se gera em: Firebase Console → Configurações do
+projeto → Contas de serviço → Gerar nova chave privada. **Essa, sim, é um
+segredo de verdade** (acesso total ao Authentication do projeto) — fica só
+na sua máquina, nunca no repositório, nunca na VM (o servidor do bot não
+precisa dela pra NADA; só verifica tokens, nunca os escreve).
 
 ## 4. Configuração
 
@@ -93,57 +103,67 @@ reiniciando, nunca pela própria tela.
 | `FIREBASE_PROJECT_ID` | o mesmo `NEXT_PUBLIC_FIREBASE_PROJECT_ID` do site |
 | `FIREBASE_API_KEY` | o mesmo `NEXT_PUBLIC_FIREBASE_API_KEY` |
 | `FIREBASE_AUTH_DOMAIN` | o mesmo `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` (`<projeto>.firebaseapp.com`) |
-| `ADMIN_EMAILS` | seu e-mail do Google |
 | `CONFIG_AUTH_DISABLED` | `true` **só em dev local**; nunca na VM (o servidor avisa no log) |
 
 Nenhuma delas é segredo: a config web do Firebase é pública por desenho e
-restrita pelos "domínios autorizados". Por isso não vão pro Key Vault.
+restrita pelos "domínios autorizados". Por isso não vão pro Key Vault. (O
+JSON da Service Account da seção 3 é diferente — esse sim é segredo, e nem
+aparece aqui porque nunca vai pro `.env` do servidor.)
 
 No **console do Firebase** → Authentication → Settings → **Authorized
 domains**, adicione `rizzato-tech.rizzatotech.com`. Sem isso, o popup de
 login falha com `auth/unauthorized-domain`. `localhost` já vem autorizado.
 
-**Falha fechada:** sem `FIREBASE_PROJECT_ID` e `ADMIN_EMAILS`, a API responde
-503 e ninguém entra. Nunca acontece de "sem config, todo mundo entra".
+**Falha fechada:** sem `FIREBASE_PROJECT_ID`, a API responde 503 e ninguém
+entra — e sem ninguém ter o custom claim `admin` (seção 3), todo login válido
+ainda recebe 403, nunca acesso. Nunca acontece de "sem config, todo mundo
+entra".
 
-## 5. Estado em 05/10/2026: o Firebase do site ainda não está configurado
+## 5. Projeto Firebase (configurado em 11-12/10/2026)
 
-O código de login do site existe (commit `c68d4eb`), mas **nenhum projeto
-Firebase está ligado a ele**:
+Projeto `rizzato-tech`, criado no console do Firebase, com Authentication →
+Google ativado. Passos já feitos, pra referência (e pra repetir se um dia
+precisar de outro projeto/ambiente):
 
-- os secrets `NEXT_PUBLIC_FIREBASE_*` não existem no repositório do site
-  (`gh secret list` só mostra o token do Azure);
-- o build publicado tem `projectId:""`;
-- não há `.env.local` local.
-
-Ou seja, hoje o login do site também não funciona em produção. Passos, uma
-vez só, servindo pros dois repositórios:
-
-1. Criar (ou escolher) o projeto no console do Firebase e ativar
-   Authentication → provedor **Google** (e os outros que o site oferece).
+1. Criar o projeto no console do Firebase e ativar Authentication →
+   provedor **Google**.
 2. Registrar um app Web e copiar a config (apiKey, authDomain, projectId,
    storageBucket, messagingSenderId, appId).
-3. **Site:** cadastrar os 6 valores como secrets `NEXT_PUBLIC_FIREBASE_*` no
-   GitHub do `rizzatotech-site` e fazer um push (o workflow já os injeta no
-   build).
-4. **Agente:** `FIREBASE_PROJECT_ID`, `FIREBASE_API_KEY`,
-   `FIREBASE_AUTH_DOMAIN` e `ADMIN_EMAILS` no `.env` da VM, depois
+3. **Site:** os 6 valores foram cadastrados como secrets
+   `NEXT_PUBLIC_FIREBASE_*` no GitHub do `rizzatotech-site`, e um rebuild
+   (`gh run rerun`) publicou o site já com o Firebase ligado.
+4. **Agente:** `FIREBASE_PROJECT_ID`, `FIREBASE_API_KEY` e
+   `FIREBASE_AUTH_DOMAIN` no `.env` da VM, seguido de
    `pm2 restart agente-atendimento --update-env`.
-5. Authorized domains: `www.rizzatotech.com` e `rizzato-tech.rizzatotech.com`.
+5. Authorized domains: `rizzato-tech.rizzatotech.com` e
+   `www.rizzatotech.com` adicionados em Authentication → Settings.
 
-Até o passo 4, a tela de configuração em produção fica **bloqueada** (503).
-Para mudar a config nesse meio-tempo, edite o arquivo de `AGENT_CONFIG_PATH`
-na VM por SSH e reinicie.
+**Facebook e Microsoft como provedores de login:** o código já está pronto
+dos dois lados (botões em `public/settings.html` e em
+`rizzatotech-site/components/auth/AuthForm.tsx`), mas comentados — os
+providers nunca foram habilitados no Firebase Console (falta criar um app
+em developers.facebook.com e um app registration no Azure AD pra login,
+diferente do app registration já usado pela integração de agenda — ver
+`docs/AGENDA_INTEGRATION.md`). Pendência conhecida, não uma decisão final.
+
+**Domínio do consentimento do Google:** a tela "Escolher conta para
+continuar em..." mostra `rizzato-tech.firebaseapp.com`, não
+`www.rizzatotech.com` — decisão deliberada (13/10/2026): trocar isso exigiria
+servir a página de auth do Firebase a partir do domínio do site, que hoje é
+Azure Static Web Apps, não Firebase Hosting. Ficou como está; revisitar só
+se isso se tornar um problema real de confiança do usuário.
 
 ## 6. Testes
 
 `tests/firebaseAuth.test.ts` assina tokens com uma chave RSA gerada no teste
 e cobre: token válido, outro projeto (`aud`/`iss`), expirado, payload
 adulterado, `alg` diferente de RS256 (incluindo `none`), `kid` desconhecido
-(nova busca + recusa), token malformado, e as regras de admin (e-mail
-verificado, maiúsculas, fora da lista).
+(nova busca + recusa), token malformado, e as regras de admin — agora o
+custom claim `admin` (`true`/`false`/ausente), inclusive o caso que trocou
+de comportamento: `admin: true` sem `email_verified` continua autorizando
+(seção 3 explica por quê).
 
-Validado também contra um servidor local: sem token dá 401 em `GET` e
-`POST`, um token forjado dá 401 (com busca real das chaves do Google), e
-`/api/auth/config` devolve a config. **Não validado ainda:** o login real
-pelo navegador, que depende do projeto Firebase da seção 5.
+Validado contra um servidor local **e em produção** (12/10/2026): login real
+pelo navegador, pelo domínio público (`rizzato-tech.rizzatotech.com`), com
+`arizzato369@gmail.com` via Google — tela de configuração abriu
+normalmente, `/api/config` sem token continua dando 401.

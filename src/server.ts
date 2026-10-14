@@ -21,7 +21,7 @@ import { validateTelegramInitData } from "./handoff/telegramInitData.js";
 import type { ChannelName } from "./types.js";
 import { RateLimiter } from "./orchestrator/rateLimiter.js";
 import { message as fixedMessage, normalizeLanguage } from "./orchestrator/messages.js";
-import { fetchGoogleKeys, isAdmin, parseAdminEmails, verifyFirebaseIdToken } from "./admin/firebaseAuth.js";
+import { fetchGoogleKeys, isAdmin, verifyFirebaseIdToken } from "./admin/firebaseAuth.js";
 
 // Augmenta o tipo Request do Express com o campo rawBody (ver o hook
 // `verify` do express.json() logo abaixo) — fazer isso via "declare
@@ -45,7 +45,6 @@ const app = express();
 // liberado.
 const configAuthDisabled =
   env.CONFIG_AUTH_DISABLED === "true" && process.env.NODE_ENV !== "production";
-const adminEmails = parseAdminEmails(env.ADMIN_EMAILS);
 if (env.CONFIG_AUTH_DISABLED === "true" && process.env.NODE_ENV === "production") {
   console.warn("WARNING: CONFIG_AUTH_DISABLED=true is ignored in production — /api/config remains protected.");
 }
@@ -458,8 +457,12 @@ setInterval(() => {
 
 // Preâmbulo: requireAdmin protege as rotas de leitura e gravação da
 // configuração. A tela só envia um ID token do Firebase; a autorização real
-// acontece aqui, no servidor, usando assinatura, projeto, e-mail verificado
-// e a lista ADMIN_EMAILS — nunca confiamos numa decisão feita pelo navegador.
+// acontece aqui, no servidor, usando assinatura, projeto e o custom claim
+// "admin" (ver src/admin/firebaseAuth.ts) — nunca confiamos numa decisão
+// feita pelo navegador. Até 13/10/2026 a autorização comparava o e-mail
+// contra uma lista fixa (ADMIN_EMAILS no .env, exigindo reiniciar o PM2 pra
+// mudar); agora é um claim setado uma vez por scripts/setAdminClaim.mjs,
+// então promover/revogar um admin não toca mais em arquivo nenhum da VM.
 async function requireAdmin(
   req: express.Request,
   res: express.Response,
@@ -470,10 +473,13 @@ async function requireAdmin(
     return;
   }
 
-  // Sem estes dados não é possível validar a identidade e decidir quem é
-  // admin. Responder 503 deixa explícito que falta configuração, sem abrir a
-  // API como fallback.
-  if (!env.FIREBASE_PROJECT_ID || adminEmails.size === 0) {
+  // Sem o projeto configurado não há como verificar assinatura nenhuma.
+  // Responder 503 deixa explícito que falta configuração, sem abrir a API
+  // como fallback. Diferente da checagem antiga (`adminEmails.size === 0`),
+  // "ninguém tem o claim admin ainda" NÃO é mais um sinal de má configuração
+  // — é só "ainda não promovi ninguém", e isso já é tratado pelo 403 mais
+  // abaixo, não aqui.
+  if (!env.FIREBASE_PROJECT_ID) {
     res.status(503).json({ error: "Autenticação de admin não está configurada no servidor." });
     return;
   }
@@ -500,7 +506,7 @@ async function requireAdmin(
     res.status(401).json({ error: "Sessão inválida ou expirada. Entre novamente." });
     return;
   }
-  if (!isAdmin(identity, adminEmails)) {
+  if (!isAdmin(identity)) {
     const account = identity.email ? ` (${identity.email})` : "";
     res.status(403).json({ error: `A conta${account} não tem acesso de administrador.` });
     return;

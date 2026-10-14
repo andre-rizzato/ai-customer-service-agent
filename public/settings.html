@@ -331,14 +331,24 @@
 <!--
   Login de admin: mostrado no lugar do formulário quando o servidor exige
   autenticação (GET /api/auth/config -> enabled) e não há admin logado. As
-  contas são as do site (mesmo projeto Firebase); só e-mails verificados em
-  ADMIN_EMAILS (.env do servidor) passam — quem decide é o servidor, esta
-  tela só faz o login e manda o token.
+  contas são as do site (mesmo projeto Firebase); só quem tem o custom
+  claim "admin" no próprio token (setado via scripts/setAdminClaim.mjs, ver
+  docs/ADMIN_AUTH.md) passa — quem decide é o servidor, esta tela só faz o
+  login e manda o token.
 -->
 <div id="auth-gate" class="auth-card" hidden>
   <h2>🔒 Acesso de administrador</h2>
   <p>Entre com a mesma conta do site Rizzato Tech.</p>
   <button id="google-btn" class="google-btn">Entrar com Google</button>
+  <!-- Facebook/Microsoft (13/10/2026): escondidos até os providers serem
+       configurados de verdade no Firebase Console (precisam de app
+       registrado no Azure AD / developers.facebook.com, ver
+       docs/ADMIN_AUTH.md) — nunca chegaram a ganhar handler de clique em
+       initAuth(). Só o Google fica visível por enquanto. -->
+  <!--
+  <button id="facebook-btn" class="secondary-btn">Entrar com Facebook</button>
+  <button id="microsoft-btn" class="secondary-btn">Entrar com Microsoft</button>
+  -->
   <div class="divider">ou com e-mail e senha</div>
   <input type="email" id="auth-email" placeholder="e-mail" autocomplete="username" />
   <input type="password" id="auth-password" placeholder="senha" autocomplete="current-password" />
