@@ -22,6 +22,7 @@ import type { ChannelName } from "./types.js";
 import { RateLimiter } from "./orchestrator/rateLimiter.js";
 import { message as fixedMessage, normalizeLanguage } from "./orchestrator/messages.js";
 import { fetchGoogleKeys, isAdmin, verifyFirebaseIdToken } from "./admin/firebaseAuth.js";
+import { verifyAppCheckToken } from "./admin/appCheck.js";
 
 // Augmenta o tipo Request do Express com o campo rawBody (ver o hook
 // `verify` do express.json() logo abaixo) — fazer isso via "declare
@@ -244,14 +245,59 @@ function webIpRateLimit(req: express.Request, res: express.Response, next: expre
   res.status(429).json({ reply: text, message: text });
 }
 
+// Preâmbulo: appCheck() é o middleware do Firebase App Check (13/10/2026,
+// ver src/admin/appCheck.ts) — primeira linha de defesa do canal web,
+// montado ANTES de webIpRateLimit no array abaixo: um script sem o token
+// nunca chega a gastar uma tentativa do rate limit, é rejeitado ali mesmo.
+// Só reforça o que já existe (webIpRateLimit continua rodando pra quem
+// passa por aqui), nunca o substitui.
+//
+// Fail-open em dois casos, de propósito: (1) sem FIREBASE_APP_CHECK_ENABLED
+// configurado — pra não quebrar o widget em produção enquanto o reCAPTCHA
+// não estiver ligado dos dois lados (Firebase Console + o site); (2) falha
+// de REDE ao buscar as chaves públicas do Google — não é culpa do
+// visitante, e travar todo o atendimento por uma instabilidade momentânea
+// do Google contradiz o princípio de "nunca deixar o cliente sem resposta"
+// do resto do pipeline. Um token simplesmente AUSENTE ou INVÁLIDO continua
+// sendo recusado (fail-closed) nos dois casos — só a infraestrutura de
+// verificação em si tem a válvula de escape.
+async function appCheck(req: express.Request, res: express.Response, next: express.NextFunction): Promise<void> {
+  if (req.method !== "POST") return next();
+  if (env.FIREBASE_APP_CHECK_ENABLED !== "true" || !env.FIREBASE_PROJECT_NUMBER) return next();
+
+  const token = req.header("X-Firebase-AppCheck");
+  if (!token) {
+    console.warn("App Check: requisição sem token no canal web.");
+    res.status(401).json({ error: "Requisição não verificada." });
+    return;
+  }
+
+  let valid: boolean;
+  try {
+    valid = await verifyAppCheckToken(token, env.FIREBASE_PROJECT_NUMBER);
+  } catch (err) {
+    console.error("Failed to verify App Check token, failing open:", err);
+    next();
+    return;
+  }
+
+  if (!valid) {
+    console.warn("App Check: token inválido no canal web.");
+    res.status(401).json({ error: "Requisição não verificada." });
+    return;
+  }
+
+  next();
+}
+
 for (const adapter of adapters) {
   // Só o canal "web" é pensado pra ser chamado de um browser em outro
   // domínio (o widget embarcável) — Telegram e WhatsApp chamam o webhook
   // deles mesmos, server-to-server, sem CORS envolvido. Pelo mesmo motivo,
-  // só ele leva o rate limit por IP: as requisições do Telegram e do
-  // WhatsApp vêm dos servidores da plataforma (um IP para todos os
+  // só ele leva App Check e o rate limit por IP: as requisições do Telegram
+  // e do WhatsApp vêm dos servidores da plataforma (um IP para todos os
   // clientes), e lá o id do usuário é verificado pela plataforma.
-  const middlewares = adapter.name === "web" ? [widgetCors, webIpRateLimit] : [];
+  const middlewares = adapter.name === "web" ? [widgetCors, appCheck, webIpRateLimit] : [];
   // Extraído como função nomeada (em vez de inline só em um app.all) porque
   // o canal "web" precisa dela montada em DOIS caminhos — ver o alias
   // /webhook/web/message logo abaixo.

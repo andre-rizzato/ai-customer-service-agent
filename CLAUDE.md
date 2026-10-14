@@ -254,6 +254,13 @@ perceber:
    (`orchestrator.ts`) força o handoff de novo ao ver
    `intent === "cancel_appointment" | "reschedule_appointment"`, mesmo se o
    lado Python tivesse um bug. Ver `docs/AGENDA_INTEGRATION.md`.
+7. **Firebase App Check (reCAPTCHA v3) no canal web** (13/10/2026,
+   `src/admin/appCheck.ts` + `appCheck()` em `src/server.ts`) é reforço
+   ANTES do `webIpRateLimit`, nunca o substitui — fail-open quando
+   `FIREBASE_APP_CHECK_ENABLED`/`FIREBASE_PROJECT_NUMBER` não estão
+   configurados. Rota nova no canal web que chame API paga = checar se ela
+   está na mesma cadeia de middlewares (`adapter.name === "web"` em
+   `src/server.ts`), não só repetir o rate limit.
 
 ## Armadilhas do ambiente de desenvolvimento (Windows)
 

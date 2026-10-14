@@ -40,6 +40,7 @@ modelo.
 |---|---|---|
 | Teto do corpo HTTP | `src/server.ts` (`express.json({ limit: "64kb" })`) | Acima disso, 413, sem chegar em nenhum handler (o padrão do Express era 100kb) |
 | Limite de texto por mensagem | `Orchestrator`, PASSO −1 (`agentConfig.maxMessageChars`, padrão 2000) | Recusa com mensagem fixa, sem chamar API e sem gravar no histórico (senão o texto voltaria em cada turno da janela) |
+| App Check (reCAPTCHA v3) | `src/server.ts` (`appCheck`, 13/10/2026) + `src/admin/appCheck.ts` | Reforço ANTES do rate limit — um script sem o header `X-Firebase-AppCheck` nunca chega a gastar uma tentativa do limite. Fail-open se `FIREBASE_APP_CHECK_ENABLED`/`FIREBASE_PROJECT_NUMBER` não estiverem configurados (rollout gradual) ou se a verificação em si falhar por rede. **Não detecta um navegador automatizado de verdade** (reCAPTCHA v3 mede comportamento, não identidade) — só scripts batendo direto na API sem carregar a página |
 | Rate limit por IP no widget | `src/server.ts` (`webIpRateLimit`, padrão 20/min) | O limite por conversa não protege o widget, porque o navegador escolhe o id. Só vale para o canal web: Telegram e WhatsApp chegam do IP da plataforma, com id verificado |
 | Rate limit por conversa | `rateLimiter.ts` (`rateLimit`) | Já existia. Desde 09/10, o mapa é limpo (antes crescia para sempre, um risco de memória na VM) |
 | Handoff por palavra-chave e cancelamento | `handoff.ts`, `capabilityRouter.ts` | Decididos sem LLM, que não pode ser convencido a "esquecer" |

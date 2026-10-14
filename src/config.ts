@@ -338,6 +338,20 @@ const EnvSchema = z.object({
   // pode ter essa armadilha. Comparado com === "true" em src/server.ts.
   CONFIG_AUTH_DISABLED: z.string().optional(),
 
+  // Firebase App Check no canal web (13/10/2026, ver src/admin/appCheck.ts)
+  // — camada extra antes do rate limit por IP (webIpRateLimit, src/server.ts),
+  // pro widget embarcável do site. "true" (mesmo padrão booleano-seguro de
+  // CONFIG_AUTH_DISABLED acima, nunca z.coerce.boolean) liga a exigência; sem
+  // isso, o middleware deixa passar direto (fail-open), pra não quebrar o
+  // widget em produção antes do reCAPTCHA estar configurado dos dois lados.
+  FIREBASE_APP_CHECK_ENABLED: z.string().optional(),
+  // Número do projeto Firebase — DIFERENTE de FIREBASE_PROJECT_ID acima
+  // (ex.: "896501484372", não "rizzato-tech"): é o valor que já existe como
+  // `messagingSenderId` na config web do Firebase, mas os tokens de App
+  // Check usam esse número no aud/iss, não o project id usado pro login.
+  // Não é segredo, mesma categoria de FIREBASE_PROJECT_ID.
+  FIREBASE_PROJECT_NUMBER: z.string().optional(),
+
   // Diretório onde o histórico de cada conversa é persistido em disco
   // (um arquivo .json por conversationId) — usado por
   // src/conversation/store.ts.
