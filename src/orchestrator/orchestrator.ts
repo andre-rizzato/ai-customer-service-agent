@@ -311,15 +311,20 @@ export class Orchestrator {
           );
         }
 
-        // contextUsed guarda a referência (id do evento criado, ou o link
-        // de agendamento do Calendly) só pra auditoria — mesmo raciocínio
-        // de `order:${agentResponse.order_id}` acima, nunca usado pra
-        // decidir fluxo.
-        const reference = agentResponse.appointment_id
-          ? [`appointment:${agentResponse.appointment_id}`]
-          : agentResponse.scheduling_link
-            ? [`scheduling_link:${agentResponse.scheduling_link}`]
-            : [];
+        // contextUsed guarda a referência (protocolo do agendamento, id do
+        // evento criado, ou o link do Calendly) só pra auditoria — mesmo
+        // raciocínio de `order:${agentResponse.order_id}` acima, nunca
+        // usado pra decidir fluxo. appointment_code (13/10/2026) vem
+        // primeiro porque é o dado que o cliente de fato recebeu e pode
+        // citar de volta — appointment_id (o id de evento do provedor) é
+        // só debug/auditoria interna.
+        const reference = agentResponse.appointment_code
+          ? [`appointment_code:${agentResponse.appointment_code}`]
+          : agentResponse.appointment_id
+            ? [`appointment:${agentResponse.appointment_id}`]
+            : agentResponse.scheduling_link
+              ? [`scheduling_link:${agentResponse.scheduling_link}`]
+              : [];
         this.conversations.append(conversationId, {
           role: "assistant",
           text: agentResponse.reply,

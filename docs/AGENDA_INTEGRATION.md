@@ -6,7 +6,12 @@ disponibilidade e marcar horário de verdade em um dos três calendários
 abaixo. Cancelar ou reagendar **sempre** passa por um atendente humano, em
 qualquer provedor — ver seção 4.
 
-Última atualização: 11/10/2026.
+**Em uso hoje:** só o Google Calendar (decisão do usuário, 13/10/2026).
+Microsoft Calendar e Calendly têm o código pronto e testado (seções 2-3),
+mas sem credencial real configurada em produção — ficam como pendência até
+um cliente precisar de um dos dois.
+
+Última atualização: 13/10/2026.
 
 ---
 
@@ -105,18 +110,75 @@ executada pelo bot sozinho, em nenhum provedor. Em duas camadas:
    e força o handoff independente do que o AgentService tenha respondido —
    rede de segurança adicional, mesmo se o lado Python tivesse um bug.
 
-## 5. Testes
+## 5. Protocolo de agendamento (13/10/2026)
+
+Marcar um horário não devolve o id de evento do Google pro cliente (string
+longa, ilegível num chat) — devolve um **protocolo de 6 dígitos**, gerado e
+guardado por `appointment_store.py` (`DistributedOrderSystem/src/AgentService`).
+
+**Onde fica guardado:** um arquivo JSON Lines local
+(`APPOINTMENTS_STORE_PATH`, default `data/appointments.jsonl`) — mesmo
+raciocínio de `ConversationStore`/`audit-log.jsonl` do lado Node: barato,
+sem infra nova, funciona igual pra Microsoft quando esse dia chegar
+(diferente de depender de uma consulta à API do Google, que só funcionaria
+pra Google). O evento do Google TAMBÉM recebe o protocolo em
+`extendedProperties.private` — redundância gratuita, visível só via API
+(não aparece na tela normal do Calendar), nunca a fonte de verdade: cancelar
+ou reagendar sempre consulta o arquivo local, nunca o Google.
+
+**Fluxo:** `book_appointment_node` (`scheduling_node.py`) gera o protocolo
+ANTES de chamar o `SchedulingBackend` (pra poder carimbar no evento), e só
+grava no arquivo DEPOIS que a reserva é confirmada — se o horário já tiver
+sido ocupado por outra pessoa (409 do Google), o protocolo gerado
+simplesmente não é persistido, sem deixar registro órfão.
+
+**Contrato HTTP:** `AgentResponse.appointment_code` (`main.py`) — distinto
+de `appointment_id` (o id de evento do provedor, só debug/auditoria). O
+Node (`agentServiceClient.ts`/`orchestrator.ts`) já registra o
+`appointment_code` no histórico da conversa pra auditoria.
+
+## 6. Limitação conhecida: um profissional por clínica (11/10/2026)
+
+Nenhum dos três conectores sabe o que é "profissional" — cada um fala com
+**uma** agenda fixa (`GOOGLE_CALENDAR_ID`, `MICROSOFT_CALENDAR_USER_ID`,
+`CALENDLY_EVENT_TYPE_URI`), configurada uma vez pro negócio inteiro.
+`service_id` identifica o *serviço* (corte, coloração), nunca o
+*profissional* que vai atender. Isso foi descoberto depois do desenho
+original (que assumiu "uma agenda, um dono") e **decidiu-se não resolver
+ainda** — fica documentado como limitação, sem bloquear o uso.
+
+Consequência prática pra uma clínica com mais de um doutor, dependendo de
+como o operador configurar:
+
+- **Os doutores compartilham a mesma agenda do Google/Outlook:** o bot
+  funciona sem erro, mas `check_availability()` não distingue quem está
+  ocupado. Se o Dr. A está ocupado às 15h mas a Dra. B está livre, o bot
+  responde "sem horário às 15h" — um falso negativo, não um erro visível.
+- **Cada doutor tem a própria agenda:** não há como configurar isso hoje —
+  só uma agenda por instalação do `SCHEDULING_BACKEND`.
+
+Pra separar por profissional de verdade seria preciso: um `provider_id`
+novo no `SchedulingBackend` (ao lado de `service_id`), uma env var mapeando
+profissional → calendar_id/user_id próprio (`SCHEDULING_PROVIDERS`), e o
+`intent_classifier.py` extraindo qual profissional o cliente quer — nenhum
+desses três existe ainda. Reavaliar quando um cliente real de múltiplos
+profissionais precisar desta capacidade.
+
+## 7. Testes
 
 `DistributedOrderSystem/src/AgentService/tests/test_microsoft_calendar_backend.py`
 e `test_calendly_backend.py` cobrem os dois conectores novos sem rede nem
 credencial real (o método `_client`/`_access_token` é trocado por um dublê
 no próprio teste — ver o cabeçalho de cada arquivo). `test_scheduling_slots.py`
 continua cobrindo `compute_available_slots()`, reaproveitada pelo Google e
-pelo Microsoft. Nenhum dos três provedores foi testado contra uma conta
-real nesta sessão — antes de depender disso pra um cliente de verdade,
-confirme contra um ambiente real (ver seção 2 pra gerar as credenciais).
+pelo Microsoft. `test_appointment_store.py` cobre o protocolo (seção 5):
+criar/achar, colisão, append-only — contra um arquivo temporário de
+verdade, sem mock nenhum (é só um arquivo, exercitar é mais simples que
+simular). Nenhum dos três provedores foi testado contra uma conta real
+nesta sessão — antes de depender disso pra um cliente de verdade, confirme
+contra um ambiente real (ver seção 2 pra gerar as credenciais).
 
-## 6. Verificação ponta a ponta (quando houver credencial real)
+## 8. Verificação ponta a ponta (quando houver credencial real)
 
 1. Configure um dos três `SCHEDULING_BACKEND` + credenciais na VM, adicione
    `"scheduling"` em `agentConfig.enabledCapabilities` e alguma keyword em
@@ -127,5 +189,7 @@ confirme contra um ambiente real (ver seção 2 pra gerar as credenciais).
 3. `npm run simulate` perguntando algo como "tem horário livre pra corte na
    sexta?" — deve listar horários reais do calendário configurado.
 4. Peça pra marcar um dos horários — deve criar o evento de verdade
-   (Google/Microsoft) ou devolver o link do Calendly.
+   (Google/Microsoft, com um protocolo de 6 dígitos na resposta — confira
+   também em `data/appointments.jsonl`, seção 5) ou devolver o link do
+   Calendly.
 5. Peça pra cancelar — deve sempre virar handoff, nunca cancelar direto.

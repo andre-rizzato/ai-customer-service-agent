@@ -28,6 +28,12 @@ export interface AgentServiceResponse {
   // dois nunca vêm preenchidos juntos.
   appointment_id?: string;
   scheduling_link?: string;
+  // Protocolo de agendamento (13/10/2026) — o código curto de 6 dígitos
+  // (appointment_store.py do AgentService) que o cliente de fato consegue
+  // anotar/repetir num chat, diferente de appointment_id (id de evento do
+  // Google/Microsoft, ilegível por telefone). Só existe junto com
+  // appointment_id (reserva confirmada), nunca com scheduling_link.
+  appointment_code?: string;
 }
 
 // Preâmbulo: callAgentService() é chamada pelo Orchestrator quando
