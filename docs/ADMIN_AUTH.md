@@ -122,11 +122,20 @@ entra".
 ## 5. Projeto Firebase (configurado em 11-12/10/2026)
 
 Projeto `rizzato-tech`, criado no console do Firebase, com Authentication →
-Google ativado. Passos já feitos, pra referência (e pra repetir se um dia
-precisar de outro projeto/ambiente):
+Google e E-mail/senha ativados. Passos já feitos, pra referência (e pra
+repetir se um dia precisar de outro projeto/ambiente):
 
 1. Criar o projeto no console do Firebase e ativar Authentication →
    provedor **Google**.
+   **Incidente (13/10/2026):** o provedor **E-mail/senha** foi esquecido
+   nessa primeira passada — só o Google foi ativado. Resultado: qualquer
+   cadastro por e-mail/senha no site (`rizzatotech-site`) falhava com
+   `auth/operation-not-allowed` (HTTP 400), e como esse código não está
+   mapeado em `lib/firebase/errors.ts`, aparecia como a mensagem genérica
+   "Não foi possível completar a ação" — sem nada no log do lado do bot,
+   porque o erro acontece inteiro no navegador, direto contra a API do
+   Firebase, antes de qualquer requisição chegar a este servidor. Corrigido
+   no mesmo dia, ativando o provedor que faltava.
 2. Registrar um app Web e copiar a config (apiKey, authDomain, projectId,
    storageBucket, messagingSenderId, appId).
 3. **Site:** os 6 valores foram cadastrados como secrets
