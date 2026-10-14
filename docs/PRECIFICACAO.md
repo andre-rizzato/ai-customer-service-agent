@@ -1,29 +1,34 @@
-# Precificação da Rizzato Tech — proposta de 09/10/2026
+# Precificação da Rizzato Tech — repreçficação de 13/10/2026
 
 **Documento interno.** O bot nunca lê este arquivo. A tabela que os
 clientes veem está em `knowledge/catalog.json`, o catálogo da própria
-Rizzato Tech, usado no teste em produção. Aqui ficam as premissas e as
-margens, para revisar quando houver dados reais de uso.
+Rizzato Tech — **ainda com os valores antigos** (349/649/1.190); esta
+revisão fica em proposta até você aprovar e rodar a seção "Como ativar em
+produção" mais abaixo.
 
-Os preços são uma **proposta**, montada com o custo medido em 09/10/2026.
-Precisam da sua aprovação antes de ir ao ar, e de revisão depois de algumas
-semanas de `npm run usage:report` com clientes reais.
+Os preços de 09/10/2026 (primeira versão deste documento) foram repreçados
+em 13/10/2026 depois de uma pesquisa de mercado (concorrentes reais, não só
+uma tabela genérica de "nível de projeto") — ver a seção "Por que
+repreçar" abaixo pro raciocínio completo. Precisam da sua aprovação antes
+de ir ao ar, e de revisão depois de algumas semanas de `npm run usage:report`
+com clientes reais.
 
-## Tabela proposta
+## Tabela proposta (13/10/2026)
 
 | | Essencial | Profissional | Completo |
 |---|---|---|---|
 | O que inclui | Atendimento | Atendimento + 1 capacidade (Agenda, Pedidos ou Vendas) | Atendimento + as 3 capacidades |
 | Canais | 1 (WhatsApp ou Telegram) + chat do site | WhatsApp + Telegram + chat do site | idem |
-| Mensalidade | R$ 349,00 | R$ 649,00 | R$ 1.190,00 |
+| Mensalidade | ~~R$ 349,00~~ **R$ 429,00** | ~~R$ 649,00~~ **R$ 890,00** | ~~R$ 1.190,00~~ **R$ 1.690,00** |
 | Franquia | 1.000 conversas/mês | 2.500 | 5.000 |
 | Conversa excedente | R$ 0,25 | R$ 0,20 | R$ 0,15 |
-| Implantação | R$ 990,00 | R$ 1.990,00 | R$ 3.490,00 |
-| Anual (à vista, implantação grátis) | R$ 3.490,00 | R$ 6.490,00 | R$ 11.900,00 |
+| Implantação | ~~R$ 990,00~~ **R$ 1.990,00** | ~~R$ 1.990,00~~ **R$ 3.790,00** | ~~R$ 3.490,00~~ **R$ 5.990,00** |
+| Anual (à vista, implantação grátis) | ~~R$ 3.490,00~~ **R$ 4.290,00** | ~~R$ 6.490,00~~ **R$ 8.900,00** | ~~R$ 11.900,00~~ **R$ 16.900,00** |
 | Ajustes de catálogo/mês | 2 | 4 | 8 + prioridade |
 
-- **Capacidade extra no Profissional:** R$ 300,00/mês.
-- **Hora técnica:** R$ 150,00.
+- **Capacidade extra no Profissional:** R$ 300,00/mês (sem mudança — já
+  estava alinhada ao mercado, ver seção abaixo).
+- **Hora técnica:** R$ 150,00 (sem mudança).
 - **Implantação:**
   - 5% de desconto no Pix, ou 3x sem juros no cartão;
   - **ou** grátis com fidelidade de 12 meses;
@@ -31,6 +36,40 @@ semanas de `npm run usage:report` com clientes reais.
 - **Cancelamento e garantia:**
   - sem fidelidade para quem paga a implantação (aviso de 30 dias);
   - garantia de 30 dias com devolução de 50% da implantação.
+
+## Por que repreçar (pesquisa de mercado, 13/10/2026)
+
+Os preços de 09/10 foram montados só a partir do custo de API + infra —
+nunca comparados contra o que o mercado de verdade cobra pelo mesmo nível
+de tecnologia. A pesquisa (concorrentes brasileiros e internacionais)
+achou um benchmark por **tipo de IA** (mais preciso que "nível de
+projeto"):
+
+| Categoria de IA | Mensalidade de mercado | Implantação de mercado |
+|---|---|---|
+| Bot de regras | R$ 0–150 | R$ 0–2.000 |
+| IA conversacional sem RAG | R$ 150–800 | R$ 1.000–5.000 |
+| **IA generativa com RAG de verdade** ← categoria deste produto | **R$ 200–2.000** | **R$ 2.000–10.000** |
+| Enterprise personalizado | R$ 2.000–15.000 | R$ 10.000–100.000+ |
+
+Comparado a concorrentes reais nessa categoria:
+- **Zaia** (R$ 249/mês) e **GPT Maker** (R$ 147–497/mês): no-code, sem
+  handoff humano real, sem RAG com reranking, sem integração de agenda —
+  e cobravam perto do nosso Essencial antigo.
+- **Zenvia** só libera IA generativa de verdade a partir do plano
+  Specialist, **R$ 600/mês** — abaixo do que nosso Completo antigo (R$
+  1.190) já entregava com 3 capacidades + 3 canais.
+- **Zendesk AI** (R$ 755/agente/mês) e **Intercom Fin AI** (~R$ 5.300 pra
+  1.000 resoluções/mês) são o teto internacional usado como referência por
+  agências brasileiras.
+
+**Diagnóstico:** a mensalidade de 09/10 já estava na faixa certa pra
+categoria, só no piso baixo. A **implantação estava fora da faixa de
+mercado** — R$ 990–3.490 contra um piso de R$ 2.000 pra "IA generativa com
+RAG", a mesma categoria técnica dos concorrentes citados acima. O produto
+entrega handoff humano com relay em tempo real, integração real de agenda
+e camadas de segurança contra abuso que nenhum concorrente no-code citado
+tem — a implantação precisava refletir isso.
 
 ## Por que esses números (vantajoso para você, acessível para o cliente)
 
@@ -48,23 +87,27 @@ sozinho e usando 100% da franquia):
 
 | | Receita | API (franquia × R$ 0,07) | Infra | Margem |
 |---|---|---|---|---|
-| Essencial | R$ 349 | R$ 70 | R$ 86 | **~55%** |
-| Profissional | R$ 649 | R$ 175 | R$ 86 | **~60%** |
-| Completo | R$ 1.190 | R$ 350 | R$ 86 | **~63%** |
+| Essencial | R$ 429 | R$ 70 | R$ 86 | **~64%** |
+| Profissional | R$ 890 | R$ 175 | R$ 86 | **~71%** |
+| Completo | R$ 1.690 | R$ 350 | R$ 86 | **~74%** |
 
 **Uso típico.** Um cliente costuma usar bem menos que a franquia, e a VM é
-dividida entre vários clientes. Nesse caso, a margem passa de 75%. O
+dividida entre vários clientes. Nesse caso, a margem passa de 80%. O
 excedente custa de 2x a 3,5x o custo da conversa (R$ 0,15–0,25 contra R$
 0,07), então uso alto nunca dá prejuízo.
 
-**Implantação.** Ela paga o seu tempo de mapeamento a R$ 150/h:
-- Essencial: ~6,5h;
-- Profissional: ~13h;
-- Completo: ~23h.
+**Implantação.** Ela paga o seu tempo de mapeamento a R$ 150/h — os
+números de 09/10 (6,5h/13h/23h) subestimavam o esforço real de entregar
+RAG configurado, canais testados, segurança e (quando aplicável) a
+capacidade extra funcionando de ponta a ponta. Horas revisadas pra bater
+com o escopo de verdade:
+- Essencial: ~13h;
+- Profissional: ~25h;
+- Completo: ~40h.
 
 **Acessibilidade.** Três mecanismos tiram a barreira de entrada:
-- **Implantação grátis com fidelidade:** para você, troca R$ 990 agora por
-  pelo menos R$ 4.188 garantidos em 12 meses.
+- **Implantação grátis com fidelidade:** para você, troca R$ 1.990 agora
+  por pelo menos R$ 5.148 garantidos em 12 meses (Essencial).
 - **Plano anual:** você recebe o ano adiantado.
 - **Garantia de 30 dias:** o risco para você fica limitado a metade da
   implantação.
@@ -148,13 +191,19 @@ oferta falsa. Depois de mudar o catálogo:
 
 ## Como ativar em produção (com a VM ligada)
 
+**Nota (13/10/2026):** os passos 2 e 3 já tinham sido feitos pra versão de
+09/10 — conferido direto na VM, `agent.config.json` já está com
+`"businessName": "Rizzato Tech"` e `"knowledgeBasePath": "./knowledge/catalog.json"`.
+O que falta pra esta repreçificação é só atualizar os VALORES dentro de
+`knowledge/catalog.json` (passo 1) e reindexar (passo 3) — os passos 2 e 4
+não precisam repetir.
+
 1. **Publicar o arquivo:** o push leva o `knowledge/catalog.json` junto. O
    deploy só não sobrescreve o `.env` e o `agent.config.json`.
 2. **Ajustar o `agent.config.json` da VM** (pela tela via túnel SSH, ou à
-   mão):
+   mão) — já feito, confirmar que continua assim:
    - `"knowledgeBasePath": "./knowledge/catalog.json"`;
-   - `"businessName": "Rizzato Tech"` (hoje está "Rizzato Systems", e o site
-     usa "Rizzato Tech");
+   - `"businessName": "Rizzato Tech"`;
    - tom de voz sugerido: `["cordial", "claro", "consultivo", "sem jargão técnico"]`
      (usado no teste).
 3. **Indexar:** na VM, `cd ~/agente-atendimento && npm run ingest`. Isso
